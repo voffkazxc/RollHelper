@@ -1,0 +1,80 @@
+=== test_iiko.py ===
+Python: 3.13.12 (tags/v3.13.12:1cbe481, Feb  3 2026, 18:22:25) [MSC v.1944 64 bit (AMD64)]
+
+uiautomation: OK (v?)
+
+--- Вікна на робочому столі ---
+  [Shell_TrayWnd]  "Панель задач"
+  [MetroWindow]  "EveryLang PRO"
+  [CASCADIA_HOSTING_WINDOW_CLASS]  "Windows PowerShell"
+  [Chrome_WidgetWin_1]  "Claude"
+  [Chrome_WidgetWin_1]  "Таємний візит Абрамовича / Мир до листопада? / Федоров під з"
+  [Chrome_WidgetWin_1]  "UI патерни для продукту"
+  [WindowsForms10.Window.8.app.0.13e2e7e_r6]  "КЦ - Syrve Office 2025"
+  [CabinetWClass]  "server — проводник"
+  [Chrome_WidgetWin_1]  "CRM — Картка клієнта і ще 4 сторінки – Р-Хаус: Microsoft​ Ed"
+  [class MainWindow]  "‎Кристина @ ‎Владимир (1563)"
+  [Chrome_WidgetWin_1]  "База знаний — Колл-центр Roll Club – Р-Клаб: Microsoft​ Edge"
+  [MozillaWindowClass]  "Входящие - info@roll-chuguev.com.ua - Mozilla Thunderbird"
+  [Notepad]  "Текстовый документ.txt — Блокнот"
+  [Chrome_WidgetWin_1]  "SteelSeries GG"
+  [SDL_app]  "Специальные предложения"
+  [SDL_app]  "Steam"
+  [Chrome_WidgetWin_1]  "Візіком карти - вул. Березнева (8 Березня), 2 — Візіком карт"
+  [Chrome_WidgetWin_1]  "Razer Synapse"
+  [CASCADIA_HOSTING_WINDOW_CLASS]  "C:\WINDOWS\system32\cmd.exe"
+  [FencesCustomScrollbar]  ""
+  [FencesCustomScrollbar]  ""
+  [Progman]  "Program Manager"
+
+Знайдено WinForms вікон: 1
+
+--- Пошук DeliveryOrderEditControl ---
+  Знайдено в: "КЦ - Syrve Office 2025"
+  AutomationId: DeliveryOrderEditControl
+  ClassName:    WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1
+
+--- Читання полів ---
+  Телефон                        "+38 099 547-20-86"
+    AutoId=lookUpEditCustomerPhone  HWND=135566  InnerEDIT=201100  ValuePattern=True
+  Коментар замовлення            "Тип оплати: Готівкою
+Замовлення №650062
+м. Мереф"
+    AutoId=memoEditDeliveryComment  HWND=135554  InnerEDIT=135542  ValuePattern=True
+  Коментар клієнта               "+380995472086 
+07.12.25 опоздание___ПЕПСИ на след"
+    AutoId=memoEditCustomerComment  HWND=135568  InnerEDIT=201098  ValuePattern=True
+  Номер картки                   ""
+    AutoId=textEditCustomerCardNumber  HWND=135558  InnerEDIT=135556  ValuePattern=True
+  Адреса (комент)                ""
+    AutoId=memoEditDeliveryAddressComment  HWND=2626116  InnerEDIT=266806  ValuePattern=True
+  Вулиця                         "вулиця Харківська"
+    AutoId=gridLookUpEditStreetAddress  HWND=332274  InnerEDIT=1905298  ValuePattern=True
+  Час доставки                   "17:15"
+    AutoId=timeEditDeliveryTime  HWND=1315240  InnerEDIT=13764456  ValuePattern=True
+  Ім'я клієнта                   "Вікторія"
+    AutoId=textEditName  HWND=135550  InnerEDIT=135546  ValuePattern=True
+  Сума замовлення                "1 125,00 грн."
+    AutoId=labelOrderSum  HWND=135626  InnerEDIT=0  ValuePattern=False
+  Таблиця страв                  ""
+    AutoId=treeListItems  HWND=135600  InnerEDIT=0  ValuePattern=False
+
+--- Тест SetFocus (фокусуємо кожне поле) ---
+  Телефон                        SetFocus OK
+  Коментар замовлення            SetFocus OK
+  Коментар клієнта               SetFocus OK
+  Номер картки                   SetFocus OK
+  Адреса (комент)                SetFocus OK
+
+--- Тест читання коментаря через SetFocus + keyboard ---
+  win32clipboard: OK
+  Результат clipboard: "Тип оплати: Готівкою
+Замовлення №650062
+м. Мерефа, , дім - 6, під. -, кв. - 
+"
+  ✅ ЧИТАННЯ ЧЕРЕЗ SendKeys ПРАЦЮЄ!
+
+--- Тест SetValue (записуємо "_TEST_" в коментар і одразу стираємо) ---
+  ✅ SetValue ПРАЦЮЄ!
+
+=== ГОТОВО ===

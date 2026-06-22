@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Чек — RollHouse PRO</title>
+<style>
+/* ── Screen styles ── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Courier New', Courier, monospace;
+  background: #0a0a14;
+  color: #d0d0e0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px;
+  min-height: 100vh;
+}
+
+.screen-btns {
+  display: flex; gap: 10px; margin-bottom: 20px;
+}
+.btn-print {
+  padding: 8px 20px; background: #1a2055; border: 1px solid #4466cc;
+  border-radius: 8px; color: #88aaff; font-size: 14px; font-weight: 700;
+  cursor: pointer; font-family: inherit;
+}
+.btn-print:hover { background: #2a3080; }
+.btn-close {
+  padding: 8px 20px; background: none; border: 1px solid #252545;
+  border-radius: 8px; color: #5566aa; font-size: 14px;
+  cursor: pointer; font-family: inherit;
+}
+.btn-close:hover { border-color: #5566aa; color: #88aaff; }
+
+.receipt-wrap {
+  background: #fff;
+  color: #111;
+  width: 80mm;
+  padding: 0;
+  border-radius: 4px;
+  box-shadow: 0 4px 24px rgba(0,0,0,.5);
+  overflow: hidden;
+}
+
+/* ── Receipt layout ── */
+.ticket {
+  padding: 12px 14px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.ticket + .ticket {
+  border-top: 1px dashed #bbb;
+  padding-top: 10px;
+  margin-top: 0;
+}
+
+.ticket-header {
+  text-align: center;
+  margin-bottom: 10px;
+}
+.ticket-logo {
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  display: block;
+}
+.ticket-sub {
+  font-size: 10px;
+  color: #666;
+}
+.ticket-order-num {
+  font-size: 22px;
+  font-weight: 900;
+  display: block;
+  margin: 4px 0 2px;
+}
+.ticket-datetime {
+  font-size: 10px;
+  color: #555;
+}
+
+.sep {
+  border: none;
+  border-top: 1px solid #ccc;
+  margin: 8px 0;
+}
+.sep-dashed {
+  border-top-style: dashed;
+  border-color: #bbb;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 2px 0;
+}
+.label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  color: #888;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.val { font-size: 11px; }
+.val-lg {
+  font-size: 14px;
+  font-weight: 900;
+}
+.val-phone { font-size: 12px; font-weight: 700; letter-spacing: .5px; }
+
+.items-block {
+  background: #f5f5f5;
+  border-radius: 3px;
+  padding: 6px 8px;
+  margin: 4px 0;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.comment-block {
+  background: #fff3cd;
+  border-left: 2px solid #ffc107;
+  padding: 4px 8px;
+  margin: 4px 0;
+  font-size: 10px;
+  font-style: italic;
+}
+
+.badge-pay {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  border: 1px solid currentColor;
+}
+.pay-cash   { color: #2a7a2a; }
+.pay-card   { color: #2255bb; }
+.pay-online { color: #7722aa; }
+
+.footer-note {
+  text-align: center;
+  font-size: 9px;
+  color: #aaa;
+  margin-top: 6px;
+}
+
+/* ── Status badge ── */
+.status-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* ── Print styles ── */
+@media print {
+  body {
+    background: #fff;
+    padding: 0;
+    display: block;
+  }
+  .screen-btns { display: none !important; }
+  .receipt-wrap {
+    width: 80mm;
+    box-shadow: none;
+    border-radius: 0;
+    margin: 0 auto;
+  }
+  @page {
+    size: 80mm auto;
+    margin: 4mm;
+  }
+}
+
+/* ── Loading / error ── */
+#loadingMsg {
+  color: #5566aa;
+  font-size: 14px;
+  font-family: 'Segoe UI', sans-serif;
+  margin: 40px;
+}
+</style>
+</head>
+<body>
+
+<div id="loadingMsg">Завантаження...</div>
+
+<div class="screen-btns" id="screenBtns" style="display:none">
+  <button class="btn-print" onclick="window.print()">🖨️ Друкувати</button>
+  <button class="btn-close" onclick="window.close()">✕ Закрити</button>
+</div>
+
+<div class="receipt-wrap" id="receiptWrap" style="display:none">
+
+  <!-- KITCHEN TICKET -->
+  <div class="ticket" id="kitchenTicket">
+    <div class="ticket-header">
+      <span class="ticket-logo">🍣 КУХНЯ</span>
+    </div>
+    <div class="label">Замовлення</div>
+    <span class="ticket-order-num" id="kOrderNum">#—</span>
+    <div class="ticket-datetime" id="kDatetime">—</div>
+    <hr class="sep">
+
+    <div class="label">Позиції</div>
+    <div class="items-block" id="kItems">—</div>
+
+    <div id="kCommentWrap" style="display:none">
+      <div class="label">Коментар</div>
+      <div class="comment-block" id="kComment"></div>
+    </div>
+
+    <div id="kGiftWrap" style="display:none">
+      <hr class="sep sep-dashed">
+      <div class="label">🎁 Подарунок</div>
+      <div class="val" id="kGift"></div>
+    </div>
+
+    <hr class="sep">
+    <div class="row">
+      <div>
+        <div class="label">Тип</div>
+        <div class="val" id="kDeliveryType">—</div>
+      </div>
+      <div style="text-align:right">
+        <div class="label">Час готовності</div>
+        <div class="val" id="kReadyTime">—</div>
+      </div>
+    </div>
+    <div class="footer-note">— відрізати —</div>
+  </div>
+
+  <!-- DELIVERY SLIP -->
+  <div class="ticket" id="deliverySlip">
+    <div class="ticket-header">
+      <span class="ticket-logo">🛵 ДОСТАВКА</span>
+    </div>
+    <span class="ticket-order-num" id="dOrderNum">#—</span>
+    <div class="ticket-datetime" id="dDatetime">—</div>
+    <hr class="sep">
+
+    <div class="label">Клієнт</div>
+    <div class="val" id="dName" style="font-weight:700">—</div>
+    <div class="val-phone" id="dPhone">—</div>
+
+    <div id="dAddressWrap">
+      <hr class="sep sep-dashed">
+      <div class="label">Адреса</div>
+      <div class="val" id="dCity" style="font-weight:700"></div>
+      <div class="val" id="dAddress"></div>
+    </div>
+
+    <div id="dCourierWrap" style="display:none">
+      <hr class="sep sep-dashed">
+      <div class="label">Кур'єр</div>
+      <div class="val" id="dCourier"></div>
+    </div>
+
+    <hr class="sep">
+    <div class="row" style="align-items:flex-end">
+      <div>
+        <div class="label">Сума</div>
+        <div class="val-lg" id="dAmount">—</div>
+      </div>
+      <div style="text-align:right">
+        <div class="label">Оплата</div>
+        <div id="dPayBadge"></div>
+      </div>
+    </div>
+
+    <div id="dSlipCommentWrap" style="display:none;margin-top:6px">
+      <div class="label">Коментар</div>
+      <div class="comment-block" id="dSlipComment"></div>
+    </div>
+
+    <div class="footer-note" style="margin-top:10px">RollHouse PRO · rollhouse.delivery</div>
+  </div>
+
+</div>
+
+<script>
+const PAY_LABELS = { cash: 'Готівка', card: 'Картка', online: 'Online' };
+const PAY_CLASS  = { cash: 'pay-cash', card: 'pay-card', online: 'pay-online' };
+const DELIVERY_LABELS = { delivery: 'Доставка', pickup: 'Самовивіз' };
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function fmtDatetime(s) {
+  if (!s) return '—';
+  // "2026-06-14 13:35:00" → "14.06.2026 · 13:35"
+  const parts = s.split(' ');
+  const dateParts = (parts[0] || '').split('-');
+  const time = (parts[1] || '').slice(0, 5);
+  if (dateParts.length === 3) {
+    return dateParts[2] + '.' + dateParts[1] + '.' + dateParts[0] + ' · ' + time;
+  }
+  return s;
+}
+
+async function loadReceipt() {
+  const params = new URLSearchParams(window.location.search);
+  const orderId = params.get('order_id') || params.get('id');
+  if (!orderId) {
+    document.getElementById('loadingMsg').textContent = 'Вкажіть ?order_id=N в URL';
+    return;
+  }
+
+  try {
+    // Fetch order
+    const r = await fetch('/api/order/' + orderId);
+    const data = await r.json();
+    if (!data.ok || !data.order) {
+      document.getElementById('loadingMsg').textContent = 'Замовлення #' + orderId + ' не знайдено';
+      return;
+    }
+    const o = data.order;
+
+    // Fetch customer name
+    let customerName = '';
+    if (o.phone) {
+      try {
+        const cr = await fetch('/api/customer/' + encodeURIComponent(o.phone));
+        const cd = await cr.json();
+        if (cd.exists && cd.name) customerName = cd.name;
+      } catch(e) {}
+    }
+
+    // Fetch courier name
+    let courierName = '';
+    if (o.courier_id) {
+      try {
+        const cur = await fetch('/api/couriers');
+        const cuList = await cur.json();
+        const list = Array.isArray(cuList) ? cuList : (cuList.items || []);
+        const found = list.find(c => c.id === o.courier_id);
+        if (found) courierName = found.name;
+      } catch(e) {}
+    }
+
+    renderReceipt(o, customerName, courierName);
+  } catch(e) {
+    document.getElementById('loadingMsg').textContent = 'Помилка: ' + e.message;
+  }
+}
+
+function renderReceipt(o, customerName, courierName) {
+  const orderNum = '#' + o.id;
+  const datetime = fmtDatetime(o.created_at);
+
+  // Kitchen ticket
+  document.getElementById('kOrderNum').textContent  = orderNum;
+  document.getElementById('kDatetime').textContent  = datetime;
+  document.getElementById('kItems').textContent     = o.items || '—';
+  if (o.comment) {
+    document.getElementById('kComment').textContent   = o.comment;
+    document.getElementById('kCommentWrap').style.display = '';
+  }
+  if (o.gift) {
+    document.getElementById('kGift').textContent     = o.gift;
+    document.getElementById('kGiftWrap').style.display = '';
+  }
+  document.getElementById('kDeliveryType').textContent = DELIVERY_LABELS[o.delivery_type] || o.delivery_type || '—';
+  document.getElementById('kReadyTime').textContent    = o.ready_time || '—';
+
+  // Delivery slip
+  document.getElementById('dOrderNum').textContent  = orderNum;
+  document.getElementById('dDatetime').textContent  = datetime;
+  document.getElementById('dName').textContent      = customerName || '—';
+  document.getElementById('dPhone').textContent     = o.phone || '—';
+
+  if (o.city || o.address) {
+    document.getElementById('dCity').textContent    = o.city || '';
+    document.getElementById('dAddress').textContent = o.address || '';
+  } else {
+    document.getElementById('dAddressWrap').style.display = 'none';
+  }
+
+  if (courierName) {
+    document.getElementById('dCourier').textContent       = courierName;
+    document.getElementById('dCourierWrap').style.display = '';
+  }
+
+  document.getElementById('dAmount').textContent = (o.amount || 0) + ' грн';
+
+  const payKey = o.payment_type || 'cash';
+  const badge = document.getElementById('dPayBadge');
+  badge.className   = 'badge-pay ' + (PAY_CLASS[payKey] || '');
+  badge.textContent = PAY_LABELS[payKey] || payKey;
+
+  if (o.comment) {
+    document.getElementById('dSlipComment').textContent       = o.comment;
+    document.getElementById('dSlipCommentWrap').style.display = '';
+  }
+
+  // Hide delivery section for pickup orders
+  if (o.delivery_type === 'pickup') {
+    document.getElementById('dAddressWrap').style.display  = 'none';
+    document.getElementById('dCourierWrap').style.display  = 'none';
+  }
+
+  document.getElementById('loadingMsg').style.display  = 'none';
+  document.getElementById('receiptWrap').style.display = '';
+  document.getElementById('screenBtns').style.display  = 'flex';
+
+  // Auto-print if ?print=1
+  if (new URLSearchParams(window.location.search).get('print') === '1') {
+    setTimeout(() => window.print(), 400);
+  }
+}
+
+loadReceipt();
+</script>
+</body>
+</html>

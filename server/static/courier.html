@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>RollHouse — Кур'єр</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: #0a0a14;
+  color: #d0d0e0;
+  min-height: 100vh;
+}
+
+/* ── Topbar ── */
+.topbar {
+  background: #111120;
+  border-bottom: 1px solid #1e1e38;
+  padding: 0 16px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.topbar .logo {
+  font-size: 15px;
+  font-weight: 800;
+  color: #88aaff;
+  flex: 1;
+}
+.courier-name {
+  font-size: 13px;
+  color: #7788cc;
+  font-weight: 600;
+}
+.topbar .refresh-btn {
+  background: none;
+  border: 1px solid #2a2a50;
+  border-radius: 6px;
+  color: #5566aa;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.topbar .refresh-btn:hover { border-color: #5566aa; color: #88aaff; }
+
+/* ── Login screen ── */
+.login-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 52px);
+  padding: 24px;
+  gap: 20px;
+}
+.login-box {
+  background: #111120;
+  border: 1px solid #1e1e38;
+  border-radius: 14px;
+  padding: 28px 24px;
+  width: 100%;
+  max-width: 340px;
+}
+.login-box h2 {
+  font-size: 17px;
+  font-weight: 700;
+  color: #ccd0ee;
+  margin-bottom: 20px;
+  text-align: center;
+}
+.login-box label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #5566aa;
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+.login-box select,
+.login-box input {
+  width: 100%;
+  background: #0e0e20;
+  border: 1px solid #252545;
+  border-radius: 8px;
+  color: #d0d0e8;
+  font-size: 15px;
+  padding: 10px 13px;
+  outline: none;
+  font-family: 'Segoe UI', sans-serif;
+  margin-bottom: 14px;
+  transition: border-color .15s;
+}
+.login-box select:focus,
+.login-box input:focus { border-color: #4466cc; }
+.login-box input[type="password"] { letter-spacing: 4px; }
+.btn-login {
+  width: 100%;
+  background: #334;
+  border: 1px solid #4455aa;
+  border-radius: 8px;
+  color: #88aaff;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 12px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.btn-login:hover { background: #3a3a6a; }
+.btn-login:disabled { opacity: .5; cursor: default; }
+.login-err {
+  color: #ff6666;
+  font-size: 13px;
+  text-align: center;
+  min-height: 18px;
+}
+
+/* ── Main list ── */
+.main-wrap { padding: 12px; }
+
+.section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #445;
+  font-weight: 700;
+  margin: 16px 0 8px 4px;
+}
+.section-title.active-title { color: #5588ff; }
+.section-title.done-title { color: #44aa66; }
+
+.empty-state {
+  text-align: center;
+  color: #334;
+  font-size: 14px;
+  padding: 40px 20px;
+}
+
+/* ── Order card ── */
+.order-card {
+  background: #111120;
+  border: 1px solid #1e1e38;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  position: relative;
+}
+.order-card.status-cooking { border-left: 3px solid #ffaa44; }
+.order-card.status-on_way  { border-left: 3px solid #55ccff; }
+.order-card.status-confirmed { border-left: 3px solid #5577ff; }
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.order-id {
+  font-size: 11px;
+  color: #445;
+  font-weight: 700;
+}
+.status-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 10px;
+}
+.st-confirmed { background: #1a2066; color: #7799ff; }
+.st-cooking   { background: #3a2200; color: #ffaa44; }
+.st-on_way    { background: #003344; color: #55ccff; }
+.st-delivered { background: #1a3322; color: #55cc88; }
+
+.card-time {
+  font-size: 11px;
+  color: #445;
+  margin-left: auto;
+}
+
+.card-address {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ccd0ee;
+  margin-bottom: 6px;
+  line-height: 1.35;
+}
+.card-customer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.customer-name {
+  font-size: 13px;
+  color: #99aacc;
+}
+.phone-link {
+  font-size: 13px;
+  font-weight: 700;
+  color: #55aaff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.phone-link:hover { color: #88ccff; }
+
+.card-items {
+  font-size: 12px;
+  color: #556;
+  margin-top: 6px;
+  line-height: 1.4;
+}
+.card-comment {
+  font-size: 12px;
+  color: #aa7744;
+  margin-top: 4px;
+  font-style: italic;
+}
+.card-courier-note {
+  font-size: 13px;
+  color: #99dd66;
+  background: #0d1f06;
+  border: 1px solid #2a4a10;
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-top: 7px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.card-ready-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 5px;
+  margin-top: 5px;
+  background: #0d1a30;
+  border: 1px solid #2a3a6a;
+  color: #88aaff;
+}
+.card-ready-time.overdue {
+  background: #2a0505;
+  border-color: #cc2222;
+  color: #ff6666;
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+.order-card.overdue { border-left: 3px solid #cc2222; }
+
+/* ── Action buttons ── */
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.btn-action {
+  flex: 1;
+  padding: 11px 8px;
+  border: none;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s;
+  font-family: 'Segoe UI', sans-serif;
+}
+.btn-action:disabled { opacity: .45; cursor: default; }
+.btn-pickup {
+  background: #2a3a00;
+  color: #aadd44;
+  border: 1px solid #4a6600;
+}
+.btn-pickup:hover:not(:disabled) { background: #3a5000; }
+.btn-deliver {
+  background: #003a22;
+  color: #44dd88;
+  border: 1px solid #00664a;
+}
+.btn-deliver:hover:not(:disabled) { background: #005030; }
+.btn-problem {
+  flex: 0 0 auto;
+  padding: 11px 14px;
+  background: #2a0000;
+  color: #dd5555;
+  border: 1px solid #660000;
+}
+.btn-problem:hover:not(:disabled) { background: #3a0000; }
+
+/* ── Confirm modal ── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.75);
+  display: flex; align-items: flex-end;
+  z-index: 500;
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal-box {
+  background: #13132a;
+  border: 1px solid #2a2a55;
+  border-radius: 18px 18px 0 0;
+  padding: 24px 20px 32px;
+  width: 100%;
+  transform: translateY(100%);
+  transition: transform .25s cubic-bezier(.2,.8,.4,1);
+}
+.modal-overlay.open .modal-box { transform: translateY(0); }
+.modal-box h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ccd0ee;
+  margin-bottom: 8px;
+}
+.modal-box p {
+  font-size: 13px;
+  color: #667;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+.modal-actions {
+  display: flex;
+  gap: 10px;
+}
+.btn-cancel-modal {
+  flex: 1;
+  padding: 12px;
+  background: none;
+  border: 1px solid #2a2a50;
+  border-radius: 9px;
+  color: #5566aa;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-confirm-modal {
+  flex: 1;
+  padding: 12px;
+  background: #003a22;
+  border: 1px solid #00664a;
+  border-radius: 9px;
+  color: #44dd88;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-confirm-modal:disabled { opacity: .4; cursor: default; }
+
+/* ── Toast ── */
+.toast {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: #1a1a38; border: 1px solid #3a3a70;
+  color: #ccd0ee; padding: 10px 20px;
+  border-radius: 20px; font-size: 13px; font-weight: 600;
+  z-index: 999; transition: transform .25s ease;
+  white-space: nowrap; pointer-events: none;
+  box-shadow: 0 4px 20px rgba(0,0,0,.5);
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.err { background: #2a0a0a; border-color: #661111; color: #ff8888; }
+
+/* ── Auto-refresh indicator ── */
+.refresh-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #334;
+  display: inline-block;
+  transition: background .3s;
+}
+.refresh-dot.refreshing { background: #4488ff; animation: pulse .6s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">🛵 RH Кур'єр</div>
+  <span class="courier-name" id="courierNameDisplay">—</span>
+  <span class="refresh-dot" id="refreshDot" title="Auto-refresh"></span>
+  <button id="statusBtn" onclick="cycleStatus()" style="display:none;padding:4px 14px;border-radius:20px;border:1px solid #334;background:none;color:#5566aa;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">⚪ Офлайн</button>
+  <span id="clockEl" style="font-size:13px;font-weight:700;color:#5566aa;letter-spacing:1px;margin-left:auto">—</span>
+  <button class="refresh-btn" onclick="loadOrders()">↻</button>
+</div>
+
+<!-- ── LOGIN SCREEN ── -->
+<div class="login-wrap" id="loginScreen">
+  <div class="login-box">
+    <h2>🔐 Вхід кур'єра</h2>
+    <label>Оберіть кур'єра</label>
+    <select id="courierSelect">
+      <option value="">— завантаження... —</option>
+    </select>
+    <label>PIN-код</label>
+    <input type="password" id="pinInput" inputmode="numeric" maxlength="8" placeholder="••••"
+           onkeydown="if(event.key==='Enter') doLogin()">
+    <div class="login-err" id="loginErr"></div>
+    <button class="btn-login" id="loginBtn" onclick="doLogin()">Увійти</button>
+  </div>
+</div>
+
+<!-- ── MAIN SCREEN ── -->
+<div class="main-wrap" id="mainScreen" style="display:none">
+  <div id="activeSection">
+    <div class="section-title active-title">📦 Активні доставки</div>
+    <div id="activeList"><div class="empty-state">Завантаження...</div></div>
+  </div>
+</div>
+
+<!-- ── CONFIRM MODAL ── -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal-box">
+    <h3 id="modalTitle">Підтвердити дію?</h3>
+    <p id="modalText"></p>
+    <div class="modal-actions">
+      <button class="btn-cancel-modal" onclick="closeModal()">Скасувати</button>
+      <button class="btn-confirm-modal" id="modalConfirmBtn" onclick="confirmAction()">Підтвердити</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST ── -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ─────────────────────────────────────────
+   STATE
+───────────────────────────────────────── */
+let _courierId   = null;
+let _courierName = '';
+let _orders      = [];
+let _refreshTimer = null;
+let _pendingAction = null; // { orderId, newStatus }
+
+const STATUS_LABELS = {
+  confirmed: 'Підтверджено',
+  cooking:   'Готується',
+  on_way:    'У дорозі',
+  delivered: 'Виконано',
+};
+
+/* ─────────────────────────────────────────
+   INIT
+───────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', async () => {
+  // Restore session
+  const saved = sessionStorage.getItem('rh_courier');
+  if (saved) {
+    try {
+      const s = JSON.parse(saved);
+      _courierId   = s.id;
+      _courierName = s.name;
+      showMain();
+      return;
+    } catch {}
+  }
+  // Load courier list for login
+  await loadCourierList();
+});
+
+async function loadCourierList() {
+  try {
+    const r = await fetch('/api/couriers?active=1&role=courier');
+    const d = await r.json();
+    const sel = document.getElementById('courierSelect');
+    sel.innerHTML = '<option value="">— оберіть —</option>';
+    (d || []).forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id;
+      o.textContent = c.name;
+      sel.appendChild(o);
+    });
+  } catch {
+    showToast('Не вдалося завантажити список кур\'єрів', 'err');
+  }
+}
+
+/* ─────────────────────────────────────────
+   LOGIN
+───────────────────────────────────────── */
+async function doLogin() {
+  const sel  = document.getElementById('courierSelect');
+  const pin  = document.getElementById('pinInput').value.trim();
+  const err  = document.getElementById('loginErr');
+  const btn  = document.getElementById('loginBtn');
+  err.textContent = '';
+
+  const courierId = parseInt(sel.value);
+  if (!courierId) { err.textContent = 'Оберіть кур\'єра'; return; }
+  if (!pin)       { err.textContent = 'Введіть PIN';     return; }
+
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  try {
+    const r = await fetch('/api/auth/verify', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ pin })
+    });
+    const d = await r.json();
+    if (!d.ok) {
+      err.textContent = d.error || 'Невірний PIN';
+      return;
+    }
+    // Get courier name
+    const sel2 = document.getElementById('courierSelect');
+    _courierName = sel2.options[sel2.selectedIndex].textContent;
+    _courierId   = courierId;
+    sessionStorage.setItem('rh_courier', JSON.stringify({ id: _courierId, name: _courierName }));
+    showMain();
+  } catch {
+    err.textContent = 'Сервер недоступний';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Увійти';
+  }
+}
+
+// ── Live clock ────────────────────────────────────────────────────
+function _tickClock() {
+  const el = document.getElementById('clockEl');
+  if (!el) return;
+  const now = new Date();
+  const hh  = String(now.getHours()).padStart(2, '0');
+  const mm  = String(now.getMinutes()).padStart(2, '0');
+  el.textContent = hh + ':' + mm;
+}
+_tickClock();
+setInterval(_tickClock, 10_000);
+
+let _courierStatus = 'offline';
+
+const STATUS_STYLE = {
+  online:  { label: '🟢 Онлайн',  border: '#33aa66', color: '#66dd99' },
+  busy:    { label: '🟡 Зайнятий', border: '#aa8800', color: '#ffcc55' },
+  offline: { label: '⚪ Офлайн',   border: '#334',     color: '#5566aa' },
+};
+const STATUS_CYCLE = { online: 'busy', busy: 'offline', offline: 'online' };
+
+function updateStatusBtn(s) {
+  _courierStatus = s;
+  const btn = document.getElementById('statusBtn');
+  const st  = STATUS_STYLE[s] || STATUS_STYLE.offline;
+  btn.textContent   = st.label;
+  btn.style.borderColor = st.border;
+  btn.style.color       = st.color;
+  btn.style.display     = 'inline-block';
+}
+
+async function cycleStatus() {
+  const next = STATUS_CYCLE[_courierStatus] || 'online';
+  try {
+    const r = await fetch(`/api/courier/${_courierId}/status`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ status: next })
+    });
+    const d = await r.json();
+    if (d.ok) { updateStatusBtn(next); showToast('Статус: ' + STATUS_STYLE[next].label.replace(/\p{Emoji}/u, '').trim()); }
+    else showToast(d.error || 'Помилка', 'err');
+  } catch { showToast('Помилка мережі', 'err'); }
+}
+
+function showMain() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('mainScreen').style.display  = 'block';
+  document.getElementById('courierNameDisplay').textContent = _courierName;
+  updateStatusBtn('online');   // Стає онлайн при вході
+  fetch(`/api/courier/${_courierId}/status`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ status: 'online' })
+  }).catch(() => {});
+  loadOrders();
+  startAutoRefresh();
+}
+
+/* ─────────────────────────────────────────
+   ORDERS
+───────────────────────────────────────── */
+async function loadOrders() {
+  const dot = document.getElementById('refreshDot');
+  dot.className = 'refresh-dot refreshing';
+  try {
+    const r = await fetch(`/api/courier/${_courierId}/orders`);
+    const d = await r.json();
+    _orders = d.items || [];
+    renderOrders();
+  } catch {
+    showToast('Помилка завантаження', 'err');
+  } finally {
+    dot.className = 'refresh-dot';
+  }
+}
+
+function startAutoRefresh() {
+  clearInterval(_refreshTimer);
+  _refreshTimer = setInterval(loadOrders, 60_000);
+}
+
+function renderOrders() {
+  const active = _orders.filter(o => ['confirmed','cooking','on_way'].includes(o.status));
+  const el = document.getElementById('activeList');
+
+  if (!active.length) {
+    el.innerHTML = '<div class="empty-state">Активних замовлень немає 🎉</div>';
+    return;
+  }
+  el.innerHTML = active.map(o => orderCardHTML(o)).join('');
+}
+
+function isOverdue(ready_time) {
+  if (!ready_time) return false;
+  const now = new Date();
+  const [hh, mm] = ready_time.split(':').map(Number);
+  if (isNaN(hh) || isNaN(mm)) return false;
+  const due = new Date(now);
+  due.setHours(hh, mm, 0, 0);
+  return now > due;
+}
+
+function orderCardHTML(o) {
+  const st   = o.status;
+  const stL  = STATUS_LABELS[st] || st;
+  const time = o.order_date ? o.order_date.slice(11, 16) : '';
+  const phone = (o.customer_phone || '').replace(/^380/, '0');
+  const phoneFmt = phone.length === 10
+    ? `(${phone.slice(0,3)}) ${phone.slice(3,6)}-${phone.slice(6,8)}-${phone.slice(8)}`
+    : phone;
+
+  const overdue = o.ready_time && isOverdue(o.ready_time);
+  const readyBlock = o.ready_time
+    ? `<div class="card-ready-time${overdue ? ' overdue' : ''}">⏱ ${overdue ? '⚠️ ' : ''}${esc(o.ready_time)}</div>`
+    : '';
+
+  const actions = buildActions(o);
+
+  return `
+<div class="order-card status-${st}${overdue ? ' overdue' : ''}" id="card-${o.id}">
+  <div class="card-header">
+    <span class="order-id">#${o.id}</span>
+    <span class="status-badge st-${st}">${stL}</span>
+    <span class="card-time">${time}</span>
+  </div>
+  <div class="card-address">📍 ${esc(o.address || '—')}</div>
+  ${readyBlock}
+  <div class="card-customer">
+    <span class="customer-name">${esc(o.customer_name || '')}</span>
+    ${phone ? `<a class="phone-link" href="tel:${o.customer_phone}">📞 ${phoneFmt}</a>` : ''}
+  </div>
+  ${o.courier_note ? `<div class="card-courier-note">📋 ${esc(o.courier_note)}</div>` : ''}
+  ${o.items   ? `<div class="card-items">🛍 ${esc(o.items)}</div>` : ''}
+  ${o.comment ? `<div class="card-comment">💬 ${esc(o.comment)}</div>` : ''}
+  <div class="card-actions">${actions}</div>
+</div>`;
+}
+
+function buildActions(o) {
+  const id = o.id;
+  if (o.status === 'confirmed' || o.status === 'cooking') {
+    return `
+      <button class="btn-action btn-pickup" onclick="askAction(${id},'on_way','🚴 Взяв замовлення','Підтвердити що взяв замовлення #${id} і виїжджаєш до клієнта?')">
+        🚴 Взяв
+      </button>
+      <button class="btn-action btn-problem" onclick="reportProblem(${id})">❗</button>`;
+  }
+  if (o.status === 'on_way') {
+    return `
+      <button class="btn-action btn-deliver" onclick="askAction(${id},'delivered','✅ Виконано','Підтвердити доставку замовлення #${id}?')">
+        ✅ Виконано
+      </button>
+      <button class="btn-action btn-problem" onclick="reportProblem(${id})">❗</button>`;
+  }
+  return '';
+}
+
+function reportProblem(orderId) {
+  // Phase 5: Telegram-сповіщення. Поки — toast з телефоном менеджера.
+  showToast(`❗ Зателефонуйте менеджеру про #${orderId}`, 'err');
+}
+
+/* ─────────────────────────────────────────
+   ACTIONS
+───────────────────────────────────────── */
+function askAction(orderId, newStatus, title, text) {
+  _pendingAction = { orderId, newStatus };
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalText').textContent  = text;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modalOverlay')) return;
+  document.getElementById('modalOverlay').classList.remove('open');
+  _pendingAction = null;
+}
+
+async function confirmAction() {
+  if (!_pendingAction) return;
+  const { orderId, newStatus } = _pendingAction;
+  document.getElementById('modalOverlay').classList.remove('open');
+
+  const btn = document.querySelector(`#card-${orderId} .btn-action`);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+
+  try {
+    const r = await fetch(`/api/order/${orderId}/status`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        status:     newStatus,
+        actor_id:   _courierId,
+        actor_role: 'courier'
+      })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showToast(newStatus === 'delivered' ? '✅ Доставлено!' : '🚴 Статус оновлено');
+      await loadOrders();
+    } else {
+      showToast('🚫 ' + (d.error || 'Помилка'), 'err');
+      if (btn) { btn.disabled = false; btn.textContent = newStatus === 'delivered' ? '✅ Виконано' : '🚴 Взяв'; }
+    }
+  } catch {
+    showToast('Сервер недоступний', 'err');
+    if (btn) { btn.disabled = false; }
+  }
+  _pendingAction = null;
+}
+
+/* ─────────────────────────────────────────
+   HELPERS
+───────────────────────────────────────── */
+let _toastTimer;
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (type === 'err' ? ' err' : '') + ' show';
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { t.classList.remove('show'); }, 3000);
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>

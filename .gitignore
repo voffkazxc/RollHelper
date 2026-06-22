@@ -1,0 +1,5 @@
+*.log
+_archive/
+data/*.db
+__pycache__/
+server/__pycache__/

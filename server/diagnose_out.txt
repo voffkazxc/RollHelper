@@ -1,0 +1,316 @@
+=== DIAGNOSE IIKO UIA ===
+Час: 20:12:21
+
+WinForms вікно: "КЦ - Syrve Office 2025" [WindowsForms10.Window.8.app.0.13e2e7e_r6]
+
+DeliveryOrderEditControl знайдено в "КЦ - Syrve Office 2025"
+
+=== ДЕРЕВО КОНТРОЛІВ (глибина 8) ===
+[DeliveryOrderEditControl] Name="" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=200202
+  [panelOrder] Name="panelOrder" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134990
+    [splitContainerDeliveryDataItemsPaymentHistoryPreferred] Name="splitContainerDeliveryDataItemsPaymentHistoryPrefe" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134904
+      [134906] Name="" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134906
+        [layoutControl2] Name="The XtraLayoutControl" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134972
+          [loyaltySuggestionsGroupBox] Name="loyaltySuggestionsGroupBox" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134988
+            [dynamicIikoCard5Panel] Name="" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134986
+              [suggestionsTreeList] Name="" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134978
+                [?] Name="Панель заголовка" Cls="" Val="" hwnd=0
+                [?] Name="Панель данных" Cls="" Val="" hwnd=0
+              [134976] Name="Подсказок нет" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134976
+            [comboListButton] Name="Комбо" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134980
+          [groupDelivery] Name="groupDelivery" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134908
+            [layoutControlDelivery] Name="The XtraLayoutControl" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134932
+              [buttonAssignDeliveryTerminal] Name="Найти точку" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134968
+              [buttonDeliveryRegionsMap] Name="Карта" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134966
+              *[gridLookUpEditStreetAddress] Name="" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134964
+                [134962] Name="" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="" hwnd=134962
+                [?] Name="" Cls="" Val="" hwnd=0
+                [?] Name="Открыть" Cls="" Val="" hwnd=0
+              [restoCompletionRegion] Name="" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134960
+                [134958] Name="" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="" hwnd=134958
+                [?] Name="" Cls="" Val="" hwnd=0
+                [?] Name="Открыть" Cls="" Val="" hwnd=0
+              [textEditDeliveryBuilding] Name="" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134952
+                [134950] Name="" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="" hwnd=134950
+                [?] Name="" Cls="" Val="" hwnd=0
+              *[memoEditDeliveryAddressComment] Name="" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134948
+                [134944] Name="Полоса прокрутки" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134944
+                [134946] Name="" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="" hwnd=134946
+                [?] Name="" Cls="" Val="" hwnd=0
+              [textEditDeliveryFlat] Name="" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134942
+                [134940] Name="" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="" hwnd=134940
+                [?] Name="" Cls="" Val="" hwnd=0
+              [textEditDeliveryEntrance] Name="" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134938
+                [134936] Name="" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="" hwnd=134936
+                [?] Name="" Cls="" Val="" hwnd=0
+              [textEditDeliveryDoorphone] Name="" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134934
+                [134910] Name="" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="" hwnd=134910
+                [?] Name="" Cls="" Val="" hwnd=0
+              *[textEditDeliveryHouse] Name="-" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="-" hwnd=134924
+                [134922] Name="-" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="-" hwnd=134922
+                [?] Name="-" Cls="" Val="-" hwnd=0
+              [dateEditDeliveryDate] Name="12 июня 2026 г." Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134912
+                [134914] Name="12 июня 2026 г." Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="" hwnd=134914
+                [?] Name="12 июня 2026 г." Cls="" Val="" hwnd=0
+              *[timeEditDeliveryTime] Name="20:58" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="20:58" hwnd=134918
+                [134920] Name="20:58" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="20:58" hwnd=134920
+                [?] Name="20:58" Cls="" Val="20:58" hwnd=0
+                [?] Name="Счётчик" Cls="" Val="" hwnd=0
+              [textEditDeliveryFloor] Name="" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134916
+                [134888] Name="" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="" hwnd=134888
+                [?] Name="" Cls="" Val="" hwnd=0
+              [textEditDeliveryDuration] Name="59" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="59" hwnd=134902
+                [134900] Name="59" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="59" hwnd=134900
+                [?] Name="59" Cls="" Val="59" hwnd=0
+              [?] Name="Root" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemDeliveryTime" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemDeliveryDate" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemStreetAddressName" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemRegion" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemAddressAdditionalInfo" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemDoorphone" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItem26" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemDeliveryDuration" Cls="" Val="" hwnd=0
+                [?] Name="emptySpaceItem16" Cls="" Val="" hwnd=0
+                [?] Name="emptySpaceItem17" Cls="" Val="" hwnd=0
+                [?] Name="emptySpaceItem18" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItem30" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemAddressDetails" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemFlat" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemHouse" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItem1" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemEntrance" Cls="" Val="" hwnd=0
+                [?] Name="emptySpaceItem19" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemFloor" Cls="" Val="" hwnd=0
+                [?] Name="emptySpaceItem20" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemLine1" Cls="" Val="" hwnd=0
+                [?] Name="emptySpaceItem15" Cls="" Val="" hwnd=0
+          [groupPaymentDiscount] Name="groupPaymentDiscount" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134894
+            [layoutControlPaymentsDiscounts] Name="The XtraLayoutControl" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134896
+              [simpleButtonDiscounts] Name="Без скидки" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134886
+              [tableLayoutPanel1] Name="" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134884
+                [labelSubtotal] Name="Подытог:" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134882
+                [labelSumWithoutDiscount] Name="1 099,00 грн." Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134880
+                [labelDiscountType] Name="Скидка:" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134878
+                [labelDiscountSum] Name="0,00 грн." Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134876
+                [labelOrderSumText] Name="К оплате: " Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134874
+                [labelOrderChangeSum] Name="0,00 грн." Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134872
+                [labelOrderChangeSumText] Name="Сдача: " Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134870
+                *[labelOrderSum] Name="1 099,00 грн." Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134868
+              [buttonDeletePaymentItem] Name="X" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134866
+              [gridPaymentItems] Name="" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134864
+                [?] Name="Панель заголовка" Cls="" Val="" hwnd=0
+                [?] Name="Панель данных" Cls="" Val="" hwnd=0
+              [buttonNoChange] Name="Без сдачи" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134858
+              [?] Name="layoutControlGroupPaymentDiscount" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemNoChange" Cls="" Val="" hwnd=0
+                [?] Name="layoutDeliveryPaymentItems" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemRemovePayment" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItem47" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItem49" Cls="" Val="" hwnd=0
+          [groupControlItems] Name="groupControlItems" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134856
+            [layoutControlOrderItems] Name="The XtraLayoutControl" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134854
+              [buttonDeleteItem] Name="X" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134850
+              [buttonModifers] Name="Размеры и модификаторы" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134848
+              [buttonDecrease] Name="-" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134846
+              [buttonIncrease] Name="+" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134844
+              *[treeListItems] Name="" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134842
+                [?] Name="Панель заголовка" Cls="" Val="" hwnd=0
+                [?] Name="Панель данных" Cls="" Val="" hwnd=0
+              [checkEditSplitBetweenPersons] Name="Разбить заказ по персонам" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134836
+              [spinEditPersonsCount] Name="1" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="1" hwnd=134834
+                [134832] Name="1" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="1" hwnd=134832
+                [?] Name="1" Cls="" Val="1" hwnd=0
+                [?] Name="Счётчик" Cls="" Val="" hwnd=0
+              [?] Name="layoutControlGroupPersonsCountSplitBetweenPersons" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemPersonsCount" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemSplitBetweenPersons" Cls="" Val="" hwnd=0
+                [?] Name="emptySpaceItem1" Cls="" Val="" hwnd=0
+                [?] Name="emptySpaceItem3" Cls="" Val="" hwnd=0
+                [?] Name="emptySpaceItem6" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItem28" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemModifiers" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemPlus" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemMinus" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemRemove" Cls="" Val="" hwnd=0
+          [groupControlClient] Name="groupControlClient" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134790
+            [layoutControlDeliveryData] Name="The XtraLayoutControl" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134808
+              [buttonAdditionalInfo] Name="Дополнительная информация" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134826
+              [completionMarketingSource] Name="Не задана" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="Не задана" hwnd=134824
+                [134822] Name="Не задана" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="Не задана" hwnd=134822
+                [?] Name="Не задана" Cls="" Val="Не задана" hwnd=0
+                [?] Name="Открыть" Cls="" Val="" hwnd=0
+              [buttonBlackList] Name="Высокий риск" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134820
+              [buttonCallToCustomer] Name="Позвонить" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134818
+              [textRecommendedDiscount] Name="" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134816
+                [134814] Name="" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="" hwnd=134814
+                [?] Name="" Cls="" Val="" hwnd=0
+              *[lookUpEditCustomerPhone] Name="+38 066 882-80-90" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="+38 066 882-80-90" hwnd=134810
+                [134812] Name="+38 066 882-80-90" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="+38 066 882-80-90" hwnd=134812
+                [?] Name="+38 066 882-80-90" Cls="" Val="+38 066 882-80-90" hwnd=0
+                [?] Name="Открыть" Cls="" Val="" hwnd=0
+                [?] Name="+38 066 882-80-90" Cls="" Val="" hwnd=0
+                [?] Name="+38 066 882-80-90" Cls="" Val="" hwnd=0
+              *[memoEditCustomerComment] Name="08.06.26Опоздание 40 мин__" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="08.06.26Опоздание 40 мин__" hwnd=134792
+                [134804] Name="Полоса прокрутки" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134804
+                [134806] Name="08.06.26Опоздание 40 мин__" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="08.06.26Опоздание 40 мин__" hwnd=134806
+                [?] Name="08.06.26Опоздание 40 мин__" Cls="" Val="08.06.26Опоздание 40 мин__" hwnd=0
+              *[textEditCustomerCardNumber] Name="" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134802
+                [134800] Name="" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="" hwnd=134800
+                [?] Name="" Cls="" Val="" hwnd=0
+              *[memoEditDeliveryComment] Name=" Доставка Чугуїв: 100 грн" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val=" Доставка Чугуїв: 100 грн" hwnd=134794
+                [134798] Name="Полоса прокрутки" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134798
+                [134796] Name=" Доставка Чугуїв: 100 грн" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val=" Доставка Чугуїв: 100 грн" hwnd=134796
+                [?] Name=" Доставка Чугуїв: 100 грн" Cls="" Val=" Доставка Чугуїв: 100 грн" hwnd=0
+              *[textEditName] Name="София" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="София" hwnd=200206
+                [134788] Name="София" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="София" hwnd=134788
+                [?] Name="София" Cls="" Val="София" hwnd=0
+              [textEditCustomerSurname] Name="" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134786
+                [134784] Name="" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="" hwnd=134784
+                [?] Name="" Cls="" Val="" hwnd=0
+              [?] Name="Root" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemName" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemCard" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemAdditionalInfo" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemCustomerPhone" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlRecommendedDiscount" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemCallToCustomer" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItem33" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItemSurname" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItem34" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItem6" Cls="" Val="" hwnd=0
+                [?] Name="layoutControlItem7" Cls="" Val="" hwnd=0
+          [?] Name="layoutControlGroup3" Cls="" Val="" hwnd=0
+            [?] Name="layoutControlItem23" Cls="" Val="" hwnd=0
+            [?] Name="layoutControlItem29" Cls="" Val="" hwnd=0
+            [?] Name="layoutControlItem35" Cls="" Val="" hwnd=0
+            [?] Name="layoutControlItem44" Cls="" Val="" hwnd=0
+            [?] Name="layoutControlItem36" Cls="" Val="" hwnd=0
+  [panelFooter] Name="panelFooter" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134766
+    [footerLayoutControl] Name="The XtraLayoutControl" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134764
+      [referrerButton] Name="Рекомендатель" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134760
+      [couponButton] Name="Купон" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134742
+      [buttonClose] Name="Выйти" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134752
+      [buttonSaveAndClose] Name="Сохранить на точку" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134750
+      [buttonHistoryVisibility] Name="История" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134748
+      [buttonCustomerOpinion] Name="Отзывы" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134746
+      [buttonDeliveryConfirmation] Name="Подтвердить" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134744
+      [buttonCancelDelivery] Name="Отменить доставку" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134716
+      [?] Name="Root" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlItem38" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlItem39" Cls="" Val="" hwnd=0
+        [?] Name="emptySpaceItem11" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlItem40" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlItem41" Cls="" Val="" hwnd=0
+        [?] Name="emptySpaceItem13" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlItem42" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlSave" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlItem45" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlItem8" Cls="" Val="" hwnd=0
+  [panelHeader] Name="panelHeader" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134740
+    [layoutControlHeader] Name="The XtraLayoutControl" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134720
+      [restoCompletionCourier] Name="Не назначен" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="Не назначен" hwnd=134700
+        [134702] Name="Не назначен" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="Не назначен" hwnd=134702
+        [?] Name="Не назначен" Cls="" Val="Не назначен" hwnd=0
+        [?] Name="Открыть" Cls="" Val="" hwnd=0
+      [restoPbxControl1] Name="" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134704
+        [groupControlPbx] Name="groupControlPbx" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134706
+          [txtPbxCallNumber] Name="" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=134714
+            [134712] Name="" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="" hwnd=134712
+            [?] Name="" Cls="" Val="" hwnd=0
+          [layoutControlPbxCallIdle] Name="The XtraLayoutControl" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=134708
+            [btnPbxCallReject] Name="Отклонить" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=200466
+            [btnPbxCallAccept] Name="Принять" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=135386
+            [?] Name="layoutControlGroupIdle" Cls="" Val="" hwnd=0
+              [?] Name="layoutControlItemAccept" Cls="" Val="" hwnd=0
+              [?] Name="layoutControlItemReject" Cls="" Val="" hwnd=0
+      [buttonDeliveryProblem] Name="Проблема!" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=135366
+      [buttonCallToCourier] Name="Позвонить" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=135378
+      [restoCompletionDeliveryOperator] Name="VoIodymir" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="VoIodymir" hwnd=135382
+        [135380] Name="VoIodymir" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="VoIodymir" hwnd=135380
+        [?] Name="VoIodymir" Cls="" Val="VoIodymir" hwnd=0
+        [?] Name="Открыть" Cls="" Val="" hwnd=0
+      [restoCompletionConception] Name="Не задана" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="Не задана" hwnd=135376
+        [135374] Name="Не задана" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="Не задана" hwnd=135374
+        [?] Name="Не задана" Cls="" Val="Не задана" hwnd=0
+        [?] Name="Открыть" Cls="" Val="" hwnd=0
+      [labelDeliveryNumber] Name="75251" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=135372
+      [memoEditDeliveryHistory] Name="Заказ создан : 12.06.2026 19:58
+Подтвержден  : --" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="Заказ создан : 12.06.2026 19:58
+Подтвер" hwnd=135368
+        [135364] Name="Полоса прокрутки" Cls="WindowsForms10.Window.8.app.0.13e2e7e_r6" Val="" hwnd=135364
+          [?] Name="Строка вверх" Cls="" Val="" hwnd=0
+          [?] Name="Страница вверх" Cls="" Val="" hwnd=0
+          [?] Name="Позиция" Cls="" Val="" hwnd=0
+          [?] Name="Страница вниз" Cls="" Val="" hwnd=0
+          [?] Name="Строка вниз" Cls="" Val="" hwnd=0
+        [135350] Name="Заказ создан : 12.06.2026 19:58
+Подтвержден  : --" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="Заказ создан : 12.06.2026 19:58
+Подтвер" hwnd=135350
+          [NonClientVerticalScrollBar] Name="По вертикали" Cls="" Val="" hwnd=0
+            [UpButton] Name="Строка вверх" Cls="" Val="" hwnd=0
+            [ScrollbarThumb] Name="Положение" Cls="" Val="" hwnd=0
+            [DownPageButton] Name="Прокрутить вниз" Cls="" Val="" hwnd=0
+            [DownButton] Name="Строка вниз" Cls="" Val="" hwnd=0
+        [?] Name="Заказ создан : 12.06.2026 19:58
+Подтвержден  : --" Cls="" Val="Заказ создан : 12.06.2026 19:58
+Подтвер" hwnd=0
+      [lookUpEditDeliveryTerminal] Name="" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="" hwnd=135362
+        [?] Name="" Cls="" Val="" hwnd=0
+        [?] Name="Открыть" Cls="" Val="" hwnd=0
+      [restoCompletionOrderType] Name="Поточний" Cls="WindowsForms10.Window.b.app.0.13e2e7e_r6" Val="Поточний" hwnd=135354
+        [135358] Name="Поточний" Cls="WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1" Val="Поточний" hwnd=135358
+        [?] Name="Поточний" Cls="" Val="Поточний" hwnd=0
+        [?] Name="Открыть" Cls="" Val="" hwnd=0
+      [?] Name="Root" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlItemStatus" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlItemDeliveryNumber" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlItem2" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlItemHistoryMemoEdit" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlItemOrderType" Cls="" Val="" hwnd=0
+        [?] Name="simpleLabelItem1" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlItemDeliveryOperator" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlItem22" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlItem24" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlItem31" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlItem5" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlItemCourier" Cls="" Val="" hwnd=0
+        [?] Name="layoutControlItemEsc" Cls="" Val="" hwnd=0
+
+=== ЗНАЙДЕНІ ВАЖЛИВІ ПОЛЯ ===
+  FOUND  gridLookUpEditStreetAddress: val="" hwnd=134964
+  FOUND  timeEditDeliveryTime: val="20:58" hwnd=134918
+  MISSING gridViewItems
+  FOUND  textEditName: val="София" hwnd=200206
+  FOUND  treeListItems: val="" hwnd=134842
+  FOUND  memoEditDeliveryComment: val=" Доставка Чугуїв: 100 грн" hwnd=134794
+  FOUND  memoEditDeliveryAddressComment: val="" hwnd=134948
+  FOUND  textEditCustomerCardNumber: val="" hwnd=134802
+  FOUND  textEditDeliveryHouse: val="-" hwnd=134924
+  MISSING treeList1
+  FOUND  labelOrderSum: val="" hwnd=134868
+  FOUND  memoEditCustomerComment: val="08.06.26Опоздание 40 мин__" hwnd=134792
+  MISSING gridControlItems
+  FOUND  lookUpEditCustomerPhone: val="+38 066 882-80-90" hwnd=134810
+
+=== ПОШУК ТАБЛИЦІ СТРАВ (будь-яка treeList/gridControl) ===
+  (нічого не знайдено)
+
+=== ТЕСТ ЧИТАННЯ ВУЛИЦІ ===
+  AutomId: gridLookUpEditStreetAddress
+  Name: ""
+  ValuePattern.Value: ""
+  LegacyIAccessible.Value: ""
+  -- Дочірні контроли вулиці:
+    [134962] Name="" Val=""
+    [?] Name="" Val=""
+    [?] Name="Открыть" Val=""
+
+=== ТЕСТ ЧИТАННЯ ЧАСУ ===
+  Name: "20:58"
+  Cls: "WindowsForms10.Window.b.app.0.13e2e7e_r6_ad1"
+  ValuePattern.Value: "20:58"
+  -- Дочірні:
+    [134920] Cls="WindowsForms10.EDIT.app.0.13e2" Name="20:58" Val="20:58"
+    [?] Cls="" Name="20:58" Val="20:58"
+    [?] Cls="" Name="Счётчик" Val=""

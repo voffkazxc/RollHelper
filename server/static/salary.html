@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Зарплата кур'єрів — RollHouse PRO</title>
+<script src="/static/_sidebar.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', sans-serif; background: #0a0a14; color: #d0d0e0; min-height: 100vh; }
+
+.topbar {
+  background: #111120; border-bottom: 1px solid #1e1e38;
+  padding: 0 20px; height: 48px; display: flex; align-items: center; gap: 16px;
+  position: sticky; top: 0; z-index: 100;
+}
+.topbar .logo { font-size: 15px; font-weight: 800; color: #88aaff; letter-spacing: .5px; }
+.topbar a { font-size: 13px; color: #5566aa; text-decoration: none; padding: 4px 10px;
+            border-radius: 6px; transition: background .15s, color .15s; }
+.topbar a:hover { background: rgba(100,120,255,.1); color: #88aaff; }
+.spacer { flex: 1; }
+
+.page { max-width: 960px; margin: 0 auto; padding: 24px 20px; }
+h2 { font-size: 18px; font-weight: 800; color: #ccd; margin-bottom: 18px; }
+
+.controls {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 20px;
+}
+.controls label { font-size: 12px; color: #556; font-weight: 600; }
+.controls input[type=date] {
+  background: #0e0e22; border: 1px solid #252545; border-radius: 8px;
+  color: #d0d0e8; font-size: 13px; padding: 7px 10px; outline: none; font-family: inherit;
+}
+.controls input[type=date]:focus { border-color: #4466cc; }
+.btn {
+  padding: 7px 18px; border-radius: 8px; font-size: 13px; font-weight: 700;
+  cursor: pointer; border: 1px solid; font-family: inherit; transition: filter .12s;
+}
+.btn:hover { filter: brightness(1.2); }
+.btn-primary { background: #1a2055; border-color: #4466cc; color: #88aaff; }
+.btn-period  { background: none; border-color: #252545; color: #556; font-size: 12px; padding: 6px 12px; }
+.btn-period.active { border-color: #4466cc; color: #88aaff; background: rgba(68,102,204,.15); }
+
+/* Summary table */
+.summary-wrap { overflow-x: auto; margin-bottom: 32px; }
+table.salary-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.salary-table th {
+  background: #0d0d1e; color: #4466aa; font-size: 10px; text-transform: uppercase;
+  letter-spacing: 1px; font-weight: 800; padding: 8px 12px; text-align: left;
+  border-bottom: 1px solid #1e1e38;
+}
+.salary-table td {
+  padding: 10px 12px; border-bottom: 1px solid #131328; vertical-align: middle;
+}
+.salary-table tr:hover td { background: rgba(68,102,204,.04); }
+.val-earn  { font-weight: 800; color: #66dd99; font-size: 15px; }
+.val-paid  { color: #88aaff; }
+.val-bal   { font-weight: 800; }
+.val-bal.pos { color: #66dd99; }
+.val-bal.neg { color: #ff6666; }
+.rate-input {
+  width: 80px; background: #0e0e22; border: 1px solid #252545; border-radius: 6px;
+  color: #d0d0e8; font-size: 13px; padding: 4px 8px; outline: none; font-family: inherit;
+  text-align: right;
+}
+.rate-input:focus { border-color: #4466cc; }
+.btn-save-rate { padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 700;
+                  border: 1px solid #336633; color: #66dd99; background: none; cursor: pointer; }
+.btn-save-rate:hover { background: rgba(102,221,153,.08); }
+.btn-payout { padding: 5px 14px; border-radius: 7px; font-size: 12px; font-weight: 700;
+               border: 1px solid #4466cc; color: #88aaff; background: #1a2055; cursor: pointer; }
+.btn-payout:hover { background: #243080; }
+.btn-payout:disabled { opacity: .4; cursor: default; }
+
+/* Detail modal */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 200; display: none; align-items: center; justify-content: center; }
+.overlay.open { display: flex; }
+.modal { background: #111120; border: 1px solid #1e1e38; border-radius: 14px;
+         padding: 24px; width: 560px; max-width: 95vw; max-height: 90vh; overflow-y: auto; }
+.modal h3 { font-size: 16px; font-weight: 800; color: #ccd; margin-bottom: 16px; }
+.modal-close { float: right; background: none; border: none; color: #556; font-size: 20px;
+               cursor: pointer; margin-top: -4px; }
+.modal-close:hover { color: #88aaff; }
+.kpi-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.kpi-card { background: #0d0d1e; border: 1px solid #1e1e3a; border-radius: 10px;
+             padding: 10px 16px; flex: 1; min-width: 100px; }
+.kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #445;
+              font-weight: 700; margin-bottom: 4px; }
+.kpi-val   { font-size: 20px; font-weight: 800; color: #ccd; }
+.kpi-val.green { color: #66dd99; }
+.kpi-val.blue  { color: #88aaff; }
+.kpi-val.yellow{ color: #ffcc55; }
+
+.payout-form { background: #0d0d1e; border: 1px solid #1e1e38; border-radius: 10px; padding: 14px; margin-bottom: 20px; }
+.payout-form .pf-label { font-size: 11px; color: #556; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+.payout-form input {
+  width: 100%; background: #0a0a16; border: 1px solid #252545; border-radius: 7px;
+  color: #d0d0e8; font-size: 14px; padding: 8px 10px; outline: none; font-family: inherit; margin-bottom: 10px;
+}
+.payout-form input:focus { border-color: #4466cc; }
+.payout-form .btn-confirm { padding: 8px 24px; border-radius: 8px; background: #1a2055;
+  border: 1px solid #4466cc; color: #88aaff; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
+.payout-form .btn-confirm:hover { background: #243080; }
+.payout-form .btn-confirm:disabled { opacity: .4; cursor: default; }
+
+.orders-list { margin-top: 12px; }
+.orders-list table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.orders-list th { color: #445; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+                   padding: 6px 10px; border-bottom: 1px solid #1e1e38; font-weight: 700; }
+.orders-list td { padding: 6px 10px; border-bottom: 1px solid #131328; color: #9ab; }
+.orders-list tr:hover td { background: rgba(68,102,204,.04); }
+
+.history-title { font-size: 12px; color: #445; text-transform: uppercase; letter-spacing: 1px;
+                  font-weight: 700; margin-bottom: 8px; margin-top: 20px; }
+.history-item { display: flex; justify-content: space-between; align-items: center;
+                 padding: 7px 10px; background: #0d0d1e; border-radius: 7px; margin-bottom: 5px;
+                 font-size: 12px; }
+.history-amount { font-weight: 800; color: #66dd99; }
+.history-date   { color: #445; font-size: 11px; }
+.history-note   { color: #667; font-size: 11px; }
+
+.toast { position: fixed; bottom: 24px; right: 24px; background: #1a2055; border: 1px solid #4466cc;
+         border-radius: 10px; color: #88aaff; padding: 10px 18px; font-size: 13px; font-weight: 700;
+         z-index: 999; display: none; }
+.toast.err  { background: #2a0a0a; border-color: #cc3333; color: #ff7766; }
+.toast.show { display: block; }
+
+.loader { color: #445; text-align: center; padding: 40px; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="logo" style="color:#5566aa;opacity:.6">Зарплата</span>
+  <span class="spacer"></span>
+  <a id="reminderNavBtn" href="/dashboard" style="display:none;border:1px solid #cc5500;color:#ffaa44;border-radius:20px;padding:3px 10px;font-size:12px;text-decoration:none" title="Є нагадування">🔔 <span id="reminderNavCount">0</span></a>
+</div>
+<script>
+(function() {
+  async function checkDue() {
+    try {
+      const d = await (await fetch('/api/reminders/due-count')).json();
+      const btn = document.getElementById('reminderNavBtn');
+      if (d.count > 0) { document.getElementById('reminderNavCount').textContent = d.count; btn.style.display = 'inline'; }
+      else btn.style.display = 'none';
+    } catch {}
+  }
+  checkDue(); setInterval(checkDue, 60000);
+})();
+</script>
+
+<div class="page">
+  <h2>💰 Зарплата кур'єрів</h2>
+
+  <div class="controls">
+    <button class="btn btn-period" data-period="month" onclick="setPeriod('month')">Місяць</button>
+    <button class="btn btn-period" data-period="week" onclick="setPeriod('week')">Тиждень</button>
+    <button class="btn btn-period" data-period="today" onclick="setPeriod('today')">Сьогодні</button>
+    <label>Від: <input type="date" id="sFrom"></label>
+    <label>До: <input type="date" id="sTo"></label>
+    <button class="btn btn-primary" onclick="loadSummary()">Оновити</button>
+  </div>
+
+  <div class="summary-wrap">
+    <table class="salary-table">
+      <thead>
+        <tr>
+          <th>Кур'єр</th>
+          <th>Ставка (грн/дост)</th>
+          <th>Доставок</th>
+          <th>Нараховано</th>
+          <th>Виплачено</th>
+          <th>Залишок</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="summaryBody">
+        <tr><td colspan="7" class="loader">Завантаження...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Detail modal -->
+<div class="overlay" id="detailOverlay">
+  <div class="modal" id="detailModal">
+    <button class="modal-close" onclick="closeDetail()">✕</button>
+    <h3 id="detailTitle">Кур'єр</h3>
+
+    <div class="kpi-row">
+      <div class="kpi-card"><div class="kpi-label">Доставок</div><div class="kpi-val" id="dDeliveries">—</div></div>
+      <div class="kpi-card"><div class="kpi-label">Нараховано</div><div class="kpi-val green" id="dEarned">—</div></div>
+      <div class="kpi-card"><div class="kpi-label">Виплачено</div><div class="kpi-val blue" id="dPaid">—</div></div>
+      <div class="kpi-card"><div class="kpi-label">До виплати</div><div class="kpi-val yellow" id="dBalance">—</div></div>
+    </div>
+
+    <!-- Payout form -->
+    <div class="payout-form" id="payoutForm">
+      <div class="pf-label">Виплатити</div>
+      <input type="number" id="payoutAmt" placeholder="Сума (грн)" min="1" step="0.01">
+      <input type="text" id="payoutNote" placeholder="Примітка (необов'язково)">
+      <button class="btn-confirm" id="payoutBtn" onclick="doPayout()">💸 Виплатити</button>
+    </div>
+
+    <!-- Orders in period -->
+    <div class="orders-list" id="ordersWrap" style="display:none">
+      <div class="history-title">📦 Доставки за період</div>
+      <table>
+        <thead><tr><th>#</th><th>Дата</th><th>Місто</th><th>Адреса</th><th>Сума</th></tr></thead>
+        <tbody id="ordersBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Payout history -->
+    <div id="historyWrap">
+      <div class="history-title">📋 Виплати</div>
+      <div id="historyList"><div style="color:#445;font-size:12px">Немає виплат</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';  // відносні URL — same-origin cookie
+let _currentCourierId = null;
+let _currentSalary    = null;
+
+// ── PIN guard ──────────────────────────────────────────────────
+(function() {
+  if (sessionStorage.getItem('rh_pin_ok') === '1') return;
+  fetch(API + '/api/auth/verify', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({pin: ''})}).then(r => r.json()).then(d => {
+    if (!d.ok) window.location.href = '/dashboard';
+  }).catch(() => window.location.href = '/dashboard');
+})();
+
+// ── Period helpers ─────────────────────────────────────────────
+function todayStr() { return new Date().toISOString().slice(0,10); }
+function offsetDay(n) {
+  const d = new Date(); d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0,10);
+}
+
+function setPeriod(p) {
+  document.querySelectorAll('.btn-period').forEach(b => b.classList.remove('active'));
+  const btn = document.querySelector('[data-period="' + p + '"]');
+  if (btn) btn.classList.add('active');
+  const today = todayStr();
+  if (p === 'today') {
+    document.getElementById('sFrom').value = today;
+    document.getElementById('sTo').value   = today;
+  } else if (p === 'week') {
+    document.getElementById('sFrom').value = offsetDay(-6);
+    document.getElementById('sTo').value   = today;
+  } else if (p === 'month') {
+    const d = new Date(); d.setDate(1);
+    document.getElementById('sFrom').value = d.toISOString().slice(0,10);
+    document.getElementById('sTo').value   = today;
+  }
+  loadSummary();
+}
+
+function fmtDate(s) {
+  if (!s) return '—';
+  const p = s.slice(0,10).split('-');
+  return p[2] + '.' + p[1] + '.' + p[0];
+}
+function fmtMoney(n) { return (Math.round((n || 0) * 100) / 100).toLocaleString('uk') + ' грн'; }
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Load summary ───────────────────────────────────────────────
+async function loadSummary() {
+  const df = document.getElementById('sFrom').value;
+  const dt = document.getElementById('sTo').value;
+  const body = document.getElementById('summaryBody');
+  body.innerHTML = '<tr><td colspan="7" class="loader">Завантаження...</td></tr>';
+  try {
+    const r = await fetch(API + '/api/salary/summary?date_from=' + df + '&date_to=' + dt);
+    const d = await r.json();
+    if (!d.ok) { body.innerHTML = '<tr><td colspan="7" class="loader" style="color:#f77">Помилка</td></tr>'; return; }
+    renderSummary(d.items || []);
+  } catch(e) {
+    body.innerHTML = '<tr><td colspan="7" class="loader" style="color:#f77">Сервер не відповідає</td></tr>';
+  }
+}
+
+function renderSummary(items) {
+  const body = document.getElementById('summaryBody');
+  if (!items.length) {
+    body.innerHTML = '<tr><td colspan="7" class="loader">Нема активних кур\'єрів</td></tr>';
+    return;
+  }
+  body.innerHTML = items.map(function(c) {
+    const bal = c.balance || 0;
+    const balClass = bal > 0 ? 'pos' : bal < 0 ? 'neg' : '';
+    return '<tr>'
+      + '<td><b>' + esc(c.name) + '</b>'
+      + (c.phone ? '<br><span style="font-size:11px;color:#445">' + esc(c.phone) + '</span>' : '') + '</td>'
+      + '<td><input class="rate-input" type="number" min="0" step="1" value="' + (c.rate || 0) + '" id="rate-' + c.courier_id + '">'
+      + ' <button class="btn-save-rate" onclick="saveRate(' + c.courier_id + ')">💾</button></td>'
+      + '<td style="text-align:center;font-weight:800;color:#ccd">' + (c.deliveries || 0) + '</td>'
+      + '<td class="val-earn">' + fmtMoney(c.earned) + '</td>'
+      + '<td class="val-paid">' + fmtMoney(c.paid) + '</td>'
+      + '<td class="val-bal ' + balClass + '">' + fmtMoney(bal) + '</td>'
+      + '<td><button class="btn-payout" onclick="openDetail(' + c.courier_id + ',\'' + esc(c.name) + '\')">📋 Детально</button></td>'
+      + '</tr>';
+  }).join('');
+}
+
+async function saveRate(courierId) {
+  const val = parseFloat(document.getElementById('rate-' + courierId).value) || 0;
+  try {
+    const r = await fetch(API + '/api/salary/courier/' + courierId + '/rate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({rate: val, actor_id: 0, actor_role: 'manager'})
+    });
+    const d = await r.json();
+    if (d.ok) showToast('✅ Ставку збережено');
+    else showToast('❌ ' + (d.error || 'Помилка'), true);
+  } catch(e) {
+    showToast('❌ Сервер не відповідає', true);
+  }
+}
+
+// ── Detail modal ───────────────────────────────────────────────
+async function openDetail(courierId, name) {
+  _currentCourierId = courierId;
+  document.getElementById('detailTitle').textContent = '💰 ' + name;
+  document.getElementById('detailOverlay').classList.add('open');
+  document.getElementById('payoutAmt').value  = '';
+  document.getElementById('payoutNote').value = '';
+  await refreshDetail();
+}
+
+async function refreshDetail() {
+  const df = document.getElementById('sFrom').value;
+  const dt = document.getElementById('sTo').value;
+  try {
+    const [salR, histR] = await Promise.all([
+      fetch(API + '/api/salary/courier/' + _currentCourierId + '?date_from=' + df + '&date_to=' + dt),
+      fetch(API + '/api/salary/courier/' + _currentCourierId + '/history'),
+    ]);
+    const sal  = await salR.json();
+    const hist = await histR.json();
+
+    _currentSalary = sal;
+
+    document.getElementById('dDeliveries').textContent = sal.deliveries || 0;
+    document.getElementById('dEarned').textContent     = fmtMoney(sal.earned);
+    document.getElementById('dPaid').textContent       = fmtMoney(sal.paid);
+    const bal = sal.balance || 0;
+    const balEl = document.getElementById('dBalance');
+    balEl.textContent = fmtMoney(bal);
+    balEl.style.color = bal > 0 ? '#ffcc55' : bal < 0 ? '#ff6666' : '#ccd';
+
+    // Pre-fill payout amount = balance if positive
+    if (bal > 0 && !document.getElementById('payoutAmt').value) {
+      document.getElementById('payoutAmt').value = bal.toFixed(2);
+    }
+
+    // Orders table
+    const orders = sal.orders || [];
+    const ordWrap = document.getElementById('ordersWrap');
+    if (orders.length) {
+      ordWrap.style.display = '';
+      document.getElementById('ordersBody').innerHTML = orders.map(function(o) {
+        return '<tr>'
+          + '<td style="color:#88aaff">#' + o.id + '</td>'
+          + '<td>' + fmtDate(o.order_date) + '</td>'
+          + '<td>' + esc(o.city || '—') + '</td>'
+          + '<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(o.address||'') + '">' + esc(o.address || '—') + '</td>'
+          + '<td style="text-align:right;font-weight:700">' + Math.round(o.amount || 0).toLocaleString('uk') + ' ₴</td>'
+          + '</tr>';
+      }).join('');
+    } else {
+      ordWrap.style.display = 'none';
+    }
+
+    // History
+    const histItems = (hist.items || []);
+    const histEl = document.getElementById('historyList');
+    if (histItems.length) {
+      histEl.innerHTML = histItems.map(function(h) {
+        return '<div class="history-item">'
+          + '<span class="history-amount">' + fmtMoney(h.amount) + '</span>'
+          + '<span class="history-note">' + esc(h.note || '') + '</span>'
+          + '<span class="history-date">' + fmtDate(h.paid_at) + '</span>'
+          + '</div>';
+      }).join('');
+    } else {
+      histEl.innerHTML = '<div style="color:#445;font-size:12px">Немає виплат</div>';
+    }
+  } catch(e) {
+    showToast('❌ Помилка завантаження', true);
+  }
+}
+
+async function doPayout() {
+  const amount = parseFloat(document.getElementById('payoutAmt').value) || 0;
+  const note   = document.getElementById('payoutNote').value.trim();
+  if (amount <= 0) { showToast('❌ Введіть суму > 0', true); return; }
+
+  const df = document.getElementById('sFrom').value;
+  const dt = document.getElementById('sTo').value;
+  const deliveries = (_currentSalary && _currentSalary.deliveries) || 0;
+
+  document.getElementById('payoutBtn').disabled = true;
+  try {
+    const r = await fetch(API + '/api/salary/courier/' + _currentCourierId + '/payout', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        amount, note, date_from: df, date_to: dt, deliveries,
+        actor_id: 0, actor_role: 'manager'
+      })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showToast('✅ Виплата ' + fmtMoney(amount) + ' записана');
+      document.getElementById('payoutAmt').value  = '';
+      document.getElementById('payoutNote').value = '';
+      await refreshDetail();
+      loadSummary();
+    } else {
+      showToast('❌ ' + (d.error || 'Помилка'), true);
+    }
+  } catch(e) {
+    showToast('❌ Сервер не відповідає', true);
+  } finally {
+    document.getElementById('payoutBtn').disabled = false;
+  }
+}
+
+function closeDetail() {
+  document.getElementById('detailOverlay').classList.remove('open');
+  _currentCourierId = null;
+  _currentSalary    = null;
+}
+
+// Close on backdrop
+document.getElementById('detailOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeDetail();
+});
+
+// ── Toast ──────────────────────────────────────────────────────
+function showToast(msg, err) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (err ? ' err' : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── Init ───────────────────────────────────────────────────────
+setPeriod('month');
+</script>
+</body>
+</html>

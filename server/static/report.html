@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Звіт за зміну — RollHouse PRO</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', sans-serif; background: #0a0a14; color: #d0d0e0; min-height: 100vh; }
+
+.topbar {
+  background: #111120; border-bottom: 1px solid #1e1e38;
+  padding: 0 20px; height: 48px;
+  display: flex; align-items: center; gap: 16px;
+  position: sticky; top: 0; z-index: 100;
+}
+.logo { font-size: 15px; font-weight: 800; color: #88aaff; }
+.nav-link { font-size: 13px; color: #5566aa; text-decoration: none; padding: 4px 10px; border-radius: 6px; }
+.nav-link:hover { background: rgba(100,120,255,.1); color: #88aaff; }
+.spacer { flex: 1; }
+.page-title { font-size: 13px; color: #5566aa; font-weight: 600; }
+
+/* Controls */
+.controls {
+  padding: 16px 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;
+  border-bottom: 1px solid #1a1a30;
+}
+.ctrl-group { display: flex; flex-direction: column; gap: 4px; }
+.ctrl-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #445; font-weight: 700; }
+.ctrl-input {
+  background: #111128; border: 1px solid #252545; border-radius: 8px;
+  color: #d0d0e8; font-size: 13px; padding: 7px 12px; outline: none;
+  font-family: 'Segoe UI', sans-serif; width: 160px;
+}
+.ctrl-input:focus { border-color: #4466cc; }
+.ctrl-input.time { width: 110px; }
+.btn-generate {
+  padding: 8px 20px; background: #1a2055; border: 1px solid #4466cc;
+  border-radius: 8px; color: #88aaff; font-size: 13px; font-weight: 700;
+  cursor: pointer; font-family: 'Segoe UI', sans-serif; height: 34px;
+}
+.btn-generate:hover { background: #2a3080; }
+.btn-generate:disabled { opacity: .5; cursor: default; }
+.btn-print {
+  padding: 8px 16px; background: none; border: 1px solid #336644;
+  border-radius: 8px; color: #66dd99; font-size: 13px;
+  cursor: pointer; font-family: 'Segoe UI', sans-serif; height: 34px;
+}
+.btn-print:hover { background: rgba(100,200,100,.06); }
+.btn-tg {
+  padding: 8px 16px; background: none; border: 1px solid #226688;
+  border-radius: 8px; color: #55aacc; font-size: 13px;
+  cursor: pointer; font-family: 'Segoe UI', sans-serif; height: 34px;
+}
+.btn-tg:hover { background: rgba(50,150,200,.06); }
+.btn-tg:disabled { opacity: .4; cursor: default; }
+
+.quick-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.quick-btn {
+  padding: 4px 12px; background: none; border: 1px solid #252545;
+  border-radius: 20px; color: #5566aa; font-size: 11px; font-weight: 600;
+  cursor: pointer; font-family: 'Segoe UI', sans-serif;
+}
+.quick-btn:hover { border-color: #4455aa; color: #88aaff; }
+
+/* Report body */
+.report-body { padding: 20px; }
+
+#emptyState {
+  text-align: center; color: #334; padding: 60px;
+  font-size: 15px;
+}
+
+/* Grid */
+.kpi-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px; margin-bottom: 20px;
+}
+.kpi-card {
+  background: #0f0f22; border: 1px solid #1e1e38; border-radius: 10px;
+  padding: 14px 16px;
+}
+.kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #445; font-weight: 700; margin-bottom: 6px; }
+.kpi-val { font-size: 22px; font-weight: 900; color: #88aaff; }
+.kpi-val.green  { color: #66dd99; }
+.kpi-val.yellow { color: #ffcc55; }
+.kpi-val.red    { color: #ff6666; }
+.kpi-sub { font-size: 11px; color: #334; margin-top: 3px; }
+
+.section-title {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+  color: #445; font-weight: 700; margin-bottom: 10px; margin-top: 20px;
+}
+
+/* Tables */
+.rpt-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rpt-table th {
+  text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+  color: #334; font-weight: 700; padding: 0 10px 6px; border-bottom: 1px solid #1e1e38;
+}
+.rpt-table td { padding: 7px 10px; border-bottom: 1px solid #0f0f20; }
+.rpt-table tr:last-child td { border-bottom: none; }
+.rpt-table tr:hover td { background: rgba(20,20,50,.4); }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 4px; }
+.section-box {
+  background: #0d0d20; border: 1px solid #1a1a30; border-radius: 10px; padding: 14px;
+}
+
+/* Hour bars */
+.hour-bars { display: flex; gap: 3px; align-items: flex-end; height: 60px; }
+.hour-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.hour-bar {
+  width: 100%; background: #2a3080; border-radius: 2px 2px 0 0;
+  min-height: 2px; transition: .2s;
+}
+.hour-bar:hover { background: #4466cc; }
+.hour-lbl { font-size: 8px; color: #334; }
+
+/* Status badges inline */
+.st-badge {
+  display: inline-block; padding: 1px 8px; border-radius: 20px;
+  font-size: 10px; font-weight: 700; border: 1px solid transparent;
+}
+.st-new       { color:#88aaff; border-color:#2a3060; background:#0d0d28; }
+.st-confirmed { color:#aaccff; border-color:#334488; background:#0d1030; }
+.st-cooking   { color:#ffcc55; border-color:#554400; background:#1a1400; }
+.st-on_way    { color:#99eecc; border-color:#224433; background:#0a1a14; }
+.st-delivered { color:#66ee88; border-color:#225533; background:#0a1a0e; }
+.st-cancelled { color:#ff8888; border-color:#441122; background:#1a080a; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 20px; right: 20px; padding: 10px 20px;
+  background: #1a2244; border: 1px solid #4466cc; border-radius: 10px;
+  color: #88aaff; font-size: 13px; font-weight: 600; z-index: 9999;
+  animation: fadeIn .2s;
+}
+.toast.err { background: #2a0a10; border-color: #cc4444; color: #ff6666; }
+@keyframes fadeIn { from { opacity:0; transform: translateY(10px); } }
+
+/* Print */
+@media print {
+  .topbar, .controls, .no-print { display: none !important; }
+  .print-header { display: block !important; }
+  body { background: #fff; color: #111; }
+  .kpi-card { background: #f8f8f8; border: 1px solid #ddd; }
+  .kpi-val { color: #222; }
+  .kpi-val.green { color: #006600; }
+  .kpi-val.yellow { color: #885500; }
+  .kpi-val.red { color: #cc0000; }
+  .section-box { background: #f8f8f8; border: 1px solid #ddd; }
+  .rpt-table td, .rpt-table th { border-color: #ddd; }
+  .section-title { color: #888; }
+  .kpi-label { color: #888; }
+  .hour-bar { background: #3355aa; }
+  .two-col { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar no-print">
+  <div class="logo">🍱 RollHouse PRO</div>
+  <a class="nav-link" href="/dashboard">Дашборд</a>
+  <a class="nav-link" href="/analytics">Аналітика</a>
+  <a class="nav-link" href="/customers">👥 Клієнти</a>
+  <a class="nav-link" href="/logs">📋 Логи</a>
+  <a class="nav-link" href="/admin">⚙️ Адмін</a>
+  <div class="spacer"></div>
+  <span class="page-title">📊 Звіт за зміну</span>
+</div>
+
+<div class="controls no-print">
+  <div class="ctrl-group">
+    <div class="ctrl-label">Від дати</div>
+    <input type="date" class="ctrl-input" id="dateFrom">
+  </div>
+  <div class="ctrl-group">
+    <div class="ctrl-label">До дати</div>
+    <input type="date" class="ctrl-input" id="dateTo">
+  </div>
+  <div class="ctrl-group">
+    <div class="ctrl-label">Від часу</div>
+    <input type="time" class="ctrl-input time" id="timeFrom" placeholder="00:00">
+  </div>
+  <div class="ctrl-group">
+    <div class="ctrl-label">До часу</div>
+    <input type="time" class="ctrl-input time" id="timeTo" placeholder="23:59">
+  </div>
+  <button class="btn-generate" id="btnGenerate" onclick="generate()">📊 Сформувати</button>
+  <button class="btn-print" onclick="window.print()">🖨️ Друк</button>
+  <button class="btn-tg" id="btnTg" onclick="sendTg()" disabled>✈️ В Telegram</button>
+</div>
+
+<div class="controls no-print" style="padding-top:8px;padding-bottom:12px;gap:6px;border-bottom:1px solid #1a1a30">
+  <span style="font-size:11px;color:#334;white-space:nowrap">Швидко:</span>
+  <div class="quick-btns">
+    <button class="quick-btn" onclick="setToday()">Сьогодні</button>
+    <button class="quick-btn" onclick="setYesterday()">Вчора</button>
+    <button class="quick-btn" onclick="setShift('morning')">Ранкова зміна (10–16)</button>
+    <button class="quick-btn" onclick="setShift('evening')">Вечірня зміна (16–23)</button>
+    <button class="quick-btn" onclick="setThisWeek()">Цей тиждень</button>
+    <button class="quick-btn" onclick="setThisMonth()">Цей місяць</button>
+  </div>
+</div>
+
+<div class="report-body">
+  <div id="emptyState">Оберіть період і натисніть «Сформувати»</div>
+  <div id="reportContent" style="display:none"></div>
+</div>
+
+<script>
+const STATUS_LABELS = {
+  new:'Новий', confirmed:'Підтверджено', cooking:'Готується',
+  on_way:'В дорозі', delivered:'Доставлено', cancelled:'Скасовано'
+};
+const STATUS_ORDER = ['new','confirmed','cooking','on_way','delivered','cancelled'];
+
+let _lastData = null;
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+function daysAgo(n) {
+  const d = new Date(); d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+
+function setToday() {
+  const t = today();
+  document.getElementById('dateFrom').value = t;
+  document.getElementById('dateTo').value   = t;
+  document.getElementById('timeFrom').value = '';
+  document.getElementById('timeTo').value   = '';
+  generate();
+}
+function setYesterday() {
+  const t = daysAgo(1);
+  document.getElementById('dateFrom').value = t;
+  document.getElementById('dateTo').value   = t;
+  document.getElementById('timeFrom').value = '';
+  document.getElementById('timeTo').value   = '';
+  generate();
+}
+function setShift(s) {
+  const t = today();
+  document.getElementById('dateFrom').value = t;
+  document.getElementById('dateTo').value   = t;
+  if (s === 'morning') {
+    document.getElementById('timeFrom').value = '10:00';
+    document.getElementById('timeTo').value   = '16:00';
+  } else {
+    document.getElementById('timeFrom').value = '16:00';
+    document.getElementById('timeTo').value   = '23:00';
+  }
+  generate();
+}
+function setThisWeek() {
+  const now = new Date();
+  const day = now.getDay() || 7;
+  const mon = new Date(now); mon.setDate(now.getDate() - day + 1);
+  document.getElementById('dateFrom').value = mon.toISOString().slice(0,10);
+  document.getElementById('dateTo').value   = today();
+  document.getElementById('timeFrom').value = '';
+  document.getElementById('timeTo').value   = '';
+  generate();
+}
+function setThisMonth() {
+  const now = new Date();
+  document.getElementById('dateFrom').value = now.toISOString().slice(0,8) + '01';
+  document.getElementById('dateTo').value   = today();
+  document.getElementById('timeFrom').value = '';
+  document.getElementById('timeTo').value   = '';
+  generate();
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function fmtMoney(n) {
+  return Number(n).toLocaleString('uk-UA', {minimumFractionDigits:0, maximumFractionDigits:0}) + ' ₴';
+}
+
+async function generate() {
+  const dateFrom = document.getElementById('dateFrom').value;
+  const dateTo   = document.getElementById('dateTo').value;
+  if (!dateFrom || !dateTo) { showToast('Оберіть дати', true); return; }
+  const timeFrom = document.getElementById('timeFrom').value;
+  const timeTo   = document.getElementById('timeTo').value;
+
+  const btn = document.getElementById('btnGenerate');
+  btn.disabled = true; btn.textContent = '⏳ Завантаження...';
+
+  try {
+    const p = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
+    if (timeFrom) p.set('time_from', timeFrom);
+    if (timeTo)   p.set('time_to',   timeTo);
+    const r = await fetch('/api/report/shift?' + p);
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Помилка');
+    _lastData = { dateFrom, dateTo, timeFrom, timeTo };
+    renderReport(d);
+    document.getElementById('btnTg').disabled = false;
+  } catch(e) {
+    showToast('Помилка: ' + e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = '📊 Сформувати';
+  }
+}
+
+function renderReport(d) {
+  document.getElementById('emptyState').style.display = 'none';
+  const el = document.getElementById('reportContent');
+  el.style.display = '';
+
+  // Period label
+  const pFrom = (d.period.from || '').slice(0, 16).replace('T', ' ');
+  const pTo   = (d.period.to   || '').slice(0, 16).replace('T', ' ');
+  const periodLabel = pFrom === pTo ? pFrom : pFrom + ' — ' + pTo;
+
+  // Status rows
+  const statusRows = STATUS_ORDER.map(s => {
+    const info = d.by_status[s];
+    if (!info) return '';
+    return `<tr>
+      <td><span class="st-badge st-${s}">${STATUS_LABELS[s]}</span></td>
+      <td style="font-weight:700;color:#88aaff">${info.cnt}</td>
+      <td style="color:#66dd99">${fmtMoney(info.rev)}</td>
+    </tr>`;
+  }).join('');
+
+  // Payment rows
+  const payRows = Object.entries(d.by_payment).map(([k, v]) => `<tr>
+    <td>${esc(k)}</td>
+    <td style="font-weight:700;color:#88aaff">${v.cnt}</td>
+    <td style="color:#66dd99">${fmtMoney(v.rev)}</td>
+  </tr>`).join('') || '<tr><td colspan="3" style="color:#334">—</td></tr>';
+
+  // City rows
+  const cityRows = d.by_city.map(c => `<tr>
+    <td>${esc(c.city)}</td>
+    <td style="font-weight:700;color:#88aaff">${c.cnt}</td>
+    <td style="color:#66dd99">${fmtMoney(c.rev)}</td>
+  </tr>`).join('') || '<tr><td colspan="3" style="color:#334">—</td></tr>';
+
+  // Courier rows
+  const courierRows = d.by_courier.map(c => `<tr>
+    <td>🛵 ${esc(c.name)}</td>
+    <td style="font-weight:700;color:#88aaff">${c.cnt}</td>
+    <td style="color:#66dd99">${fmtMoney(c.rev)}</td>
+  </tr>`).join('') || '<tr><td colspan="3" style="color:#334">Не призначено</td></tr>';
+
+  // Top items
+  const itemRows = d.top_items.map((it, i) => `<tr>
+    <td style="color:#334;font-size:11px">#${i+1}</td>
+    <td>${esc(it.name)}</td>
+    <td style="font-weight:700;color:#ffcc55">${it.qty} шт</td>
+  </tr>`).join('') || '<tr><td colspan="3" style="color:#334">—</td></tr>';
+
+  // Hour chart
+  let maxCnt = 1;
+  d.by_hour.forEach(h => { if (h.cnt > maxCnt) maxCnt = h.cnt; });
+  // Fill all 24 hours
+  const hourMap = {};
+  d.by_hour.forEach(h => { hourMap[h.hour] = h; });
+  const hourBars = Array.from({length: 24}, (_, i) => {
+    const hr = String(i).padStart(2, '0');
+    const info = hourMap[hr] || {cnt:0, rev:0};
+    const pct  = info.cnt ? Math.max(6, Math.round(info.cnt / maxCnt * 100)) : 2;
+    return `<div class="hour-bar-wrap" title="${hr}:00 — ${info.cnt} замовлень · ${fmtMoney(info.rev)}">
+      <div class="hour-bar" style="height:${pct}%${info.cnt ? '' : ';opacity:.2'}"></div>
+      <div class="hour-lbl">${hr}</div>
+    </div>`;
+  }).join('');
+
+  const delivCnt = (d.by_status.delivered || {}).cnt || 0;
+  const cancCnt  = (d.by_status.cancelled || {}).cnt || 0;
+
+  const convRate = d.total_orders > 0 ? Math.round(delivCnt / d.total_orders * 100) : 0;
+  const exportUrl = '/api/orders/export.csv?' + new URLSearchParams({
+    date_from: _lastData.dateFrom, date_to: _lastData.dateTo
+  });
+
+  el.innerHTML = `
+    <div style="display:none" class="print-header">
+      <div style="font-size:18px;font-weight:900;color:#111;margin-bottom:4px">🍣 RollHouse PRO — Звіт за зміну</div>
+      <div style="font-size:13px;color:#555">📅 ${esc(periodLabel)}</div>
+      <hr style="border:none;border-top:1px solid #ccc;margin:10px 0">
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px" class="no-print">
+      <span style="font-size:11px;color:#334">📅 Період: <b style="color:#5566aa">${esc(periodLabel)}</b></span>
+      <a href="${exportUrl}" style="font-size:11px;color:#66dd99;border:1px solid #336633;border-radius:20px;padding:3px 12px;text-decoration:none">📥 CSV</a>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Замовлень</div>
+        <div class="kpi-val">${d.total_orders}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Виручка</div>
+        <div class="kpi-val green">${fmtMoney(d.total_revenue)}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Середній чек</div>
+        <div class="kpi-val yellow">${fmtMoney(d.avg_order)}</div>
+        <div class="kpi-sub">за доставленими</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Доставлено</div>
+        <div class="kpi-val green">${delivCnt}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Скасовано</div>
+        <div class="kpi-val${cancCnt ? ' red' : ''}">${cancCnt}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Конверсія</div>
+        <div class="kpi-val${convRate >= 80 ? ' green' : convRate >= 60 ? ' yellow' : ' red'}">${convRate}%</div>
+        <div class="kpi-sub">доставлено / всього</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Нові клієнти</div>
+        <div class="kpi-val">${d.new_customers}</div>
+      </div>
+    </div>
+
+    <div class="section-title">Розподіл по годинах</div>
+    <div class="section-box" style="padding:14px 10px 10px">
+      <div class="hour-bars">${hourBars}</div>
+    </div>
+
+    <div class="two-col">
+      <div>
+        <div class="section-title">По статусах</div>
+        <div class="section-box">
+          <table class="rpt-table">
+            <thead><tr><th>Статус</th><th>К-сть</th><th>Сума</th></tr></thead>
+            <tbody>${statusRows || '<tr><td colspan="3" style="color:#334">—</td></tr>'}</tbody>
+          </table>
+        </div>
+
+        <div class="section-title">По типу оплати (доставлені)</div>
+        <div class="section-box">
+          <table class="rpt-table">
+            <thead><tr><th>Оплата</th><th>К-сть</th><th>Сума</th></tr></thead>
+            <tbody>${payRows}</tbody>
+          </table>
+        </div>
+
+        <div class="section-title">По містах</div>
+        <div class="section-box">
+          <table class="rpt-table">
+            <thead><tr><th>Місто</th><th>К-сть</th><th>Сума</th></tr></thead>
+            <tbody>${cityRows}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-title">Кур'єри</div>
+        <div class="section-box">
+          <table class="rpt-table">
+            <thead><tr><th>Кур'єр</th><th>Доставок</th><th>Сума</th></tr></thead>
+            <tbody>${courierRows}</tbody>
+          </table>
+        </div>
+
+        <div class="section-title">Топ позиції</div>
+        <div class="section-box">
+          <table class="rpt-table">
+            <thead><tr><th>#</th><th>Позиція</th><th>Шт</th></tr></thead>
+            <tbody>${itemRows}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function sendTg() {
+  if (!_lastData) return;
+  const btn = document.getElementById('btnTg');
+  btn.disabled = true; btn.textContent = '⏳ Надсилаю...';
+  try {
+    const r = await fetch('/api/report/shift/telegram', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(_lastData)
+    });
+    const d = await r.json();
+    if (d.ok) showToast('✅ Надіслано в Telegram');
+    else      showToast('❌ ' + (d.error || 'Помилка'), true);
+  } catch(e) {
+    showToast('❌ ' + e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = '✈️ В Telegram';
+  }
+}
+
+let _toastTimer;
+function showToast(msg, err) {
+  clearTimeout(_toastTimer);
+  let el = document.getElementById('_toast');
+  if (!el) { el = document.createElement('div'); el.id = '_toast'; document.body.appendChild(el); }
+  el.className = 'toast' + (err ? ' err' : '');
+  el.textContent = msg;
+  el.style.display = 'block';
+  _toastTimer = setTimeout(() => { el.style.display = 'none'; }, 3500);
+}
+
+// ── PIN guard ──
+(function() {
+  if (sessionStorage.getItem('rh_pin_ok') === '1') return;
+  const overlay = document.createElement('div');
+  overlay.id = 'pinGuard';
+  overlay.innerHTML = `
+    <div style="position:fixed;inset:0;background:#07070f;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+      <div style="font-size:20px;font-weight:800;color:#88aaff">🔐 RollHouse PRO</div>
+      <div style="font-size:13px;color:#445;margin-bottom:4px">Введіть PIN для доступу</div>
+      <div style="display:flex;gap:10px;margin-bottom:8px" id="pgDots">
+        ${[0,1,2,3].map(i=>`<div id="pgd${i}" style="width:14px;height:14px;border-radius:50%;border:2px solid #334;transition:.15s"></div>`).join('')}
+      </div>
+      <div style="color:#ff6666;font-size:12px;height:16px" id="pgErr"></div>
+      <div style="display:grid;grid-template-columns:repeat(3,56px);gap:8px;margin-top:4px">
+        ${[1,2,3,4,5,6,7,8,9,'','0','⌫'].map(k=>`<button onclick="pgKey('${k}')" style="height:56px;background:#111128;border:1px solid #1e1e38;border-radius:10px;color:#ccd;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit">${k}</button>`).join('')}
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  let _p = '';
+  window.pgKey = async function(k) {
+    if (k === '⌫') { _p = _p.slice(0,-1); } else if (k !== '' && _p.length < 4) { _p += k; }
+    for(let i=0;i<4;i++) document.getElementById('pgd'+i).style.background = i<_p.length?'#88aaff':'transparent';
+    if (_p.length < 4) return;
+    try {
+      const r = await fetch('/api/auth/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:_p})});
+      const d = await r.json();
+      if (d.ok) { sessionStorage.setItem('rh_pin_ok','1'); overlay.remove(); delete window.pgKey; init(); }
+      else { document.getElementById('pgErr').textContent=d.error||'Невірний PIN'; _p=''; for(let i=0;i<4;i++) document.getElementById('pgd'+i).style.background='transparent'; }
+    } catch(e) { document.getElementById('pgErr').textContent='Сервер не відповідає'; _p=''; }
+  };
+  document.addEventListener('keydown', function h(e){
+    if (!document.getElementById('pinGuard')) { document.removeEventListener('keydown',h); return; }
+    if (e.key>='0'&&e.key<='9') pgKey(e.key);
+    else if (e.key==='Backspace') pgKey('⌫');
+  });
+})();
+
+function init() {
+  // Default to today
+  const t = today();
+  document.getElementById('dateFrom').value = t;
+  document.getElementById('dateTo').value   = t;
+}
+
+if (sessionStorage.getItem('rh_pin_ok') === '1') init();
+</script>
+</body>
+</html>

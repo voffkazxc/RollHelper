@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RollHouse PRO — Кур'єри</title>
+<script src="/static/_sidebar.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: #0a0a14;
+  color: #d0d0e0;
+  min-height: 100vh;
+}
+
+/* ── Top bar ── */
+.topbar {
+  background: #111120;
+  border-bottom: 1px solid #1e1e38;
+  padding: 0 20px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.topbar .logo { font-size: 15px; font-weight: 800; color: #88aaff; }
+.topbar .nav-link {
+  font-size: 13px; color: #5566aa; text-decoration: none;
+  padding: 4px 10px; border-radius: 6px; transition: all .15s;
+}
+.topbar .nav-link:hover { background: rgba(100,120,255,.1); color: #88aaff; }
+.topbar .spacer { flex: 1; }
+
+/* ── Main layout ── */
+.main { max-width: 800px; margin: 0 auto; padding: 24px 20px 60px; }
+
+/* ── Page title ── */
+.page-title {
+  font-size: 20px; font-weight: 800; color: #ccd0ee;
+  margin-bottom: 20px;
+  display: flex; align-items: center; gap: 10px;
+}
+.page-title .count-badge {
+  background: #1e1e38; border-radius: 20px;
+  padding: 2px 12px; font-size: 13px; color: #6677aa; font-weight: 600;
+}
+
+/* ── Add form ── */
+.add-form {
+  background: #111120;
+  border: 1px solid #1e1e38;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.add-form .field { flex: 1; min-width: 140px; }
+.add-form label {
+  display: block; font-size: 10px; text-transform: uppercase;
+  letter-spacing: 1px; color: #445; font-weight: 700; margin-bottom: 5px;
+}
+.add-form input {
+  width: 100%;
+  background: #0e0e1e; border: 1px solid #252545;
+  border-radius: 7px; color: #d0d8f0;
+  font-size: 13px; padding: 8px 11px; outline: none;
+  font-family: 'Segoe UI', sans-serif;
+  transition: border-color .15s;
+}
+.add-form input:focus { border-color: #4466cc; }
+.btn-add {
+  padding: 8px 20px;
+  background: linear-gradient(135deg, #2255cc, #1144aa);
+  border: none; border-radius: 8px;
+  color: #fff; font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: opacity .15s;
+  white-space: nowrap;
+}
+.btn-add:hover { opacity: .85; }
+.btn-add:disabled { opacity: .4; cursor: default; }
+
+/* ── Couriers list ── */
+.couriers-list { display: flex; flex-direction: column; gap: 8px; }
+
+.courier-card {
+  background: #111120;
+  border: 1px solid #1e1e38;
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: border-color .15s;
+}
+.courier-card:hover { border-color: #2a2a50; }
+.courier-card.inactive { opacity: .45; }
+
+/* Avatar */
+.courier-avatar {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1e3a5f, #2255aa);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.courier-card.inactive .courier-avatar {
+  background: #1a1a2a;
+  filter: grayscale(1);
+}
+
+/* Info */
+.courier-info { flex: 1; min-width: 0; }
+.courier-name {
+  font-size: 15px; font-weight: 700; color: #ccd0ee;
+  margin-bottom: 2px;
+}
+.courier-phone { font-size: 12px; color: #5568aa; }
+
+/* Stats */
+.courier-stats {
+  display: flex; gap: 12px; flex-shrink: 0;
+  flex-wrap: wrap; justify-content: flex-end;
+}
+.stat-item { text-align: center; }
+.stat-item .sv {
+  font-size: 16px; font-weight: 800; color: #88aaff; line-height: 1;
+}
+.stat-item .sl {
+  font-size: 9px; text-transform: uppercase; letter-spacing: 1px;
+  color: #445; margin-top: 1px;
+}
+.stat-item.today .sv { color: #66dd99; }
+.stat-item.active-orders .sv { color: #ffbb44; }
+
+/* Actions */
+.courier-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.btn-icon {
+  background: none;
+  border: 1px solid #1e1e38;
+  border-radius: 7px;
+  color: #5566aa;
+  width: 32px; height: 32px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.btn-icon:hover { border-color: #4466cc; color: #88aaff; background: rgba(70,100,200,.08); }
+.btn-icon.danger:hover { border-color: #cc3333; color: #ff6666; background: rgba(200,50,50,.08); }
+.btn-icon.success { border-color: #1e3a2a; color: #44aa77; }
+.btn-icon.success:hover { border-color: #33cc77; color: #66ddaa; background: rgba(50,200,100,.08); }
+
+/* ── Edit row ── */
+.edit-row {
+  display: flex; gap: 8px; align-items: center;
+  margin-top: 8px; flex-wrap: wrap;
+}
+.edit-row input {
+  background: #0e0e1e; border: 1px solid #2a2a50;
+  border-radius: 6px; color: #d0d8f0;
+  font-size: 13px; padding: 6px 10px; outline: none;
+  font-family: 'Segoe UI', sans-serif;
+  transition: border-color .15s;
+}
+.edit-row input:focus { border-color: #4466cc; }
+.edit-row input.name-input { flex: 1; min-width: 120px; }
+.edit-row input.phone-input { width: 140px; }
+.btn-save-edit {
+  padding: 6px 14px;
+  background: rgba(50,150,80,.15);
+  border: 1px solid #33aa66;
+  border-radius: 6px; color: #55cc88;
+  font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: all .15s;
+  white-space: nowrap;
+}
+.btn-save-edit:hover { background: rgba(50,150,80,.25); }
+.btn-cancel-edit {
+  padding: 6px 10px;
+  background: none; border: 1px solid #252545;
+  border-radius: 6px; color: #556;
+  font-size: 12px; cursor: pointer; transition: all .15s;
+}
+.btn-cancel-edit:hover { border-color: #4466cc; color: #88aaff; }
+
+/* ── Empty ── */
+.empty { padding: 40px 0; text-align: center; color: #334; font-size: 14px; }
+
+/* ── Toast ── */
+.toast-fixed {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%);
+  background: #1a2a1a; border: 1px solid #33aa66;
+  color: #66ee99; border-radius: 8px;
+  padding: 10px 20px; font-size: 13px; font-weight: 600;
+  z-index: 999; display: none; white-space: nowrap;
+}
+.toast-fixed.err { background: #2a1a1a; border-color: #aa3333; color: #ff8888; }
+.toast-fixed.show { display: block; }
+
+/* ── PIN overlay ── */
+.pin-overlay {
+  position: fixed; inset: 0; background: #07070f;
+  z-index: 1000; display: flex; align-items: center; justify-content: center;
+}
+.pin-box {
+  background: #111120; border: 1px solid #1e1e3a;
+  border-radius: 16px; padding: 32px 28px 28px;
+  width: 280px; text-align: center;
+  box-shadow: 0 16px 64px rgba(0,0,0,.7);
+}
+.pin-logo { font-size: 28px; margin-bottom: 8px; }
+.pin-title { font-size: 15px; font-weight: 700; color: #ccd0ee; margin-bottom: 4px; }
+.pin-sub { font-size: 12px; color: #445; margin-bottom: 20px; }
+.pin-dots { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+.pin-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #1e1e38; border: 2px solid #2a2a50;
+  transition: background .12s, border-color .12s;
+}
+.pin-dot.filled { background: #6688ff; border-color: #6688ff; }
+.pin-dot.error  { background: #ff4444; border-color: #ff4444; animation: shake .3s ease; }
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+.pin-pad {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 8px; margin-bottom: 10px;
+}
+.pin-key {
+  padding: 14px 0; border-radius: 10px;
+  border: 1px solid #1e1e38; background: #161626;
+  color: #ccd0ee; font-size: 18px; font-weight: 700;
+  cursor: pointer; transition: background .1s, transform .08s; user-select: none;
+}
+.pin-key:hover  { background: #1e1e40; }
+.pin-key:active { transform: scale(.93); background: #2a2a55; }
+.pin-key.del { font-size: 16px; color: #556; }
+.pin-key.del:hover { color: #ff6666; }
+.pin-err { font-size: 12px; color: #ff6666; min-height: 18px; margin-top: 4px; }
+
+/* ── Section divider ── */
+.section-sep {
+  border: none; border-top: 1px solid #1a1a30;
+  margin: 20px 0 16px;
+}
+.section-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px;
+  color: #445; font-weight: 700; margin-bottom: 10px;
+}
+</style>
+</head>
+<body>
+
+<!-- PIN overlay -->
+<div class="pin-overlay" id="pinOverlay">
+  <div class="pin-box">
+    <div class="pin-logo">🔐</div>
+    <div class="pin-title">RollHouse PRO</div>
+    <div class="pin-sub">Введіть PIN для входу</div>
+    <div class="pin-dots" id="pinDots">
+      <div class="pin-dot" id="pd0"></div>
+      <div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div>
+      <div class="pin-dot" id="pd3"></div>
+    </div>
+    <div class="pin-pad">
+      <button class="pin-key" onclick="pinKey('1')">1</button>
+      <button class="pin-key" onclick="pinKey('2')">2</button>
+      <button class="pin-key" onclick="pinKey('3')">3</button>
+      <button class="pin-key" onclick="pinKey('4')">4</button>
+      <button class="pin-key" onclick="pinKey('5')">5</button>
+      <button class="pin-key" onclick="pinKey('6')">6</button>
+      <button class="pin-key" onclick="pinKey('7')">7</button>
+      <button class="pin-key" onclick="pinKey('8')">8</button>
+      <button class="pin-key" onclick="pinKey('9')">9</button>
+      <button class="pin-key del" onclick="pinClear()">✕</button>
+      <button class="pin-key" onclick="pinKey('0')">0</button>
+      <button class="pin-key del" onclick="pinBackspace()">⌫</button>
+    </div>
+    <div class="pin-err" id="pinErr"></div>
+  </div>
+</div>
+
+<!-- Top bar -->
+<div class="topbar">
+  <span class="logo" style="color:#5566aa;opacity:.6">Кур'єри</span>
+  <span class="spacer"></span>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <div class="page-title">
+    🛵 Кур'єри
+    <span class="count-badge" id="countBadge">0</span>
+  </div>
+
+  <!-- Add form -->
+  <div class="add-form">
+    <div class="field">
+      <label>Ім'я кур'єра *</label>
+      <input type="text" id="addName" placeholder="Олег, Максим..." maxlength="60">
+    </div>
+    <div class="field">
+      <label>Телефон</label>
+      <input type="text" id="addPhone" placeholder="0501234567" maxlength="20">
+    </div>
+    <button class="btn-add" id="btnAdd" onclick="addCourier()">➕ Додати</button>
+  </div>
+
+  <!-- Active couriers -->
+  <div class="section-label">Активні</div>
+  <div class="couriers-list" id="listActive">
+    <div class="empty">Завантаження...</div>
+  </div>
+
+  <!-- Inactive couriers (collapsed if empty) -->
+  <div id="inactiveSection" style="display:none">
+    <hr class="section-sep">
+    <div class="section-label">Неактивні</div>
+    <div class="couriers-list" id="listInactive"></div>
+  </div>
+</div>
+
+<div class="toast-fixed" id="toast"></div>
+
+<script>
+const API = '';  // відносні URL — same-origin cookie
+const PIN_SESSION_KEY = 'rh_pin_ok';
+let _couriers = [];
+let _editingId = null;
+
+// ── Load ─────────────────────────────────────────────────────────
+
+async function load() {
+  try {
+    const rows = await fetch(API + '/api/couriers?stats=1&active=0').then(r => r.json());
+    _couriers = Array.isArray(rows) ? rows : [];
+    render();
+  } catch(e) {
+    document.getElementById('listActive').innerHTML =
+      '<div class="empty" style="color:#f77">Сервер не відповідає. Запустіть start.bat</div>';
+  }
+}
+
+function render() {
+  const active   = _couriers.filter(function(c){ return c.active; });
+  const inactive = _couriers.filter(function(c){ return !c.active; });
+
+  document.getElementById('countBadge').textContent = active.length;
+  document.getElementById('listActive').innerHTML   = active.length
+    ? active.map(renderCard).join('')
+    : '<div class="empty">Ще немає активних кур\'єрів. Додайте першого!</div>';
+
+  if (inactive.length) {
+    document.getElementById('inactiveSection').style.display = 'block';
+    document.getElementById('listInactive').innerHTML = inactive.map(renderCard).join('');
+  } else {
+    document.getElementById('inactiveSection').style.display = 'none';
+  }
+}
+
+function renderCard(c) {
+  const isEditing = _editingId === c.id;
+  const initial   = (c.name || '?').charAt(0).toUpperCase();
+
+  let actionsHtml;
+  if (isEditing) {
+    actionsHtml = ''; // кнопки в edit-row
+  } else {
+    const toggleBtn = c.active
+      ? '<button class="btn-icon danger" title="Деактивувати" onclick="toggleActive(' + c.id + ', 0)">🚫</button>'
+      : '<button class="btn-icon success" title="Активувати"   onclick="toggleActive(' + c.id + ', 1)">✅</button>';
+    actionsHtml = '<div class="courier-actions">'
+      + '<button class="btn-icon" title="Редагувати" onclick="startEdit(' + c.id + ')">✏️</button>'
+      + toggleBtn
+      + '</div>';
+  }
+
+  let editRow = '';
+  if (isEditing) {
+    editRow = '<div class="edit-row">'
+      + '<input class="name-input"  id="eName_'  + c.id + '" type="text" value="' + esc(c.name || '') + '" placeholder="Ім\'я">'
+      + '<input class="phone-input" id="ePhone_' + c.id + '" type="text" value="' + esc(c.phone || '') + '" placeholder="Телефон">'
+      + '<button class="btn-save-edit"   onclick="saveEdit(' + c.id + ')">💾 Зберегти</button>'
+      + '<button class="btn-cancel-edit" onclick="cancelEdit()">Скасувати</button>'
+      + '</div>';
+  }
+
+  const statusDot = { online:'🟢', busy:'🟡', offline:'⚪' }[c.courier_status] || '⚪';
+  const statusLbl = { online:'Онлайн', busy:'Зайнятий', offline:'Офлайн' }[c.courier_status] || 'Офлайн';
+  return '<div class="courier-card' + (c.active ? '' : ' inactive') + '" id="cc-' + c.id + '">'
+    + '<div class="courier-avatar">' + esc(initial) + '</div>'
+    + '<div class="courier-info">'
+    +   '<div class="courier-name">' + esc(c.name) + ' <span title="' + statusLbl + '" style="font-size:11px">' + statusDot + '</span></div>'
+    +   '<div class="courier-phone">' + (c.phone ? '📞 ' + esc(c.phone) : '<span style="color:#334">Телефон не вказано</span>') + '</div>'
+    +   editRow
+    +   '<textarea id="cnotes-' + c.id + '" rows="2" oninput="scheduleCourierNotes(' + c.id + ')" '
+    +     'style="width:100%;margin-top:6px;background:#0a0a18;border:1px solid #1e1e38;border-radius:6px;'
+    +     'color:#778;font-size:11px;padding:5px 8px;resize:none;outline:none;font-family:Segoe UI,sans-serif" '
+    +     'placeholder="Нотатки про кур\'єра...">'
+    +     esc(c.notes || '') + '</textarea>'
+    + '</div>'
+    + '<div class="courier-stats">'
+    +   '<div class="stat-item today">'
+    +     '<div class="sv">' + (c.today_orders || 0) + '</div>'
+    +     '<div class="sl">Сьогодні</div>'
+    +   '</div>'
+    +   '<div class="stat-item active-orders">'
+    +     '<div class="sv">' + (c.active_orders || 0) + '</div>'
+    +     '<div class="sl">Активних</div>'
+    +   '</div>'
+    +   '<div class="stat-item">'
+    +     '<div class="sv">' + (c.total_orders || 0) + '</div>'
+    +     '<div class="sl">Всього</div>'
+    +   '</div>'
+    + '</div>'
+    + actionsHtml
+    + '</div>';
+}
+
+// ── Courier notes auto-save ───────────────────────────────────────
+const _courierNotesTimers = {};
+function scheduleCourierNotes(courierId) {
+  clearTimeout(_courierNotesTimers[courierId]);
+  _courierNotesTimers[courierId] = setTimeout(async function() {
+    const ta = document.getElementById('cnotes-' + courierId);
+    if (!ta) return;
+    try {
+      const r = await fetch(API + '/api/courier/' + courierId + '/notes', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ notes: ta.value })
+      });
+      const d = await r.json();
+      if (d.ok) {
+        ta.style.borderColor = '#336633';
+        setTimeout(() => { if (ta) ta.style.borderColor = '#1e1e38'; }, 1000);
+      }
+    } catch {}
+  }, 800);
+}
+
+// ── Add ──────────────────────────────────────────────────────────
+
+async function addCourier() {
+  const name  = document.getElementById('addName').value.trim();
+  const phone = document.getElementById('addPhone').value.trim();
+  if (!name) {
+    document.getElementById('addName').focus();
+    showToast('Введіть ім\'я кур\'єра', 'err');
+    return;
+  }
+  const btn = document.getElementById('btnAdd');
+  btn.disabled = true; btn.textContent = '⏳';
+  try {
+    const r = await fetch(API + '/api/couriers', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, phone }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      document.getElementById('addName').value  = '';
+      document.getElementById('addPhone').value = '';
+      showToast('✅ Кур\'єра додано');
+      load();
+    } else {
+      showToast('❌ ' + (d.error || 'Помилка'), 'err');
+    }
+  } catch(e) {
+    showToast('❌ Сервер не відповідає', 'err');
+  }
+  btn.disabled = false; btn.textContent = '➕ Додати';
+}
+
+// ── Edit ─────────────────────────────────────────────────────────
+
+function startEdit(id) {
+  _editingId = id;
+  render();
+  // Фокус на поле імені
+  setTimeout(function() {
+    const el = document.getElementById('eName_' + id);
+    if (el) { el.focus(); el.select(); }
+  }, 0);
+}
+
+function cancelEdit() {
+  _editingId = null;
+  render();
+}
+
+async function saveEdit(id) {
+  const nameEl  = document.getElementById('eName_' + id);
+  const phoneEl = document.getElementById('ePhone_' + id);
+  const name    = nameEl  ? nameEl.value.trim()  : '';
+  const phone   = phoneEl ? phoneEl.value.trim() : '';
+
+  if (!name) { nameEl.focus(); showToast('Ім\'я не може бути порожнім', 'err'); return; }
+
+  // P4: disabled-стан під час запиту
+  const saveBtn = document.querySelector('#cc-' + id + ' .btn-save-edit');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳'; }
+
+  try {
+    const r = await fetch(API + '/api/couriers', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ id, name, phone }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      // P4: оновлюємо UI тільки після підтвердження API
+      _editingId = null;
+      const c = _couriers.find(function(c){ return c.id === id; });
+      if (c) { c.name = name; c.phone = phone; }
+      render();
+      showToast('✅ Збережено');
+    } else {
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Зберегти'; }
+      showToast('❌ ' + (d.error || 'Помилка'), 'err');
+    }
+  } catch(e) {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Зберегти'; }
+    showToast('❌ Сервер не відповідає', 'err');
+  }
+}
+
+// ── Toggle active ─────────────────────────────────────────────────
+
+async function toggleActive(id, active) {
+  // P4: disabled під час запиту
+  const btn = document.querySelector('#cc-' + id + ' .btn-icon.danger, #cc-' + id + ' .btn-icon.success');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+
+  try {
+    const r = await fetch(API + '/api/couriers', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ id, active }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      // P4: оновлюємо UI тільки після підтвердження API
+      const c = _couriers.find(function(c){ return c.id === id; });
+      if (c) c.active = active;
+      render();
+      showToast(active ? '✅ Активовано' : '🚫 Деактивовано');
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = active ? '✅' : '🚫'; }
+      showToast('❌ ' + (d.error || 'Помилка'), 'err');
+    }
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = active ? '✅' : '🚫'; }
+    showToast('❌ Сервер не відповідає', 'err');
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast-fixed show' + (type === 'err' ? ' err' : '');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function() { t.classList.remove('show'); }, 3500);
+}
+
+function esc(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Enter в формі додавання
+document.getElementById('addName').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('addPhone').focus();
+});
+document.getElementById('addPhone').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') addCourier();
+});
+
+// ── PIN ───────────────────────────────────────────────────────────
+
+let _pin = '';
+
+function pinKey(d) {
+  if (_pin.length >= 4) return;
+  _pin += d;
+  updatePinDots();
+  if (_pin.length === 4) setTimeout(submitPin, 80);
+}
+function pinBackspace() {
+  _pin = _pin.slice(0,-1);
+  document.getElementById('pinErr').textContent = '';
+  updatePinDots();
+}
+function pinClear() {
+  _pin = '';
+  document.getElementById('pinErr').textContent = '';
+  updatePinDots();
+}
+function updatePinDots() {
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('pd' + i).className = 'pin-dot' + (i < _pin.length ? ' filled' : '');
+  }
+}
+function pinShakeError(msg) {
+  _pin = '';
+  for (let i = 0; i < 4; i++) document.getElementById('pd' + i).className = 'pin-dot error';
+  document.getElementById('pinErr').textContent = msg;
+  setTimeout(function() {
+    for (let i = 0; i < 4; i++) document.getElementById('pd' + i).className = 'pin-dot';
+  }, 500);
+}
+async function submitPin() {
+  try {
+    const r = await fetch(API + '/api/auth/verify', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ pin: _pin }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      sessionStorage.setItem(PIN_SESSION_KEY, '1');
+      document.getElementById('pinOverlay').style.display = 'none';
+      load();
+    } else {
+      pinShakeError(d.error || 'Невірний PIN');
+    }
+  } catch(e) { pinShakeError('Сервер не відповідає'); }
+}
+document.addEventListener('keydown', function(e) {
+  if (document.getElementById('pinOverlay').style.display === 'none') return;
+  if (e.key >= '0' && e.key <= '9') pinKey(e.key);
+  else if (e.key === 'Backspace') pinBackspace();
+  else if (e.key === 'Escape') pinClear();
+});
+
+// ── Init ──────────────────────────────────────────────────────────
+if (sessionStorage.getItem(PIN_SESSION_KEY) === '1') {
+  document.getElementById('pinOverlay').style.display = 'none';
+  load();
+}
+</script>
+</body>
+</html>
