@@ -1,4 +1,4 @@
-﻿#Requires AutoHotkey v1.1
+#Requires AutoHotkey v1.1
 #NoEnv
 #SingleInstance Force
 CoordMode, Mouse, Screen
@@ -1880,6 +1880,7 @@ SilentMagicClean:
             isFutureDate := 1, warnReason := sysD3 . "." . sysD2 . "." . sysD1
         }
     }
+    text := RegExReplace(text, "i)\d{4}-\d{2}-\d{2}", "")
     if (!isFutureDate && RegExMatch(text, "i)\b(завтра|послезавтра|післязавтра)\b", kw))
         isFutureDate := 1, warnReason := kw1
     if (!isFutureDate && RegExMatch(text, "(?<!\d)(0?[1-9]|[12]\d|3[01])[\./](0?[1-9]|1[012])[\./](20\d{2}|\d{2})(?!\d)", mFullD)) {
@@ -2110,7 +2111,17 @@ SilentMagicClean:
     kitchenNote := ""
     if RegExMatch(text, "i)Напишіть свої побажання:\s*([^;\r\n]+)", mWish) {
         kitchenNote .= Trim(mWish1)
-        text := RegExReplace(text, "\Q" . mWish0 . "\E", "")
+        text := StrReplace(text, mWish0, "")
+    }
+    ; Клієнтський коментар → в кухню (не в чек кур'єра)
+    if RegExMatch(text, "i)(?:Коментар:|Комментарий к заказу:)\s*(.*?)(?=\r|\n|$)", matchComm) {
+        commVal := Trim(matchComm1)
+        if (commVal != "") {
+            if (kitchenNote != "")
+                kitchenNote .= " | "
+            kitchenNote .= commVal
+        }
+        text := StrReplace(text, matchComm0, "")
     }
     Loop {
         if (!RegExMatch(text, "i)([^.,;!?\r\n]*(?:без\s+[а-яіїєґ]+|не\s+(?:додавати|додавайте|кладіть)|алерг|добре\s+просмаж)[^.,;!?\r\n]*)", kMatch))
@@ -2118,25 +2129,23 @@ SilentMagicClean:
         if (kitchenNote != "")
             kitchenNote .= " | "
         kitchenNote .= Trim(kMatch1)
-        text := RegExReplace(text, "\Q" . kMatch1 . "\E", "")
+        text := StrReplace(text, kMatch1, "")
     }
-    ; kitchenNote НЕ мержимо в infoText — воно пишеться окремо в колонку "Коментарій"
-    ; таблиці страв (напротив блюда), а не в "Інформація про клієнта"
+    ; kitchenNote → поле «Кухня», не в коментар кур'єра
 
     ; 9. ВИДАЛЕННЯ СМІТТЯ
-    text := RegExReplace(text, "i)м\.\s*(Мерефа|Берестин|Берестін|Чугуїв|Чугуєв|Харків).*?(дім\s*-|кв\.|буд\.).*?(?=\r|\n|$)", "")
-    text := RegExReplace(text, "i)(Адреса доставки:|Адреса:\s*).*?((?=,\s*Оплата)|(?=[;\r\n]|$))", "")
+    text := RegExReplace(text, "i)(м\.|г\.)\s*(Мерефа|Берес\s*тин|Берес\s*тін|Чугуїв|Чугуєв|Харків).*?(дім\s*-|кв\.|буд\.|дом\b).*?(?=\r|\n|$)", "")
+    text := RegExReplace(text, "i)(Адреса доставки:|Адреса:\s*|Адрес:\s*).*?((?=,\s*Оплата)|(?=[;\r\n]|$))", "")
     text := RegExReplace(text, "i)(Android v[\d\.]+|iOS v[\d\.]+)[,\s;]*", "")
-    text := RegExReplace(text, "i)Замовлення №\d+[ \r\n]*", "")
-    text := RegExReplace(text, "i)(?:---ОПЛАЧЕНО---|УСПІШНО)", "")
-    text := RegExReplace(text, "i)Тип оплати:\s*(.*?)(?=\r|\n|$)", "")
+    text := RegExReplace(text, "i)(Замовлення|Заказ) №\d+[ \r\n]*", "")
+    text := RegExReplace(text, "i)(?:---ОПЛАЧЕНО---|УСПІШНО|УСПЕШНО)", "")
+    text := RegExReplace(text, "i)(Тип оплати:|Тип оплаты:)\s*(.*?)(?=\r|\n|$)", "")
     text := RegExReplace(text, "i)Оплата:\s*(.*?)(?=[,\r\n;]|$)", "")
-    text := RegExReplace(text, "i)Коментар:\s*", "") 
-    text := RegExReplace(text, "i)(?:Передзвонити|Перетелефонувати|Подзв|зателефону|звонить)[^\r\n]*", "")
-    text := RegExReplace(text, "i)(?:підготувати\s*)?решт[уа]\s*з(?:[:\sз]*?)\d+(?:\s*грн)?\s*", "")
-    text := RegExReplace(text, "i)\d{4}-\d{2}-\d{2}", "") 
-    text := RegExReplace(text, "i)Час:\s*", "")
-    text := RegExReplace(text, "i)Карткою у закладі", "")
+    text := RegExReplace(text, "i)(?:Коментар:|Комментарий к заказу:)\s*[^\r\n]*", "")  ; fallback
+    text := RegExReplace(text, "i)(?:Передзвонити|Перетелефонувати|Подзв|зателефону|звонить|перезвонить)[^\r\n]*", "")
+    text := RegExReplace(text, "i)(?:підготувати\s*|подготовить\s*)?(решт[уа]\s*з|сдача\s*с)(?:[:\sзс]*?)\d+(?:\s*грн)?\s*", "")
+    text := RegExReplace(text, "i)(Час:|Время:)\s*", "")
+    text := RegExReplace(text, "i)(Карткою у закладі|Картой в заведении)", "")
 
     ; 10. АДРЕСА
     if RegExMatch(text, "i)(?:Коментар до адреси|Комментарий к адресу):\s*(.*?)(?=(Найближчим|\d{4}-\d{2}-|$|\n|\r))", matchAddr) {
@@ -3453,4 +3462,660 @@ F7::
         GoSub, CallFreezeMode
 return
 
-; --- Завантаження с
+
+; --- Завантаження списку зі стовпчика K активного Excel ---
+LoadCallList() {
+    global callList, callListCount, callListIdx, callNoAnswer, callDialing
+    callList := []
+    callListIdx := 0
+    callListCount := 0
+    callNoAnswer := 0
+    callDialing := 0
+    try {
+        xl := ComObjActive("Excel.Application")
+    } catch e {
+        MsgBox, 48, Обзвон, Excel не запущено або файл не відкрито.
+        return 0
+    }
+    try {
+        sheet := xl.ActiveSheet
+        ; xlUp = -4162. Шукаємо останню заповнену комірку в стовпчику K (11).
+        lastRow := sheet.Cells(sheet.Rows.Count, 11).End(-4162).Row
+        Loop, % lastRow {
+            val := sheet.Cells(A_Index, 11).Value
+            if (val = "" || val = 0)
+                continue
+            ; Прибираємо все крім цифр та "+"
+            cleanNum := RegExReplace(val, "[^\d+]", "")
+            if (StrLen(cleanNum) >= 7)
+                callList.Push(cleanNum)
+        }
+        callListCount := callList.Length()
+        return 1
+    } catch e {
+        MsgBox, 48, Обзвон, Помилка читання Excel:`n%e%
+        return 0
+    }
+}
+
+; --- Міні-вікно прогресу обзвону ---
+ShowCallProgress:
+    RhApplyTheme()
+    Gui, CallGui:Destroy
+    Gui, CallGui:+AlwaysOnTop +ToolWindow -MaximizeBox
+    Gui, CallGui:Color, %RhC_BG%, %RhC_Panel%
+    Gui, CallGui:Add, Progress, x0 y0 w280 h42 -Theme c%RhC_Header%, 100
+    Gui, CallGui:Add, Progress, x0 y0 w280 h3 -Theme c%RhC_Neon%, 100
+    Gui, CallGui:Font, s10 bold c%RhC_HeaderText%, %RhFontName%
+    Gui, CallGui:Add, Text, x10 y10 w260 Center +BackgroundTrans, 📞 РЕЖИМ ОБЗВОНУ
+    Gui, CallGui:Font, s9 norm c%RhC_Muted%, %RhFontName%
+    hintLine := hkCallNext . " = наст  |  " . hkCallPause . " = пауза"
+    if (hkCallHangup != "")
+        hintLine .= "  |  " . hkCallHangup . " = покласти"
+    Gui, CallGui:Add, Text, x10 y+4 w260 Center, %hintLine%
+    ; Лічильник
+    Gui, CallGui:Font, s11 bold c%RhC_Text%, %RhFontName%
+    progressTxt := callListIdx . " з " . callListCount
+    Gui, CallGui:Add, Text, x10 y+8 w260 Center vCallProgressLbl, %progressTxt%
+    ; Поточний номер
+    Gui, CallGui:Font, s13 bold c%RhC_Neon%, %RhFontName%
+    Gui, CallGui:Add, Text, x10 y+4 w260 Center vCallCurrentNum, —
+    ; Статус
+    Gui, CallGui:Font, s10 norm c%RhC_Muted%, %RhFontName%
+    Gui, CallGui:Add, Text, x10 y+6 w260 Center vCallStatusLbl, ⏳ Очікування...
+    ; CRM-бейдж клієнта
+    Gui, CallGui:Font, s8 norm c%RhC_SoftText%, %RhFontName%
+    Gui, CallGui:Add, Text, x10 y+4 w260 Center vCallCrmLbl, —
+    ; Лічильник без відповіді
+    Gui, CallGui:Font, s9 bold cFF6666, %RhFontName%
+    Gui, CallGui:Add, Text, x10 y+4 w260 Center vCallNoAnswerLbl, 📵 Не відповіли: 0
+    ; Пауза
+    Gui, CallGui:Font, s10 bold c141A22, %RhFontName%
+    Gui, CallGui:Add, Button, x10 y+10 w260 h30 vCallPauseBtn gCallPauseToggle, ⏸ ПАУЗА (відгук)
+    Gui, CallGui:Font, s9 norm c%RhC_Text%, %RhFontName%
+    Gui, CallGui:Font, s10 bold c2563EB, %RhFontName%
+    Gui, CallGui:Add, Button, x10 y+6 w260 h30 gCallFreezeMode, 🧊 ЗАМРОЗИТИ (пробити замовлення)
+    Gui, CallGui:Font, s9 norm c%RhC_Text%, %RhFontName%
+    Gui, CallGui:Add, Button, x10 y+6 w125 h26 gCallResetCounter, ↺ Скинути
+    Gui, CallGui:Add, Button, x+10 yp w125 h26 gCallStopMode, ⏹ Стоп
+    Gui, CallGui:Show, x20 y200 w280, Обзвон
+return
+
+; --- Оновити колір та статус CallGui ---
+UpdateCallGuiState(state) {
+    if (!WinExist("Обзвон"))
+        return
+    if (state = "talking") {
+        Gui, CallGui:Color, 0d3020
+        GuiControl, CallGui:, CallStatusLbl, 🟢 Розмова...
+    } else if (state = "paused") {
+        Gui, CallGui:Color, 2e2000
+        GuiControl, CallGui:, CallStatusLbl, ⏸ Пауза
+    } else if (state = "dialing") {
+        Gui, CallGui:Color, 141428
+        GuiControl, CallGui:, CallStatusLbl, 📲 Набираємо...
+    } else {
+        Gui, CallGui:Color, 1a1a2a
+        GuiControl, CallGui:, CallStatusLbl, ⏳ Очікування...
+    }
+}
+
+CallResetCounter:
+    callListIdx := 0
+    GuiControl, CallGui:, CallProgressLbl, % callListIdx . " з " . callListCount
+    GuiControl, CallGui:, CallCurrentNum, —
+    UpdateCallGuiState("idle")
+return
+
+CallPauseToggle:
+    if (!callListMode)
+        return
+    if (!callPaused) {
+        callPaused := 1
+        GuiControl, CallGui:, CallPauseBtn, ▶ ПРОДОВЖИТИ
+        UpdateCallGuiState("paused")
+        ToolTip, ⏸ ПАУЗА — авто-перехід зупинено, 10, 10, 5
+    } else {
+        callPaused := 0
+        GuiControl, CallGui:, CallPauseBtn, ⏸ ПАУЗА (відгук)
+        UpdateCallGuiState("talking")
+        ToolTip, , , , 5
+    }
+return
+
+CallStopMode:
+CallGuiClose:
+CallGuiEscape:
+    callListMode := 0
+    callFrozen := 0
+    callAutoNext := 0
+    callPaused := 0
+    callDialing := 0
+    SetTimer, WaitForCallEnd, Off
+    SetTimer, AutoDialNext, Off
+    SetTimer, WaitForTalkStart, Off
+    Hotkey, %hkCallNext%, CallNextNumber, Off UseErrorLevel
+    if (hkCallHangup != "")
+        Hotkey, %hkCallHangup%, CallHangUp, Off UseErrorLevel
+    if (hkCallPause != "")
+        Hotkey, %hkCallPause%, CallPauseToggle, Off UseErrorLevel
+    Gui, CallGui:Destroy
+return
+
+; --- ЗАМОРОЗКА: сховати вікно + вимкнути хоткеї, але зберегти прогрес ---
+CallFreezeMode:
+    if (!callListMode)
+        return
+    ; Зупиняємо таймери та паузимо
+    callFrozen := 1
+    callPaused := 1
+    callAutoNext := 0
+    callDialing := 0
+    SetTimer, WaitForCallEnd, Off
+    SetTimer, AutoDialNext, Off
+    SetTimer, WaitForTalkStart, Off
+    ; Вимикаємо хоткеї обзвону
+    Hotkey, %hkCallNext%, CallNextNumber, Off UseErrorLevel
+    if (hkCallHangup != "")
+        Hotkey, %hkCallHangup%, CallHangUp, Off UseErrorLevel
+    if (hkCallPause != "")
+        Hotkey, %hkCallPause%, CallPauseToggle, Off UseErrorLevel
+    ; Ховаємо вікно (не знищуємо — просто Hide)
+    Gui, CallGui:Hide
+    ; Блокуємо клавіші Soundpad (вони будуть проходити нормально, але Soundpad їх не отримає)
+    BlockSoundpadKeys()
+    ToolTip, 🧊 Обзвон ЗАМОРОЖЕНО (%callListIdx%/%callListCount%) — F7 щоб відновити, 10, 10, 4
+    SetTimer, RemoveCallProgressTip, -3000
+return
+
+; --- РОЗМОРОЗКА: відновити вікно + хоткеї ---
+CallUnfreezeMode:
+    if (!callListMode || !callFrozen)
+        return
+    callFrozen := 0
+    callPaused := 0
+    ; Знімаємо блокування Soundpad
+    UnblockSoundpadKeys()
+    ; Відновлюємо хоткеї обзвону
+    Hotkey, %hkCallNext%, CallNextNumber, On UseErrorLevel
+    if (hkCallHangup != "")
+        Hotkey, %hkCallHangup%, CallHangUp, On UseErrorLevel
+    if (hkCallPause != "")
+        Hotkey, %hkCallPause%, CallPauseToggle, On UseErrorLevel
+    ; Оновлюємо та показуємо вікно
+    GuiControl, CallGui:, CallProgressLbl, % callListIdx . " з " . callListCount
+    GuiControl, CallGui:, CallPauseBtn, ⏸ ПАУЗА (відгук)
+    UpdateCallGuiState("idle")
+    Gui, CallGui:Show
+    ToolTip, ▶ Обзвон ВІДНОВЛЕНО з позиції %callListIdx%, 10, 10, 4
+    SetTimer, RemoveCallProgressTip, -2000
+return
+
+; --- Блокування клавіш Soundpad (AHK перехоплює їх і просто пропускає напів, Soundpad їх не бачить) ---
+BlockSoundpadKeys() {
+    global soundpadKeys
+    if (soundpadKeys = "" || soundpadKeys = "ERROR")
+        return
+    Loop, Parse, soundpadKeys, |
+    {
+        k := Trim(A_LoopField)
+        if (k = "")
+            continue
+        Hotkey, $%k%, SoundpadPassthrough, On UseErrorLevel
+    }
+}
+
+UnblockSoundpadKeys() {
+    global soundpadKeys
+    if (soundpadKeys = "" || soundpadKeys = "ERROR")
+        return
+    Loop, Parse, soundpadKeys, |
+    {
+        k := Trim(A_LoopField)
+        if (k = "")
+            continue
+        Hotkey, $%k%, SoundpadPassthrough, Off UseErrorLevel
+    }
+}
+
+; Просто пропускає клавішу напів без змін
+SoundpadPassthrough:
+    key := A_ThisHotkey
+    ; видаляємо префікс "$"
+    StringReplace, key, key, $
+    Send, {%key%}
+return
+
+RemoveCallProgressTip:
+    ToolTip, , , , 4
+return
+
+; --- Наступний дзвінок (вішається на hkCallNext тільки коли callListMode=1) ---
+CallNextNumber:
+    if (!callListMode)
+        return
+    ; Скидаємо авто-очікування та паузу
+    callAutoNext := 0
+    callPaused := 0
+    SetTimer, WaitForCallEnd, Off
+    SetTimer, AutoDialNext, Off
+    GuiControl, CallGui:, CallPauseBtn, ⏸ ПАУЗА (відгук)
+    UpdateCallGuiState("idle")
+    if (callListIdx >= callListCount) {
+        ToolTip, Список закінчився (%callListCount%), , , 4
+        SetTimer, RemoveCallProgressTip, -2500
+        return
+    }
+    callListIdx++
+    num := callList[callListIdx]
+
+    ; Запам'ятати буфер обміну, щоб не зіпсувати робочий вміст
+    prevClip := ClipboardAll
+    Clipboard := num
+    ClipWait, 0.5
+
+    ; Клік у поле, очистити, вставити
+    Click, %aikoInputX%, %aikoInputY%
+    Sleep, % SpDly(150)
+    Send, ^a
+    Sleep, 50
+    Send, ^v
+    Sleep, % SpDly(180)
+
+    ; Дзвонити (клік по кнопці)
+    Click, %aikoCallX%, %aikoCallY%
+
+    ; Відновити буфер
+    Sleep, 100
+    Clipboard := prevClip
+    prevClip := ""
+
+    ; Оновити лічильник та поточний номер у міні-вікні
+    GuiControl, CallGui:, CallProgressLbl, % callListIdx . " з " . callListCount
+    GuiControl, CallGui:, CallCurrentNum, %num%
+    GuiControl, CallGui:, CallCrmLbl, % RH_SERVER_OK ? "⏳ Шукаємо..." : "—"
+    callDialing := 1
+    UpdateCallGuiState("dialing")
+    ; CRM lookup (асинхронно через одноразовий таймер)
+    SetTimer, CrmLookupTimer, -200
+
+    ; --- Запустити автодетект розмови (макс 30 сек) ---
+    ; Працює якщо є картинка img\call_start.png і задано хоткей "Прийняти розмову"
+    if (hkAcceptTalk != "" && FileExist("img\call_start.png")) {
+        callWaitDeadline := A_TickCount + 30000
+        SetTimer, WaitForTalkStart, 300
+    }
+return
+
+; --- Таймер: коли побачив img\call_start.png — надсилає клавішу hkAcceptTalk ---
+WaitForTalkStart:
+    if (!callListMode) {
+        SetTimer, WaitForTalkStart, Off
+        ToolTip, , , , 5
+        return
+    }
+    if (A_TickCount > callWaitDeadline) {
+        SetTimer, WaitForTalkStart, Off
+        ToolTip, , , , 5
+        ; Клієнт не відповів — кладемо трубку і йдемо далі
+        if (aikoHangupX > 0)
+            Click, %aikoHangupX%, %aikoHangupY%
+        callDialing := 0
+        callNoAnswer++
+        GuiControl, CallGui:, CallNoAnswerLbl, 📵 Не відповіли: %callNoAnswer%
+        ToolTip, 📵 Не відповів. Наступний..., 10, 10, 5
+        SetTimer, AutoDialNext, -2000
+        return
+    }
+    ImageSearch, fX, fY, 0, 0, A_ScreenWidth, A_ScreenHeight, *60 img\call_start.png
+    if (ErrorLevel = 0) {
+        SetTimer, WaitForTalkStart, Off
+        ; Надсилаємо налаштовану клавішу — натискає кнопку "Розмова" в Aiko
+        Send, {%hkAcceptTalk%}
+        callDialing := 0   ; відповіли — більше не "без відповіді"
+        ToolTip, 🟢 Розмова почалась!, 10, 10, 5
+        SetTimer, RemoveTalkTip, -2000
+        UpdateCallGuiState("talking")
+        ; --- АВТО-ПЕРЕХІД: запускаємо моніторинг кінця розмови ---
+        if (FileExist("img\call_end.png")) {
+            callAutoNext := 1
+            SetTimer, WaitForCallEnd, 1000
+        }
+    } else {
+        secLeft := Round((callWaitDeadline - A_TickCount) / 1000)
+        ToolTip, Чекаю розмову... %secLeft%с, 10, 10, 5
+    }
+return
+
+RemoveTalkTip:
+    ToolTip, , , , 5
+return
+
+; --- Таймер: чекаємо кінець розмови → авто-набираємо наступний ---
+WaitForCallEnd:
+    if (!callListMode || !callAutoNext) {
+        SetTimer, WaitForCallEnd, Off
+        return
+    }
+    if (callPaused)   ; пауза — чекаємо, нічого не робимо
+        return
+    ; Область пошуку: ±200 px від прицела 15, або весь екран якщо не задано
+    if (callEndX > 0) {
+        ceX1 := callEndX - 200
+        ceY1 := callEndY - 200
+        ceX2 := callEndX + 200
+        ceY2 := callEndY + 200
+        if (ceX1 < 0)
+            ceX1 := 0
+        if (ceY1 < 0)
+            ceY1 := 0
+        if (ceX2 > A_ScreenWidth)
+            ceX2 := A_ScreenWidth
+        if (ceY2 > A_ScreenHeight)
+            ceY2 := A_ScreenHeight
+    } else {
+        ceX1 := 0
+        ceY1 := 0
+        ceX2 := A_ScreenWidth
+        ceY2 := A_ScreenHeight
+    }
+    ImageSearch, ceFoundX, ceFoundY, %ceX1%, %ceY1%, %ceX2%, %ceY2%, *40 img\call_end.png
+    if (ErrorLevel = 0) {
+        SetTimer, WaitForCallEnd, Off
+        callAutoNext := 0
+        ToolTip, ✅ Розмова завершена. Набираю наступний..., 10, 10, 5
+        UpdateCallGuiState("idle")
+        SetTimer, AutoDialNext, -2000   ; 2 сек паузи перед автонабором
+    }
+return
+
+; --- CRM lookup таймер (запускається після набору номера) ---
+CrmLookupTimer:
+    _curNum := callList[callListIdx]
+    if (_curNum != "" && RH_SERVER_OK) {
+        ShowCrmPopup(_curNum)
+        ; Якщо новий — зберегти в базу (без даних, просто зафіксувати номер)
+        RhSaveCustomer(_curNum)
+        ; Залогувати дзвінок
+        RhLogCall(_curNum, 0, 0)
+    }
+return
+
+AutoDialNext:
+    ToolTip, , , , 5
+    GoSub, CallNextNumber
+return
+
+; --- Покласти трубку (hkCallHangup, тільки коли callListMode=1) ---
+CallHangUp:
+    if (!callListMode)
+        return
+    if (aikoHangupX = 0) {
+        ToolTip, Не задано приціл "Покласти трубку" (Налаштування → 14), , , 4
+        SetTimer, RemoveCallProgressTip, -2500
+        return
+    }
+    Click, %aikoHangupX%, %aikoHangupY%
+
+    ; Зупиняємо таймер очікування — не чекаємо 30 сек
+    SetTimer, WaitForTalkStart, Off
+    ToolTip, , , , 5
+
+    ; Якщо ще не відповіли (дзвонили) — рахуємо як "не відповів"
+    if (callDialing) {
+        callDialing := 0
+        callNoAnswer++
+        GuiControl, CallGui:, CallNoAnswerLbl, 📵 Не відповіли: %callNoAnswer%
+    }
+
+    ; Одразу до наступного (1 сек пауза)
+    UpdateCallGuiState("idle")
+    SetTimer, AutoDialNext, -1000
+return
+
+; ═══════════════════════════════════════════════════════════
+; АВТО-ВИЗНАЧЕННЯ ЗОНИ ДОСТАВКИ (RollClub)
+; Щоб оновити карту — просто замініть файл:
+;   brands\rollclub\zones.kml
+; Кеш скинеться при перезапуску скрипта.
+; ═══════════════════════════════════════════════════════════
+
+; ── Таймер: запускається через 450мс після відкриття GUI ──
+LoadKmlFile:
+    FileSelectFile, _kmlSel, 3,, Виберіть KML-файл зони, KML (*.kml)
+    if (_kmlSel = "")
+        return
+    _kmlDst := A_ScriptDir . "\brands\rollclub\zones.kml"
+    FileCopy, %_kmlSel%, %_kmlDst%, 1
+    if (ErrorLevel) {
+        MsgBox, 48, KML, Не вдалось скопіювати KML-файл.
+        return
+    }
+    RcZonesOk := 0
+    RcZones := []
+    MsgBox, 64, KML, Зону завантажено. Діє з наступного замовлення.
+return
+
+RcCheckZone:
+    global streetText, isPickup, RcZones, RcZonesOk
+    SetTimer, RcCheckZone, Off
+
+    addr := Trim(streetText)
+    if (addr = "" || isPickup)
+        return
+
+    ; Очищаємо адресу від квартир, поверхів, під'їздів перед геокодуванням
+    addr := RegExReplace(addr, "i)[,\s]+(эт|поверх|кв|квартира|под|під|п|к|парадна)\.?\s*\d+.*$", "")
+    ; Видаляємо назву міста з початку адреси, якщо вона там є
+    addr := RegExReplace(addr, "i)^(Днепр|Дніпро|Харьков|Харків|Одесса|Одеса|Киев|Київ|Львов|Львів|Винница|Вінниця|Рівне|Ровно)[,\s]+", "")
+    
+    ; Виправлення проблемних мікрорайонів (особливо для Дніпра), бо Nominatim погано шукає російські назви
+    addr := RegExReplace(addr, "i)Тополь[\-\s]*(\d)", "Тополя-$1")
+    addr := RegExReplace(addr, "i)Победа[\-\s]*(\d)", "Перемога-$1")
+    addr := RegExReplace(addr, "i)Сокол[\-\s]*(\d)", "Сокіл-$1")
+    addr := RegExReplace(addr, "i)Красный Камень", "Червоний Камінь")
+    addr := RegExReplace(addr, "i)Коммунар", "Покровський")
+    
+    addr := Trim(addr)
+
+    ; Геокодування через Nominatim
+    encoded := RcUriEncode(addr)
+    url := "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&q=" . encoded
+    resp := RcHttpGet(url, 6000)
+
+    if (resp = "") {
+        GuiControl, Roll:, MapSearch, ❓ Мережа недоступна
+        return
+    }
+
+    if (!RegExMatch(resp, """lat"":""([^""]+)""", mLat) || !RegExMatch(resp, """lon"":""([^""]+)""", mLon)) {
+        ; Запасний варіант — прибираємо номер будинку (все після останньої коми)
+        if (InStr(addr, ",")) {
+            addrNoHouse := Trim(RegExReplace(addr, ",[^,]+$", ""))
+            resp2 := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&q=" . RcUriEncode(addrNoHouse), 6000)
+            if (!RegExMatch(resp2, """lat"":""([^""]+)""", mLat) || !RegExMatch(resp2, """lon"":""([^""]+)""", mLon)) {
+                GuiControl, Roll:, MapSearch, ❓ Адресу не знайдено
+                return
+            }
+            resp := resp2
+        } else {
+            GuiControl, Roll:, MapSearch, ❓ Адресу не знайдено
+            return
+        }
+    }
+
+    lat := mLat1 + 0
+    lng := mLon1 + 0
+
+    ; Завантажити KML якщо ще не завантажено (кеш зберігається до перезапуску)
+    kmlPath := A_ScriptDir "\brands\rollclub\zones.kml"
+    if (!RcZonesOk && FileExist(kmlPath))
+        RcLoadKml(kmlPath)
+
+    ; Визначення зони
+    if (RcZonesOk && RcZones.MaxIndex() > 0) {
+        zone := RcFindZone(lng, lat)
+        result := (zone != "") ? ("📍 " . zone) : "⚠️ Поза зонами доставки"
+    } else {
+        ; KML немає або порожній — показуємо display_name з геокодера
+        if RegExMatch(resp, """display_name"":""([^""]+)""", mD)
+            result := "📍 " . SubStr(mD1, 1, 55)
+        else
+            result := "📍 " . lat . ", " . lng
+    }
+
+    GuiControl, Roll:, MapSearch, %result%
+return
+
+; ── HTTP GET (синхронний, з таймаутом) ──
+RcHttpGet(url, timeoutMs := 6000) {
+    try {
+        whr := ComObjCreate("WinHttp.WinHttpRequest.5.1")
+        whr.Open("GET", url, false)
+        whr.SetTimeouts(timeoutMs, timeoutMs, timeoutMs, timeoutMs)
+        whr.SetRequestHeader("User-Agent", "RollHelper/3.0 (AHK)")
+        whr.Send()
+        return whr.ResponseText
+    } catch {
+        return ""
+    }
+}
+
+; ── URI-encode рядка для Nominatim ──
+RcUriEncode(str) {
+    VarSetCapacity(buf, StrPut(str, "UTF-8") * 3 + 1)
+    StrPut(str, &buf, "UTF-8")
+    out := ""
+    Loop {
+        byte := NumGet(buf, A_Index - 1, "UChar")
+        if (!byte)
+            break
+        ch := Chr(byte)
+        out .= RegExMatch(ch, "[A-Za-z0-9\-_.~]") ? ch : Format("%{:02X}", byte)
+    }
+    return out
+}
+
+; ── Завантажити KML → заповнити RcZones ──
+; Підтримує: Polygon всередині Folder (по містах) та на верхньому рівні.
+; Point-маркери (кухні/ресторани) ігноруються.
+RcLoadKml(kmlPath) {
+    global RcZones, RcZonesOk
+    RcZones   := []
+    RcZonesOk := 0
+
+    xml := ComObjCreate("MSXML2.DOMDocument.6.0")
+    xml.async := false
+    if (!xml.load(kmlPath)) {
+        return
+    }
+
+    try {
+        xml.setProperty("SelectionLanguage", "XPath")
+        xml.setProperty("SelectionNamespaces", "xmlns:k='http://www.opengis.net/kml/2.2'")
+        placemarks := xml.selectNodes("//k:Placemark[.//k:Polygon]")
+    } catch {
+        placemarks := xml.selectNodes("//Placemark")
+    }
+
+    Loop % placemarks.length {
+        pm := placemarks.item(A_Index - 1)
+
+        try {
+            nameNode := pm.selectSingleNode(".//k:name")
+        } catch {
+            nameNode := pm.getElementsByTagName("name").item(0)
+        }
+        
+        if (nameNode) {
+            zoneName := Trim(nameNode.text)
+        } else {
+            zoneName := "Зона " . A_Index
+        }
+        
+        zoneName := RegExReplace(zoneName, "[\r\n]+", " ")
+        zoneName := Trim(zoneName)
+
+        try {
+            coordNode := pm.selectSingleNode(".//k:Polygon//k:coordinates")
+        } catch {
+            coordNode := ""
+        }
+        
+        if (!coordNode) {
+            try {
+                coordNode := pm.selectSingleNode(".//k:coordinates")
+            } catch {
+                coordNode := pm.getElementsByTagName("coordinates").item(0)
+            }
+        }
+        
+        if (!coordNode) {
+            continue
+        }
+
+        coords := []
+        rawCoords := Trim(coordNode.text)
+        Loop, Parse, rawCoords, `n, `r
+        {
+            lf := Trim(A_LoopField)
+            if (lf != "") {
+                parts := StrSplit(lf, ",")
+                if (parts.MaxIndex() >= 2) {
+                    coords.Push([parts[1] + 0, parts[2] + 0])
+                }
+            }
+        }
+        
+        if (coords.MaxIndex() >= 3) {
+            RcZones.Push({name: zoneName, coords: coords})
+        }
+    }
+
+    if (RcZones.MaxIndex() > 0) {
+        RcZonesOk := 1
+    } else {
+        RcZonesOk := 0
+    }
+}
+
+; ── Point-in-polygon (ray casting algorithm) ──
+RcInPolygon(lng, lat, coords) {
+    inside := 0
+    n := coords.MaxIndex()
+    j := n
+    Loop % n {
+        i  := A_Index
+        xi := coords[i][1],  yi := coords[i][2]
+        xj := coords[j][1],  yj := coords[j][2]
+        if ((yi > lat) != (yj > lat))
+            if (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)
+                inside := !inside
+        j := i
+    }
+    return inside
+}
+
+; ── Знайти зону за координатами (перебір всіх полігонів) ──
+RcFindZone(lng, lat) {
+    global RcZones
+    for i, z in RcZones {
+        if RcInPolygon(lng, lat, z.coords)
+            return z.name
+    }
+    return ""
+}
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
