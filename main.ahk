@@ -3950,34 +3950,41 @@ RcCheckZone:
     
     addr := Trim(addr)
 
-    ; Геокодування через Nominatim
-    encoded := RcUriEncode(addr)
-    url := "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&q=" . encoded
-    resp := RcHttpGet(url, 6000)
+    ; Формуємо список спроб для геокодера
+    attempts := [addr]
+    if RegExMatch(addr, "i)^(Мерефа|Берестин|Чугуїв|Чугуєв|Харків)[,\s]+(.*)$", m)
+        attempts.Push(Trim(m2))
 
-    if (resp = "") {
-        GuiControl, Roll:, MapSearch, ❓ Мережа недоступна
-        return
-    }
-
-    if (!RegExMatch(resp, """lat"":""([^""]+)""", mLat) || !RegExMatch(resp, """lon"":""([^""]+)""", mLon)) {
-        ; Запасний варіант — прибираємо номер будинку (все після останньої коми)
-        if (InStr(addr, ",")) {
-            addrNoHouse := Trim(RegExReplace(addr, ",[^,]+$", ""))
-            resp2 := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&q=" . RcUriEncode(addrNoHouse), 6000)
-            if (!RegExMatch(resp2, """lat"":""([^""]+)""", mLat) || !RegExMatch(resp2, """lon"":""([^""]+)""", mLon)) {
-                GuiControl, Roll:, MapSearch, ❓ Адресу не знайдено
-                return
-            }
-            resp := resp2
-        } else {
-            GuiControl, Roll:, MapSearch, ❓ Адресу не знайдено
+    lat := "", lng := ""
+    for idx, a in attempts {
+        resp := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&q=" . RcUriEncode(a), 6000)
+        if (resp = "") {
+            GuiControl, Roll:, MapSearch, ❓ Мережа недоступна
             return
+        }
+        if (RegExMatch(resp, """lat"":""([^""]+)""", mLat) && RegExMatch(resp, """lon"":""([^""]+)""", mLon)) {
+            lat := mLat1, lng := mLon1
+            break
+        }
+        ; Запасний варіант — прибираємо номер будинку (все після останньої коми)
+        if (InStr(a, ",")) {
+            addrNoHouse := Trim(RegExReplace(a, ",[^,]+$", ""))
+            resp2 := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&q=" . RcUriEncode(addrNoHouse), 6000)
+            if (RegExMatch(resp2, """lat"":""([^""]+)""", mLat) && RegExMatch(resp2, """lon"":""([^""]+)""", mLon)) {
+                resp := resp2
+                lat := mLat1, lng := mLon1
+                break
+            }
         }
     }
 
-    lat := mLat1 + 0
-    lng := mLon1 + 0
+    if (lat = "") {
+        GuiControl, Roll:, MapSearch, ❓ Адресу не знайдено
+        return
+    }
+
+    lat += 0
+    lng += 0
 
     ; Завантажити KML якщо ще не завантажено (кеш зберігається до перезапуску)
     kmlPath := A_ScriptDir "\brands\rollclub\zones.kml"
