@@ -374,6 +374,31 @@ def _json_utf8(data, status: int = 200):
                     status=status,
                     mimetype='application/json; charset=utf-8')
 
+import parser as _parser
+
+@app.route('/api/iiko/analyze', methods=['GET', 'POST'])
+def analyze_comment():
+    """Парсинг комментария (замена гигантских RegEx из AHK)"""
+    try:
+        text = request.args.get('text', '')
+        if request.method == 'POST':
+            # Handle both JSON and raw text bodies
+            if request.is_json:
+                data = request.get_json(silent=True) or {}
+                text = data.get('text', text)
+            else:
+                text = request.get_data(as_text=True)
+
+        result = _parser.parse_comment(text)
+        
+        # Return plain Key=Value text for AHK
+        lines = []
+        for k, v in result.items():
+            lines.append(f"{k}={v}")
+        return Response("\n".join(lines), mimetype='text/plain; charset=utf-8')
+    except Exception as e:
+        return Response(f"error={str(e)}", mimetype='text/plain; charset=utf-8')
+
 @app.route('/api/iiko/read', methods=['GET'])
 def iiko_read():
     """Читає всі поля форми доставки iiko через UIA.
@@ -1913,3 +1938,12 @@ if __name__ == '__main__':
     print("  http://localhost:5000")
     print("=" * 50)
     app.run(host='127.0.0.1', port=5000, debug=False, use_reloader=False, threaded=True)
+
+@app.route('/api/iiko/set_fields', methods=['POST'])
+def iiko_set_fields():
+    data = request.json
+    if not data:
+        return jsonify({'ok': False, 'error': 'no_json'})
+    import iiko_bridge
+    res = iiko_bridge.set_fields(data)
+    return jsonify(res)
