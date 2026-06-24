@@ -3433,13 +3433,7 @@ return
 F6::
     if (callListMode) {
         ; --- ВИМКНУТИ режим ---
-        callListMode := 0
-        Hotkey, %hkCallNext%, CallNextNumber, Off UseErrorLevel
-        if (hkCallHangup != "")
-            Hotkey, %hkCallHangup%, CallHangUp, Off UseErrorLevel
-        Gui, CallGui:Destroy
-        ToolTip, Режим обзвону ВИМКНЕНО, , , 4
-        SetTimer, RemoveCallProgressTip, -2000
+        GoSub, CallStopMode
         return
     }
     ; --- УВІМКНУТИ режим ---
@@ -3616,8 +3610,11 @@ CallGuiEscape:
         Hotkey, %hkCallHangup%, CallHangUp, Off UseErrorLevel
     if (hkCallPause != "")
         Hotkey, %hkCallPause%, CallPauseToggle, Off UseErrorLevel
+    UnblockSoundpadKeys()
     Gui, CallGui:Destroy
     Gui, UnfreezeGui:Destroy
+    ToolTip, Режим обзвону ВИМКНЕНО, , , 4
+    SetTimer, RemoveCallProgressTip, -2000
 return
 
 ; --- ЗАМОРОЗКА: сховати вікно + вимкнути хоткеї, але зберегти прогрес ---
