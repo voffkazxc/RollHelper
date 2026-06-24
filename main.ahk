@@ -3927,15 +3927,17 @@ LoadKmlFile:
 return
 
 RcCheckZone:
-    global streetText, isPickup, RcZones, RcZonesOk
+    global streetText, isPickup, RcZones, RcZonesOk, deliveryCostNum
     SetTimer, RcCheckZone, Off
 
     addr := Trim(streetText)
     if (addr = "" || isPickup)
         return
 
-    ; Очищаємо адресу від квартир, поверхів, під'їздів перед геокодуванням
-    addr := RegExReplace(addr, "i)[,\s]+(эт|поверх|кв|квартира|под|під|п|к|парадна)\.?\s*\d+.*$", "")
+    ; Очищаємо адресу від квартир, поверхів, під'їздів перед геокодуванням (ігноруємо 'empty', який надсилає iiko)
+    addr := RegExReplace(addr, "i)[,\s]+(эт|поверх|кв|квартира|под|під|п|к|парадна|корп|корпус)\.?\s*(\d+|empty).*$", "")
+    ; Також видаляємо ізольоване слово empty, якщо воно залишилось
+    addr := RegExReplace(addr, "i)\bempty\b", "")
     ; Видаляємо назву міста з початку адреси, якщо вона там є
     addr := RegExReplace(addr, "i)^(Днепр|Дніпро|Харьков|Харків|Одесса|Одеса|Киев|Київ|Львов|Львів|Винница|Вінниця|Рівне|Ровно)[,\s]+", "")
     
@@ -3993,6 +3995,9 @@ RcCheckZone:
         else
             result := "📍 " . lat . ", " . lng
     }
+    
+    if (deliveryCostNum > 0 && result != "⚠️ Поза зонами доставки")
+        result .= " (" . deliveryCostNum . " грн)"
 
     GuiControl, Roll:, MapSearch, %result%
 return
