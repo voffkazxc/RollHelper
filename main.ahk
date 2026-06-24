@@ -2355,12 +2355,29 @@ PunchByPlu(pluCode, qty, itX, itY) {
     Sleep, % SpDly(250)
     Send, {Enter}
     Sleep, % SpDly(500)
-    if (qty > 1) {
-        Send, %qty%
-        Sleep, % SpDly(200)
-        Send, {Enter}
-        Sleep, % SpDly(350)
+    
+    Send, %qty%
+    Sleep, % SpDly(200)
+    
+    ; Перевірка того, що ввелось по факту
+    Clipboard := ""
+    Send, ^a
+    Sleep, 50
+    Send, ^c
+    ClipWait, 0.5
+    
+    copiedQty := RegExReplace(Clipboard, "[^\d,.]", "")
+    copiedNum := StrSplit(copiedQty, ",")[1]
+    copiedNum := StrSplit(copiedNum, ".")[1]
+    
+    if (copiedNum != qty) {
+        SoundBeep, 1200, 150
+        SoundBeep, 800, 150
+        SoundBeep, 1200, 150
     }
+    
+    Send, {Enter}
+    Sleep, % SpDly(350)
 }
 
 ; ════════════════════════════════════════════════════════════
