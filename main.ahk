@@ -1928,9 +1928,9 @@ SilentMagicClean:
         text := RegExReplace(text, "i)Час:\s*\d{1,2}:\d{2}", "")
 
     timeCandidate := ""
-    if (RegExMatch(text, "i)(?:\b(?:на|к|до|в)\b\s*)?(?<!час:\s*)(?<!\d)([01]?\d|2[0-3])\s*[:\.\-]\s*([0-5]\d)(?!\d)", tCand))
+    if (RegExMatch(text, "i)(?:\b(?:на|к|до|в|час|время)\b\s*|Час:\s*|Время:\s*)?(?<!час:\s*)(?<!\d)([01]?\d|2[0-3])\s*[:\.\-]\s*([0-5]\d)(?!\d)", tCand))
         timeCandidate := Format("{:02}:{:02}", tCand1+0, tCand2+0)
-    else if (RegExMatch(text, "i)(?:\b(?:на|к|до|в)\b\s*)?(?<!\d)([01]?\d|2[0-3])\s+([0-5]\d)(?!\d)", tCandSp))
+    else if (RegExMatch(text, "i)(?:\b(?:на|к|до|в|час|время)\b\s*|Час:\s*|Время:\s*)?(?<!\d)([01]?\d|2[0-3])\s+([0-5]\d)(?!\d)", tCandSp))
         timeCandidate := Format("{:02}:{:02}", tCandSp1+0, tCandSp2+0)
 
     if RegExMatch(text, "i)(\d{1,2}):(\d{2})\s*PM", pmMatch) {
@@ -1956,8 +1956,8 @@ SilentMagicClean:
         extractedTime := timeCandidate
 
     ; Вичистити час у різних форматах, щоб не дублювати в коментарі.
-    text := RegExReplace(text, "i)(?:\b(?:на|к|до|в)\b\s*|Час:\s*)?(?<!\d)([01]?\d|2[0-3])\s*[:\.\-]\s*([0-5]\d)(?!\d)(?:\s*(?:AM|PM))?", "")
-    text := RegExReplace(text, "i)(?:\b(?:на|к|до|в)\b\s*|Час:\s*)?(?<!\d)([01]?\d|2[0-3])\s+([0-5]\d)(?!\d)", "")
+    text := RegExReplace(text, "i)(?:\b(?:на|к|до|в|час|время)\b\s*|Час:\s*|Время:\s*)?(?<!\d)([01]?\d|2[0-3])\s*[:\.\-]\s*([0-5]\d)(?!\d)(?:\s*(?:AM|PM))?", "")
+    text := RegExReplace(text, "i)(?:\b(?:на|к|до|в|час|время)\b\s*|Час:\s*|Время:\s*)?(?<!\d)([01]?\d|2[0-3])\s+([0-5]\d)(?!\d)", "")
     text := RegExReplace(text, "i)\s*\(?Якомога швидше\)?|\s*\(?Найближчим часом\)?", "")
 
     ; 3. ОПЛАТА ТА НОМЕР
@@ -2156,7 +2156,7 @@ SilentMagicClean:
     text := RegExReplace(text, "i)(?:Коментар:|Комментарий к заказу:)\s*[^\r\n]*", "")  ; fallback
     text := RegExReplace(text, "i)(?:Передзвонити|Перетелефонувати|Подзв|зателефону|звонить|перезвонить)[^\r\n]*", "")
     text := RegExReplace(text, "i)(?:підготувати\s*|подготовить\s*)?(решт[уа]\s*з|сдача\s*с)(?:[:\sзс]*?)\d+(?:\s*грн)?\s*", "")
-    text := RegExReplace(text, "i)(Час:|Время:)\s*", "")
+    text := RegExReplace(text, "i)\b(?:Час|Время):?\s*", "")
     text := RegExReplace(text, "i)(Карткою у закладі|Картой в заведении)", "")
 
     ; 10. АДРЕСА
@@ -2203,6 +2203,11 @@ SilentMagicClean:
         finalClean .= (Trim(finalClean) != "") ? " подзвонити по готовності" : "подзвонити по готовності"
         
     cleanComment := Trim(finalClean)
+
+    ; Оновити палички у головному вікні (Щоб було як у F1)
+    GuiControl, Roll:, VisNorm, %parsedSticksNorm%
+    GuiControl, Roll:, VisEdu, %parsedSticksEdu%
+
 return
 
 ; --- СИВ МОДУЛЬ (PLU-режим: одразу показуємо вікно вводу) ---
