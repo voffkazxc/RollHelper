@@ -3617,6 +3617,7 @@ CallGuiEscape:
     if (hkCallPause != "")
         Hotkey, %hkCallPause%, CallPauseToggle, Off UseErrorLevel
     Gui, CallGui:Destroy
+    Gui, UnfreezeGui:Destroy
 return
 
 ; --- ЗАМОРОЗКА: сховати вікно + вимкнути хоткеї, але зберегти прогрес ---
@@ -3637,11 +3638,17 @@ CallFreezeMode:
         Hotkey, %hkCallHangup%, CallHangUp, Off UseErrorLevel
     if (hkCallPause != "")
         Hotkey, %hkCallPause%, CallPauseToggle, Off UseErrorLevel
-    ; Ховаємо вікно (не знищуємо — просто Hide)
+    ; Ховаємо вікно і показуємо маленьку кнопку розморозки
     Gui, CallGui:Hide
+    Gui, UnfreezeGui:Destroy
+    Gui, UnfreezeGui:+AlwaysOnTop +ToolWindow -Caption -MaximizeBox
+    Gui, UnfreezeGui:Color, 2563EB
+    Gui, UnfreezeGui:Font, s11 bold cFFFFFF, %RhFontName%
+    Gui, UnfreezeGui:Add, Button, x0 y0 w280 h35 gCallUnfreezeMode, ▶ РОЗМОРОЗИТИ (або F7)
+    Gui, UnfreezeGui:Show, x20 y200 w280 h35, Unfreeze
     ; Блокуємо клавіші Soundpad (вони будуть проходити нормально, але Soundpad їх не отримає)
     BlockSoundpadKeys()
-    ToolTip, 🧊 Обзвон ЗАМОРОЖЕНО (%callListIdx%/%callListCount%) — F7 щоб відновити, 10, 10, 4
+    ToolTip, 🧊 Обзвон ЗАМОРОЖЕНО (%callListIdx%/%callListCount%) — натисни кнопку або F7 щоб відновити, 10, 10, 4
     SetTimer, RemoveCallProgressTip, -3000
 return
 
@@ -3651,6 +3658,7 @@ CallUnfreezeMode:
         return
     callFrozen := 0
     callPaused := 0
+    Gui, UnfreezeGui:Destroy
     ; Знімаємо блокування Soundpad
     UnblockSoundpadKeys()
     ; Відновлюємо хоткеї обзвону
@@ -3767,6 +3775,11 @@ return
 ; --- Таймер: коли побачив img\call_start.png — надсилає клавішу hkAcceptTalk ---
 WaitForTalkStart:
     if (!callListMode) {
+        SetTimer, WaitForTalkStart, Off
+        ToolTip, , , , 5
+        return
+    }
+    if (callPaused) {
         SetTimer, WaitForTalkStart, Off
         ToolTip, , , , 5
         return
