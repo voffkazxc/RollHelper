@@ -701,6 +701,10 @@ TriggerMain:
             rawComment := StrReplace(rawComment, "\r", "")
             RegExMatch(_iikoData, """street""\s*:\s*""([^""]*)""", _mSt)
             streetText := _mSt1
+            if RegExMatch(_iikoData, """city""\s*:\s*""([^""]*)""", _mCty) {
+                if (_mCty1 != "")
+                    streetText := _mCty1 . ", " . streetText
+            }
             RegExMatch(_iikoData, """sum""\s*:\s*(\d+)", _mSum)
             orderSum := _mSum1 + 0
             RegExMatch(_iikoData, """time""\s*:\s*""([^""]*)""", _mT)

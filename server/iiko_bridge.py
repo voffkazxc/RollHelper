@@ -489,3 +489,27 @@ def read_phone():
         return ''
     el = _find_by_id(form, 'lookUpEditCustomerPhone')
     return _read_el_value(el) if el else ''
+
+def set_fields(fields: dict):
+    form = get_delivery_form()
+    if not form:
+        return {'ok': False, 'error': 'no_form'}
+    results = {}
+    for aid, val in fields.items():
+        try:
+            el = form.EditControl(searchDepth=12, AutomationId=aid)
+            if el.Exists(0, 0):
+                try:
+                    el.GetValuePattern().SetValue(str(val))
+                    results[aid] = True
+                except AttributeError:
+                    try:
+                        el.GetPattern(10002).SetValue(str(val))
+                        results[aid] = True
+                    except Exception as e2:
+                        results[aid] = f'err_pattern: {e2}'
+            else:
+                results[aid] = 'not_found'
+        except Exception as e:
+            results[aid] = str(e)
+    return {'ok': True, 'results': results}
