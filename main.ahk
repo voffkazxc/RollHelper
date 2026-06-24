@@ -1876,7 +1876,8 @@ SilentMagicClean:
     FormatTime, todayDt, %A_Now%, yyyy-MM-dd
     isFutureDate := 0, warnReason := ""
     if RegExMatch(text, "(\d{4})-(\d{2})-(\d{2})", sysD) {
-        if (sysD1 . "-" . sysD2 . "-" . sysD3 != todayDt) {
+        ; Порівнюємо рядково: ISO дата "більше ніж сьогодні" = майб႑тню
+        if ((sysD1 . "-" . sysD2 . "-" . sysD3) > todayDt) {
             isFutureDate := 1, warnReason := sysD3 . "." . sysD2 . "." . sysD1
         }
     }
@@ -1915,8 +1916,19 @@ SilentMagicClean:
 
     ; 2. РОЗУМНИЙ ЧАС
     ; Підстраховка: люди часто пишуть час як "17.10", "17-10", "17 10", "на 17:10", "к 17.10" тощо.
+    ;
+    ; ВАЖЛИВО: Поле "Час: 2026-06-23 11:16" — це час СТВОРЕННЯ замовлення, не доставки!
+    ; Якщо замовлення "Якомога швидше" — системний час ігноруємо,
+    ; і шукаємо час тільки в коментарі клієнта (після "Коментар:").
+    isAsap := RegExMatch(text, "i)Якомога швидше|Найближчим часом|Як можна скоріше|Как можно скорее")
+
+    ; Якщо ASAP — вилучаємо весь блок "Час: HH:MM" зі схематичного тексту
+    ; (дата вже видалена в кроці 1, залишається "Час:  11:16")
+    if (isAsap)
+        text := RegExReplace(text, "i)Час:\s*\d{1,2}:\d{2}", "")
+
     timeCandidate := ""
-    if (RegExMatch(text, "i)(?:\b(?:на|к|до|в)\b\s*)?(?<!\d)([01]?\d|2[0-3])\s*[:\.\-]\s*([0-5]\d)(?!\d)", tCand))
+    if (RegExMatch(text, "i)(?:\b(?:на|к|до|в)\b\s*)?(?<!час:\s*)(?<!\d)([01]?\d|2[0-3])\s*[:\.\-]\s*([0-5]\d)(?!\d)", tCand))
         timeCandidate := Format("{:02}:{:02}", tCand1+0, tCand2+0)
     else if (RegExMatch(text, "i)(?:\b(?:на|к|до|в)\b\s*)?(?<!\d)([01]?\d|2[0-3])\s+([0-5]\d)(?!\d)", tCandSp))
         timeCandidate := Format("{:02}:{:02}", tCandSp1+0, tCandSp2+0)
