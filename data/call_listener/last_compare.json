@@ -1,0 +1,46 @@
+{
+  "ok": true,
+  "decision": "compare",
+  "reason": "compare_languages",
+  "text": "",
+  "error": "",
+  "timestamp": "2026-08-03 22:16:02",
+  "device_index": 30,
+  "device_name": "Speakers (High Definition Audio Device) [Loopback]",
+  "device_loopback": true,
+  "audio_backend": "pyaudiowpatch",
+  "rate": 48000,
+  "channels": 1,
+  "input_channels": 2,
+  "seconds": 8.02,
+  "wav": "C:\\Users\\voffk\\Documents\\РХ_ПалочкиPRO_V6.5\\RollHelper\\data\\call_listener\\last_call.wav",
+  "compare": [
+    {
+      "model": "small",
+      "requested_language": "uk",
+      "language": "uk",
+      "language_probability": 1.0,
+      "text": "Тому що зазнаємо безперерних ракетних ударів з боку Росії. Виризакуйте власним життям і намагаєтеся на уласні очі побачити що...",
+      "decision": "manual",
+      "reason": "unknown"
+    },
+    {
+      "model": "small",
+      "requested_language": "ru",
+      "language": "ru",
+      "language_probability": 1.0,
+      "text": "потому что зазнаемо бесперерных ракетных ударов сбоку Русии. Вы резакуйте властным життям и намагайтесь на властные очи, побачите, что...",
+      "decision": "manual",
+      "reason": "unknown"
+    },
+    {
+      "model": "small",
+      "requested_language": "auto",
+      "language": "uk",
+      "language_probability": 0.9968319535255432,
+      "text": "Тому що зазнаємо безперерних ракетних ударів з боку Росії. Виризакуйте власним життям і намагаєтеся на уласні очі побачити що...",
+      "decision": "manual",
+      "reason": "unknown"
+    }
+  ]
+}

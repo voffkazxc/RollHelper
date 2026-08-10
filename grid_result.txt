@@ -1,0 +1,33 @@
+﻿Total elements count: 31
+
+[1] Name: 'Панель заголовка' | Val: '' | Aid: '' | Type: 50025
+[2] Name: 'Блюдо' | Val: '' | Aid: '' | Type: 50034
+[3] Name: 'Количество' | Val: '' | Aid: '' | Type: 50034
+[4] Name: 'Комментарий' | Val: '' | Aid: '' | Type: 50034
+[5] Name: 'Цена' | Val: '' | Aid: '' | Type: 50034
+[6] Name: 'Сумма' | Val: '' | Aid: '' | Type: 50034
+[7] Name: 'Панель данных' | Val: '' | Aid: '' | Type: 50026
+[8] Name: 'Узел0' | Val: '' | Aid: '' | Type: 50024
+[9] Name: 'Блюдо row 0' | Val: '' | Aid: '' | Type: 50029
+[10] Name: 'Количество row 0' | Val: '' | Aid: '' | Type: 50029
+[11] Name: 'Комментарий row 0' | Val: '' | Aid: '' | Type: 50029
+[12] Name: 'Цена row 0' | Val: '' | Aid: '' | Type: 50029
+[13] Name: 'Сумма row 0' | Val: '' | Aid: '' | Type: 50029
+[14] Name: 'Узел1' | Val: '' | Aid: '' | Type: 50024
+[15] Name: 'Блюдо row 1' | Val: '' | Aid: '' | Type: 50029
+[16] Name: 'Количество row 1' | Val: '' | Aid: '' | Type: 50029
+[17] Name: 'Комментарий row 1' | Val: '' | Aid: '' | Type: 50029
+[18] Name: 'Цена row 1' | Val: '' | Aid: '' | Type: 50029
+[19] Name: 'Сумма row 1' | Val: '' | Aid: '' | Type: 50029
+[20] Name: 'Узел2' | Val: '' | Aid: '' | Type: 50024
+[21] Name: 'Блюдо row 2' | Val: '' | Aid: '' | Type: 50029
+[22] Name: 'Количество row 2' | Val: '' | Aid: '' | Type: 50029
+[23] Name: 'Комментарий row 2' | Val: '' | Aid: '' | Type: 50029
+[24] Name: 'Цена row 2' | Val: '' | Aid: '' | Type: 50029
+[25] Name: 'Сумма row 2' | Val: '' | Aid: '' | Type: 50029
+[26] Name: 'Узел3' | Val: '' | Aid: '' | Type: 50024
+[27] Name: 'Блюдо row 3' | Val: '' | Aid: '' | Type: 50029
+[28] Name: 'Количество row 3' | Val: '' | Aid: '' | Type: 50029
+[29] Name: 'Комментарий row 3' | Val: '' | Aid: '' | Type: 50029
+[30] Name: 'Цена row 3' | Val: '' | Aid: '' | Type: 50029
+[31] Name: 'Сумма row 3' | Val: '' | Aid: '' | Type: 50029

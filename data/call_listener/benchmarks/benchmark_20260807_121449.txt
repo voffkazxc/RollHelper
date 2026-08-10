@@ -1,0 +1,109 @@
+=== RollHouse local ASR benchmark ===
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_call.wav
+  faster-whisper base lang=ru fallback=yes time=6286ms
+  decision=manual reason=unknown
+  text=С
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_call.wav
+  vosk tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=2807ms
+  decision=empty reason=text_empty
+  text=
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_call.wav
+  sherpa-nemo-ctc tools\call_listener\models\sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19 lang= fallback=no time=2117ms
+  decision=manual reason=unknown
+  text=все супер
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_customer_call.wav
+  faster-whisper base lang=ru fallback=yes time=4825ms
+  decision=manual reason=unknown
+  text=С
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_customer_call.wav
+  vosk tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=486ms
+  decision=manual reason=unknown
+  text=супер
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_customer_call.wav
+  sherpa-nemo-ctc tools\call_listener\models\sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19 lang= fallback=no time=173ms
+  decision=manual reason=unknown
+  text=все супер
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_14000.wav
+  faster-whisper base lang=ru fallback=yes time=5233ms
+  decision=manual reason=unknown
+  text=Кричь, долг, долг, декурт.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_14000.wav
+  vosk tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=805ms
+  decision=manual reason=unknown
+  text=так как сюда было пятна
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_14000.wav
+  sherpa-nemo-ctc tools\call_listener\models\sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19 lang= fallback=no time=312ms
+  decision=empty reason=text_empty
+  text=
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_8000.wav
+  faster-whisper base lang=ru fallback=yes time=5001ms
+  decision=manual reason=unknown
+  text=Ваши лакки, что-то упало, как вы.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_8000.wav
+  vosk tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=848ms
+  decision=manual reason=unknown
+  text=так как сюда дал голубятню
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_8000.wav
+  sherpa-nemo-ctc tools\call_listener\models\sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19 lang= fallback=no time=288ms
+  decision=empty reason=text_empty
+  text=
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_3000.wav
+  faster-whisper base lang=ru fallback=yes time=7255ms
+  decision=manual reason=unknown
+  text=Крик, что-то упало, как вы.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_3000.wav
+  vosk tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=795ms
+  decision=manual reason=unknown
+  text=так дал было пятна
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_3000.wav
+  sherpa-nemo-ctc tools\call_listener\models\sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19 lang= fallback=no time=296ms
+  decision=empty reason=text_empty
+  text=
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_1000.wav
+  faster-whisper base lang=ru fallback=yes time=4979ms
+  decision=manual reason=unknown
+  text=что-то было бы, как вы.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_1000.wav
+  vosk tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=881ms
+  decision=manual reason=unknown
+  text=так как сюда было пятна
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_1000.wav
+  sherpa-nemo-ctc tools\call_listener\models\sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19 lang= fallback=no time=305ms
+  decision=empty reason=text_empty
+  text=
+  error=

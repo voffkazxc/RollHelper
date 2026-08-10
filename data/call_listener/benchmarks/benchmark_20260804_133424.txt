@@ -1,0 +1,73 @@
+=== RollHouse local ASR benchmark ===
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_call.wav
+  vosk tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=1899ms
+  decision=manual reason=unknown
+  text=вам хорошо
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_call.wav
+  vosk-grammar tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=74ms
+  decision=positive reason=positive_short:^(все\s+)?(хорошо|добре|отлично|чудово|нормально|ок|окей|гаразд)[.!?, ]*$
+  text=хорошо
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_customer_call.wav
+  vosk tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=968ms
+  decision=manual reason=unknown
+  text=вам хорошо
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_customer_call.wav
+  vosk-grammar tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=76ms
+  decision=positive reason=positive_short:^(все\s+)?(хорошо|добре|отлично|чудово|нормально|ок|окей|гаразд)[.!?, ]*$
+  text=хорошо
+  error=
+
+C:\Users\voffk\Downloads\2026-08-04_12-23_0990487775_outgoing.mp3
+  vosk tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=2186ms
+  decision=positive reason=positive_short:все\s+(хорошо|добре|отлично|чудово|нормально),все\s+.*\b(хорошо|добре|отлично|чудово|нормально)\b
+  text=да превратятся сейчас много часов подобралась вам все нормально к размеру во-первых рыбок ласкали
+  error=
+
+C:\Users\voffk\Downloads\2026-08-04_12-23_0990487775_outgoing.mp3
+  vosk-grammar tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=398ms
+  decision=positive reason=positive_short:все\s+(хорошо|добре|отлично|чудово|нормально),все\s+.*\b(хорошо|добре|отлично|чудово|нормально)\b
+  text=добре все нормально
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_14000.wav
+  vosk tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=751ms
+  decision=manual reason=unknown
+  text=так как сюда дал голубятню
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_14000.wav
+  vosk-grammar tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=58ms
+  decision=manual reason=unknown
+  text=так чудово было дякую
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_8000.wav
+  vosk tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=763ms
+  decision=manual reason=unknown
+  text=так как сюда было пятна
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_8000.wav
+  vosk-grammar tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=55ms
+  decision=manual reason=unknown
+  text=так чудово было дякую
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_3000.wav
+  vosk tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=803ms
+  decision=manual reason=unknown
+  text=так дал было пятна
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_3000.wav
+  vosk-grammar tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=59ms
+  decision=manual reason=unknown
+  text=так чудово было дякую
+  error=

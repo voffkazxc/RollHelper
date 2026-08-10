@@ -1,0 +1,55 @@
+=== RollHouse local ASR benchmark ===
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_call.wav
+  faster-whisper base lang=ru fallback=yes time=4071ms
+  decision=positive reason=positive_short:все\s+(хорошо|добре|отлично|чудово|нормально),все\s+.*\b(хорошо|добре|отлично|чудово|нормально)\b
+  text=Вона все хорошо козіла.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_call.wav
+  vosk tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=1852ms
+  decision=manual reason=unknown
+  text=вам хорошо
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_call.wav
+  sherpa-nemo-ctc tools\call_listener\models\sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19 lang= fallback=no time=1875ms
+  decision=positive reason=positive_short:все\s+(хорошо|добре|отлично|чудово|нормально),все\s+.*\b(хорошо|добре|отлично|чудово|нормально)\b
+  text=да все хорошо спасибо
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_customer_call.wav
+  faster-whisper base lang=ru fallback=yes time=2873ms
+  decision=positive reason=positive_short:все\s+(хорошо|добре|отлично|чудово|нормально),все\s+.*\b(хорошо|добре|отлично|чудово|нормально)\b
+  text=Вона все хорошо козіла.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_customer_call.wav
+  vosk tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=920ms
+  decision=manual reason=unknown
+  text=вам хорошо
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_customer_call.wav
+  sherpa-nemo-ctc tools\call_listener\models\sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19 lang= fallback=no time=576ms
+  decision=positive reason=positive_short:все\s+(хорошо|добре|отлично|чудово|нормально),все\s+.*\b(хорошо|добре|отлично|чудово|нормально)\b
+  text=да все хорошо спасибо
+  error=
+
+C:\Users\voffk\Downloads\2026-08-04_12-23_0990487775_outgoing.mp3
+  faster-whisper base lang=ru fallback=yes time=4264ms
+  decision=manual reason=positive_with_problem_tail:\b(но|але|только|тільки|кроме|крім|окрім)\b
+  text=Доброго дня, Теро Ухал. Доброго вечера. Добрый день. Петки дичьер-сев пододалось вон. Все нормально, кроме Ролла Феодельсия. Рыба Коскане.
+  error=
+
+C:\Users\voffk\Downloads\2026-08-04_12-23_0990487775_outgoing.mp3
+  vosk tools\call_listener\models\vosk-model-small-ru-0.22 lang= fallback=no time=2156ms
+  decision=manual reason=positive_with_problem_tail:\b(но|але|только|тільки|кроме|крім|окрім)\b
+  text=да превратятся сейчас уже много часов подобралась вам все нормально кроме роллов филадельфия рыбок ласкали
+  error=
+
+C:\Users\voffk\Downloads\2026-08-04_12-23_0990487775_outgoing.mp3
+  sherpa-nemo-ctc tools\call_listener\models\sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19 lang= fallback=no time=3004ms
+  decision=manual reason=positive_with_problem_tail:\b(но|але|только|тільки|кроме|крім|окрім)\b
+  text=аллоо доброго дня ер хаус добрый вечерзамолни пкажите все сподоблось вам все нормально кроме рола филадельфия рыба кками
+  error=

@@ -1,0 +1,1 @@
+ERROR: iiko main window not found.

@@ -1,0 +1,103 @@
+{
+  "ok": true,
+  "backend": "pyaudiowpatch",
+  "seconds": 0.2,
+  "timestamp": "2026-08-05 11:42:19",
+  "best": {
+    "index": 29,
+    "name": "Headset Earphone (Jabra Link 380) [Loopback]",
+    "rate": 48000,
+    "peak_rms": 9,
+    "avg_rms": 1,
+    "duration_sec": 0.28,
+    "rms": 3,
+    "peak": 23,
+    "nonzero_percent": 0.0,
+    "wav": "C:\\Users\\voffk\\Documents\\РХ_ПалочкиPRO_V6.5\\RollHelper\\data\\call_listener\\live_channel_probe\\call_device_29.wav",
+    "error": ""
+  },
+  "selection_rule": "fallback_loudest_loopback",
+  "prefer_names": [
+    "Gaming"
+  ],
+  "rows": [
+    {
+      "index": 29,
+      "name": "Headset Earphone (Jabra Link 380) [Loopback]",
+      "rate": 48000,
+      "peak_rms": 9,
+      "avg_rms": 1,
+      "duration_sec": 0.28,
+      "rms": 3,
+      "peak": 23,
+      "nonzero_percent": 0.0,
+      "wav": "C:\\Users\\voffk\\Documents\\РХ_ПалочкиPRO_V6.5\\RollHelper\\data\\call_listener\\live_channel_probe\\call_device_29.wav",
+      "error": ""
+    },
+    {
+      "index": 28,
+      "name": "SteelSeries Sonar - Chat (SteelSeries Sonar Virtual Audio Device) [Loopback]",
+      "rate": 48000,
+      "peak_rms": 0,
+      "avg_rms": 0,
+      "duration_sec": 0.0,
+      "rms": 0,
+      "peak": 0,
+      "nonzero_percent": 0.0,
+      "wav": "",
+      "error": ""
+    },
+    {
+      "index": 30,
+      "name": "Speakers (High Definition Audio Device) [Loopback]",
+      "rate": 48000,
+      "peak_rms": 0,
+      "avg_rms": 0,
+      "duration_sec": 0.23,
+      "rms": 0,
+      "peak": 0,
+      "nonzero_percent": 0.0,
+      "wav": "C:\\Users\\voffk\\Documents\\РХ_ПалочкиPRO_V6.5\\RollHelper\\data\\call_listener\\live_channel_probe\\call_device_30.wav",
+      "error": ""
+    },
+    {
+      "index": 31,
+      "name": "SteelSeries Sonar - Microphone (SteelSeries Sonar Virtual Audio Device) [Loopback]",
+      "rate": 48000,
+      "peak_rms": 0,
+      "avg_rms": 0,
+      "duration_sec": 0.23,
+      "rms": 0,
+      "peak": 1,
+      "nonzero_percent": 0.0,
+      "wav": "C:\\Users\\voffk\\Documents\\РХ_ПалочкиPRO_V6.5\\RollHelper\\data\\call_listener\\live_channel_probe\\call_device_31.wav",
+      "error": ""
+    },
+    {
+      "index": 32,
+      "name": "SteelSeries Sonar - Media (SteelSeries Sonar Virtual Audio Device) [Loopback]",
+      "rate": 96000,
+      "peak_rms": 0,
+      "avg_rms": 0,
+      "duration_sec": 0.22,
+      "rms": 0,
+      "peak": 0,
+      "nonzero_percent": 0.0,
+      "wav": "C:\\Users\\voffk\\Documents\\РХ_ПалочкиPRO_V6.5\\RollHelper\\data\\call_listener\\live_channel_probe\\call_device_32.wav",
+      "error": ""
+    },
+    {
+      "index": 33,
+      "name": "SteelSeries Sonar - Gaming (SteelSeries Sonar Virtual Audio Device) [Loopback]",
+      "rate": 96000,
+      "peak_rms": 0,
+      "avg_rms": 0,
+      "duration_sec": 0.21,
+      "rms": 0,
+      "peak": 0,
+      "nonzero_percent": 0.0,
+      "wav": "C:\\Users\\voffk\\Documents\\РХ_ПалочкиPRO_V6.5\\RollHelper\\data\\call_listener\\live_channel_probe\\call_device_33.wav",
+      "error": ""
+    }
+  ]
+}

@@ -1,0 +1,185 @@
+My Billing Account 1 – Reports – Billing – Google Cloud console
+Skip to main content
+Keyboard shortcuts
+Accessibility help
+Accessibility feedback
+Search
+Billing
+/
+Reports
+Billing account
+My Billing Account 1
+Overview
+Cost management
+Reports
+Cost table
+Cost breakdown
+Budgets & alerts
+Billing export
+Anomalies
+Cost optimisation
+FinOps hub
+Committed-use discounts (CUDs)
+CUD analysis
+Pricing
+Cost estimation
+Credits
+Payments
+Invoices
+Transactions
+Payment settings
+Payment method
+Billing management
+Account management
+Release notes
+Reports
+See all reports
+Generate query
+Print
+Share
+Learn
+Ask Gemini Cloud Assist to create a report
+preview
+Services – this month
+Last invoice by service
+Projects – this month
+SKUs – this month
+Services – daily costs this month
+Projects – daily costs this month
+SKUs – daily costs this month
+Services – daily costs L7D
+Last invoice by project
+Last invoice by SKU
+Products – this month
+See all reports
+Services – this month
+Group by (Service)
+Time range by charge period (Current month)
+Sub-accounts (All 1)
+Products (All 3)
+Services (All 3)
+Originating services (All 1)
+Projects (All 1)
+SKUs (All 9)
+Applications (All 1)
+Locations (All 3)
+Labels (none)
+Invoice level charges (none)
+Show less
+Summary provided by Gemini Cloud Assist
+preview
+You spent $0.23 between 1 Jul 2026. This was a 8% decrease from 30 Jun 2026.
+Your largest charges were:
+Gemini API
+at $0.23 (-8%), driven by $0.23 from Project
+My First Project
+and $0.23 from Region
+global
+Gemini API
+had the largest nominal change in costs of -$0.02 (-8%) compared to the previous period, driven by:
+Decreases in Project
+My First Project
+(-$0.02; -8%)
+Decreases in Region
+global
+(-$0.02; -8%)
+Decreases in SKU
+Generate content input token count gemini 2.5 flash short input text
+(-$0.01; -12%)
+1 July 2026
+US$0.23
+8%
+includes US$0.00 in savings
+-US$0.02 over 30 June 2026
+1 – 31 July 2026 (forecasted)
+US$10.10
+41.58%
+includes US$0.00 in savings
+-US$7.19 over 31 May – 30 June 2026
+Show cumulative
+Untitled
+This chart is described by one or more grids. A grid row represents a time series. A grid column corresponds to a timestamp. By default, charts hide most columns. To display the hidden columns next to the activated column, use the Read previous item (up arrow) key until you access the column header, and then use the Activate button (enter) key.
+Data values on this chart range from a minimum of 0 to a maximum of $0.44.
+Data in this chart spans a time range from Wednesday, 1 July 2026 at 00:00:00 UTC+3 to Saturday, 1 August 2026 at 00:00:00 UTC+3.
+Unpinning the X-axis cursor allows the cursor to follow the mouse while hovering over the chart.
+ The X-axis cursor will always be pinned while using keyboard navigation to indicate that the
+ values reflected in the tooltip or the legend are associated with the position of the X-axis
+ cursor.
+Populate data for table, {LAYER_TITLE}, on chart, {CHART_TITLE}
+Navigate this grid using arrow keys. Page up and page down moves focus up and down by 10 rows. Home and End moves focus to the first and last cell in the current row. Ctrl+Home and Ctrl+End moves focus to the first and last cell of the grid.
+Grid for data, {LAYER_TITLE}, on chart, {CHART_TITLE}. Navigate this grid using arrow keys. Page up and Page down moves focus up and down by 10 rows. Home and End moves focus to the first and last cell in the current row. Ctrl+Home and Ctrl+End moves focus to the first and last cell of the grid.
+Audio
+To save memory, this table is inactive by default. To populate this table, click the
+ 'Populate data for table, {LAYER_TITLE}, on chart, {CHART_TITLE}' button just prior to this table.
+If subsequent columns are omitted, activating a column header will reveal all subsequent columns
+ up to the next revealed column.
+If subsequent rows are omitted, activating a row header will reveal all subsequent rows up to the
+ next revealed row.
+Activating a grid cell will open the tooltip at this data point.
+Forecasted cost
+Download CSV
+Service
+Usage cost
+Savings programmes
+Other savings
+Subtotal
+% change
+Gemini API
+$0.23
+—
+—
+$0.23
+8%
+Subtotal
+$0.23
+Tax
+—
+Total
+$0.23
+Please contact your network administrator for further assistance.
+Notifications (G then N)
+rollclub-kc
+APIs and services
+IAM and admin
+Billing
+Compute Engine
+Cloud Storage
+BigQuery
+VPC network
+Kubernetes Engine
+Cloud Hub
+Cloud overview
+Solutions
+Marketplace
+Agent Platform
+Security
+Monitoring
+Cloud Run
+Databases
+Cloud SQL
+Google Maps Platform
+Recently visited
+Linked account
+Overview
+Committed-use discounts (CUDs)
+Hide Billing navigation menu (visual change only)
+Reports
+Reports
+View details on reports
+View details on savings
+Currently disabled.
+Press enter to go to the tooltip.
+Use arrow keys to navigate dates
+Services – this month (Recommended)
+Last invoice by service (Recommended)
+Projects – this month (Recommended)
+SKUs – this month (Recommended)
+Services – daily costs this month (Recommended)
+Projects – daily costs this month (Recommended)
+SKUs – daily costs this month (Recommended)
+Services – daily costs L7D (Recommended)
+Last invoice by project (Recommended)
+Last invoice by SKU (Recommended)
+Products – this month (Recommended)
+Delete label key–value selection
+Download CSV

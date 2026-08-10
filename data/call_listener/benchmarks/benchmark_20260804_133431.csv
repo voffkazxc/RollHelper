@@ -1,0 +1,13 @@
+﻿file,duration_s,engine,model,language_request,language_detected,language_probability,fallback,time_ms,decision,reason,text,error
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_call.wav,3.371,vosk,tools\call_listener\models\vosk-model-small-uk-v3-nano,,,,no,1533,manual,unknown,умов,
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_call.wav,3.371,vosk-grammar,tools\call_listener\models\vosk-model-small-uk-v3-nano,,,,no,95,positive,"positive_short:^(все\s+)?(хорошо|добре|отлично|чудово|нормально|ок|окей|гаразд)[.!?, ]*$",нормально,
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_customer_call.wav,3.371,vosk,tools\call_listener\models\vosk-model-small-uk-v3-nano,,,,no,712,manual,unknown,умов,
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_customer_call.wav,3.371,vosk-grammar,tools\call_listener\models\vosk-model-small-uk-v3-nano,,,,no,94,positive,"positive_short:^(все\s+)?(хорошо|добре|отлично|чудово|нормально|ок|окей|гаразд)[.!?, ]*$",нормально,
+C:\Users\voffk\Downloads\2026-08-04_12-23_0990487775_outgoing.mp3,,vosk,tools\call_listener\models\vosk-model-small-uk-v3-nano,,,,no,2356,positive,"positive_short:все\s+(хорошо|добре|отлично|чудово|нормально),все\s+.*\b(хорошо|добре|отлично|чудово|нормально)\b,сподобал",доброго дня сподобалось вимог все нормально рибак значення,
+C:\Users\voffk\Downloads\2026-08-04_12-23_0990487775_outgoing.mp3,,vosk-grammar,tools\call_listener\models\vosk-model-small-uk-v3-nano,,,,no,567,empty,text_empty,,
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_14000.wav,2.037,vosk,tools\call_listener\models\vosk-model-small-uk-v3-nano,,,,no,576,manual,unknown,дякую,
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_14000.wav,2.037,vosk-grammar,tools\call_listener\models\vosk-model-small-uk-v3-nano,,,,no,71,empty,text_empty,,
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_8000.wav,2.037,vosk,tools\call_listener\models\vosk-model-small-uk-v3-nano,,,,no,568,manual,unknown,дякую,
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_8000.wav,2.037,vosk-grammar,tools\call_listener\models\vosk-model-small-uk-v3-nano,,,,no,61,empty,text_empty,,
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_3000.wav,2.037,vosk,tools\call_listener\models\vosk-model-small-uk-v3-nano,,,,no,559,manual,unknown,дякую,
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_3000.wav,2.037,vosk-grammar,tools\call_listener\models\vosk-model-small-uk-v3-nano,,,,no,61,empty,text_empty,,

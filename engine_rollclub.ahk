@@ -3,6 +3,9 @@
 #SingleInstance Force
 SetWorkingDir %A_ScriptDir%\brands\rollclub   ; дані Roll Club (конфіг, промо, кухні, img)
 FileEncoding, UTF-8
+#Include %A_ScriptDir%\lib\IikoUI.ahk
+
+RhKillDuplicateInstances()
 
 ; Налаштування координат
 CoordMode, Mouse, Screen
@@ -11,6 +14,9 @@ CoordMode, Pixel, Screen
 ; Максимальна швидкість виконання
 SetBatchLines, -1
 ListLines, Off
+
+; ── Автозакриття діалогу "Сумма заказа" (інший прайс-лист) ──
+SetTimer, CloseSummaAlert, 500
 
 ; Налаштування вводу (миттєве виконання)
 SendMode Input
@@ -23,6 +29,7 @@ SetControlDelay, -1
 ; ── RollHelper: перемикання бренду назад на Roll House (через трей) ──
 Menu, Tray, Add
 Menu, Tray, Add, Перемкнути на Roll House, SwitchToRollHouse
+Menu, Tray, Add, 🔄 Перезапустити сервер, RestartRhServer
 Menu, Tray, Add, 🌐 Веб-пульт (бета), OpenWebPult
 
 ; ── RollHelper: сервер iiko-моста (читання полів ПО ІМЕНАХ) ──
@@ -49,6 +56,8 @@ else
 ; АВТОСТВОРЕННЯ КОНФІГУ якщо немає
 ; ========================================================
 ConfigPath := A_ScriptDir "\brands\rollclub\RkConfig.ini"
+global UIA_MAP_CONFIG := ConfigPath
+rcLogPath  := A_ScriptDir "\siv_debug.log"
 
 if !FileExist(ConfigPath) {
     IniWrite, 0,     %ConfigPath%, Targets, CommX
@@ -76,6 +85,8 @@ if !FileExist(ConfigPath) {
     IniWrite, 00143, %ConfigPath%, PLU, SticksNorm
     IniWrite, 00144, %ConfigPath%, PLU, SticksEdu
     IniWrite, 02439, %ConfigPath%, PLU, Utensils
+    IniWrite, 00140, %ConfigPath%, PLU, Fork
+    IniWrite, 00142, %ConfigPath%, PLU, Knife
     IniWrite, 0,     %ConfigPath%, Targets, WaitX
     IniWrite, 0,     %ConfigPath%, Targets, WaitY
     IniWrite, 0,     %ConfigPath%, Targets, CallX
@@ -121,6 +132,21 @@ IniRead, adrReadX, %ConfigPath%, Targets, AdrReadX, 0
 IniRead, adrReadY, %ConfigPath%, Targets, AdrReadY, 0
 IniRead, kontsX,   %ConfigPath%, Targets, KontsX,   0
 IniRead, kontsY,   %ConfigPath%, Targets, KontsY,   0
+IniRead, confirmX, %ConfigPath%, Targets, ConfirmX, 0
+IniRead, confirmY, %ConfigPath%, Targets, ConfirmY, 0
+IniRead, saveX,    %ConfigPath%, Targets, SaveX,    0
+IniRead, saveY,    %ConfigPath%, Targets, SaveY,    0
+IniRead, naitiX,   %ConfigPath%, Targets, NaitiX,   0
+IniRead, naitiY,   %ConfigPath%, Targets, NaitiY,   0
+IniRead, tochkaX,  %ConfigPath%, Targets, TochkaX,  0
+IniRead, tochkaY,  %ConfigPath%, Targets, TochkaY,  0
+IniRead, poiskX,   %ConfigPath%, Targets, PoiskX,   0
+IniRead, poiskY,   %ConfigPath%, Targets, PoiskY,   0
+IniRead, rowX,     %ConfigPath%, Targets, RowX,     0
+IniRead, rowY,     %ConfigPath%, Targets, RowY,     0
+
+; Рубильники
+IniRead, CHECK_POINT_ENABLED, %ConfigPath%, Main, CheckPoint, 1
 
 IniRead, pluGunkan,   %ConfigPath%, PLU, Gunkan,   02929
 IniRead, pluPepsi,    %ConfigPath%, PLU, Pepsi,    02216
@@ -129,21 +155,31 @@ IniRead, pluSandwich, %ConfigPath%, PLU, Sandwich, 02926
 IniRead, pluSticksNorm, %ConfigPath%, PLU, SticksNorm, 00143
 IniRead, pluSticksEdu,  %ConfigPath%, PLU, SticksEdu,  00144
 IniRead, pluUtensils,   %ConfigPath%, PLU, Utensils,   02439
+IniRead, pluFork,       %ConfigPath%, PLU, Fork,       00140
+IniRead, pluKnife,      %ConfigPath%, PLU, Knife,      00142
+IniRead, pluSoy,        %ConfigPath%, PLU_SIV, Soy,        00424
+IniRead, pluGinger,     %ConfigPath%, PLU_SIV, Ginger,     00428
+IniRead, pluWasabi,     %ConfigPath%, PLU_SIV, Wasabi,     00426
 
-IniRead, hkMain, %ConfigPath%, Hotkeys, Main, vkC0
-IniRead, hkSiv,  %ConfigPath%, Hotkeys, Siv,  F1
-IniRead, hkWait, %ConfigPath%, Hotkeys, WaitOrder, F2
-IniRead, hkCall, %ConfigPath%, Hotkeys, WaitCall, F3
+IniRead, hkMain,   %ConfigPath%, Hotkeys, Main,      vkC0
+IniRead, hkSiv,   %ConfigPath%, Hotkeys, Siv,       F1
+IniRead, hkWait,  %ConfigPath%, Hotkeys, WaitOrder, F2
+IniRead, hkCall,  %ConfigPath%, Hotkeys, WaitCall,  F3
+IniRead, hkFinish,%ConfigPath%, Hotkeys, Finish,    ^+Enter
+IniRead, uiTheme, %ConfigPath%, UI, Theme, light
+global uiTheme
 
 ; Очищення від можливих артефактів кодування (нульових байтів)
-hkMain := RegExReplace(hkMain, "[^a-zA-Z0-9!#^+]")
-hkSiv  := RegExReplace(hkSiv,  "[^a-zA-Z0-9!#^+]")
-hkWait := RegExReplace(hkWait, "[^a-zA-Z0-9!#^+]")
-hkCall := RegExReplace(hkCall, "[^a-zA-Z0-9!#^+]")
-if (hkMain = "") hkMain := "vkC0"
-if (hkSiv  = "") hkSiv  := "F1"
-if (hkWait = "") hkWait := "F2"
-if (hkCall = "") hkCall := "F3"
+hkMain   := RegExReplace(hkMain,   "[^a-zA-Z0-9!#^+]")
+hkSiv    := RegExReplace(hkSiv,    "[^a-zA-Z0-9!#^+]")
+hkWait   := RegExReplace(hkWait,   "[^a-zA-Z0-9!#^+]")
+hkCall   := RegExReplace(hkCall,   "[^a-zA-Z0-9!#^+]")
+hkFinish := RegExReplace(hkFinish, "[^a-zA-Z0-9!#^+]")
+if (hkMain   = "") hkMain   := "vkC0"
+if (hkSiv    = "") hkSiv    := "F1"
+if (hkWait   = "") hkWait   := "F2"
+if (hkCall   = "") hkCall   := "F3"
+if (hkFinish = "") hkFinish := "^+Enter"
 
 ; ========================================================
 ; ГЛОБАЛЬНІ ЗМІННІ
@@ -153,6 +189,7 @@ global cleanComment := ""
 global infoText     := ""
 global addrNote     := ""
 global extractedTime:= ""
+global extractedTimeAuto := 0
 global clientChange := ""
 global cardText     := ""
 global orderSum     := 0
@@ -191,6 +228,12 @@ global promoKnown       := 0     ; 1 = в базі, 0 = новий
 global pickupPoint      := ""    ; точка самовивозу з тексту
 global addrMismatch    := 0    ; 1 = вулиця в коменті ≠ адресна строка
 global commentStreet   := ""   ; вулиця витягнута з коментаря
+global blockedHit      := 0    ; 1 = адреса на перекритій вулиці (brands/rollclub/BlockedStreets.txt)
+global blockedInfo     := ""   ; текст плашки: "Вулиця — ділянка"
+
+OnMessage(0x0138, "WM_CTLCOLORSTATIC")
+global RhStaticColors := {}
+global RhStaticBrush := {}
 
 ; --- База промокодів ---
 global PromoPath := A_ScriptDir "\brands\rollclub\RkPromo.ini"
@@ -205,6 +248,10 @@ global rawAddress      := ""   ; скопійований адрес з iiko
 global detectedCity    := ""   ; визначене місто
 global kitchenLine     := ""   ; готова рядок-плашка для пульта
 global hasKitchenAlert := 0    ; 1 якщо хоч одна точка міста ≠ ok
+global RcCurrentKitchen := ""   ; поточна кухня з RkKitchens.ini для часу/алертів
+global RcKitchenLastSyncTick := 0
+global RcKitchenSyncCooldownMs := 180000
+GoSub, SyncKitchensFromSheet
 GoSub, LoadKitchens
 
 ; Зона пошуку вікна модифікаторів (по скринах)
@@ -221,6 +268,16 @@ global RollHwnd    := 0   ; hwnd головного вікна Roll
 global RcRawShown  := 0   ; 1 = вихідний текст розгорнуто
 global RcRawEditH  := 0   ; висота Edit-контролу (px)
 global RcZones     := []  ; [{name, coords:[...]}] — кеш зон з KML
+global AUTO_KC_ENABLED := 0  ; ГОЛОВНИЙ РУБИЛЬНИК авто-КЦ. 0 = вимкнено (швидкий ручний пульт, БЕЗ фонового монітора). 1 = увімкнути авто (експеримент).
+global CHECK_POINT_ENABLED       ; РУБИЛЬНИК звірки точки (значення береться з RkConfig.ini).
+global RcLastZone := ""   ; остання визначена нами KML-зона (для звірки з iiko)
+global tochkaX, tochkaY             ; приціл поля "Точка" — значення з IniRead рядок 130-131
+global autoMode    := 0   ; 🤖 авто-режим (концепція/подарунок/пакет) — тумблер у пульті
+global kcBusy      := 0   ; монітор КЦ зайнятий (анти-реентрі)
+global rhPunchBusy := 0   ; 1 = зараз іде пробиття/PLU; F4/KC не має права робити кліки
+global kcStop      := 0   ; F4-стоп: сигнал негайно перервати поточний захід
+global kcLastNo    := ""  ; останній помічений № (щоб не дублювати звук)
+global kcPaused    := 0   ; пауза монітора: чекаємо Ctrl+Enter оператора
 global RcZonesOk   := 0   ; 1 = KML завантажено
 
 ; ========================================================
@@ -230,10 +287,12 @@ Hotkey, %hkMain%, TriggerMain, On
 Hotkey, %hkSiv%,  TriggerSiv,  On
 Hotkey, %hkWait%, TriggerWait, On
 Hotkey, %hkCall%, TriggerCall, On
+; FinishOrder тепер статична клавіша в #IfWinActive блоках (надійніше ніж Hotkey динамічний)
 
 SetTimer, RollFocusWatcher, 300
+SetTimer, RcKitchensBackgroundSync, 180000
 
-MsgBox, 64, Rollclub PRO 33.0, Готовий до роботи!, 2
+
 return
 
 RollFocusWatcher:
@@ -254,19 +313,26 @@ return
 ; ГОЛОВНИЙ ТРИГЕР
 ; ========================================================
 TriggerMain:
-    ; Пульт видимий → сховати (тогл)
-    if WinExist("Rollclub PRO 33.0") {
-        Gui, Roll:Hide
-        return
-    }
-    ; Пульт захований → показати без ресканування
-    DetectHiddenWindows, On
-    rollHidden := WinExist("Rollclub PRO 33.0")
-    DetectHiddenWindows, Off
-    if (rollHidden) {
-        Gui, Roll:Show
-        WinActivate, Rollclub PRO 33.0
-        return
+    GoSub, KcStopDuty          ; ручна робота → дежурство стоп
+    ; При дежурстві (_inDutyTake=1) НЕ тоглимо видимість, а ЗАВЖДИ робимо повний перечит нового заказу.
+    ; Ручна тільда — як раніше: тогл показати/сховати.
+    if (!_inDutyTake) {
+        ; Пульт видимий → сховати (тогл)
+        if WinExist("Rollclub PRO 33.0") {
+            Gui, Roll:Hide
+            return
+        }
+        ; Пульт захований → показати без ресканування
+        DetectHiddenWindows, On
+        rollHidden := WinExist("Rollclub PRO 33.0")
+        DetectHiddenWindows, Off
+        if (rollHidden) {
+            GoSub, RcKitchensSyncIfStale
+            Gui, Roll:Show
+            WinActivate, Rollclub PRO 33.0
+            GoSub, RhRepaintRollPult
+            return
+        }
     }
     ; Пульту немає взагалі → повний скан
     if (commX = 0 || commX = "" || commX = "ERROR") {
@@ -274,6 +340,8 @@ TriggerMain:
         GoSub, OpenSettings
         return
     }
+
+    GoSub, RcKitchensSyncIfStale
 
     ; --- Читання коментаря+суми: спершу СЕРВЕР (по іменах), інакше КЛІКОМ ---
     rawComment := ""
@@ -295,7 +363,7 @@ TriggerMain:
     if (!_srvOk) {
         ; Фолбек — читання кліком (як раніше, якщо сервер не відповів)
         Clipboard := ""
-        Click, %commX%, %commY%
+        IikoUI_FocusComment()
         Sleep, 100
         Send, ^a
         Sleep, 50
@@ -347,10 +415,12 @@ RcRemoveTip:
 return
 
 TriggerSiv:
+    GoSub, KcStopDuty
     GoSub, AddSivVisual
 return
 
 TriggerWait:
+    GoSub, KcStopDuty
     if (isWaiting) {
         isWaiting := 0
         SetTimer, LoopWaitOrder, Off
@@ -421,7 +491,7 @@ ShowZoneFrame:
     zH := zoneY2 - zoneY1
     Gui, ZoneFrame:+AlwaysOnTop -Caption +ToolWindow +E0x20
     Gui, ZoneFrame:Color, FF0000
-    WinSet, TransColor, FF0000 180, 
+    WinSet, TransColor, FF0000 180,
     ; Створюємо 4 лінії рамки (2px товщина)
     borderT := 2
     innerW := zW - (borderT * 2)
@@ -443,9 +513,9 @@ LoopWaitOrder:
         ToolTip
         return
     }
-    
+
     waitScanCount++
-    
+
     ; Розрахунок розміру зони
     zW := zoneX2 - zoneX1
     zH := zoneY2 - zoneY1
@@ -453,7 +523,7 @@ LoopWaitOrder:
     ; ImageSearch в межах заданої зони (допуск *50 для субпіксельного згладжування тексту)
     ImageSearch, foundX, foundY, %zoneX1%, %zoneY1%, %zoneX2%, %zoneY2%, *50 img\zxc.png
     lastErr := ErrorLevel
-    
+
     ; Дебаг-тултіп з повною інформацією
     if (lastErr = 2)
         errTxt := "⛔ ПОМИЛКА (файл/зона)"
@@ -467,22 +537,22 @@ LoopWaitOrder:
         isWaiting := 0
         SetTimer, LoopWaitOrder, Off
         ToolTip, 🟢 ЗАМОВЛЕННЯ ЗНАЙДЕНО! [%foundX%x%foundY%], %foundX%, % foundY - 30
-        
+
         logFile := A_ScriptDir "\siv_debug.log"
         FileAppend, `n[DEBUG] %A_Now% - Event: Order Found at %foundX%x%foundY% (zone %zoneX1%,%zoneY1%-%zoneX2%,%zoneY2%) scan#%waitScanCount%`n, %logFile%
-        
+
         ; Клікаємо туди, де знайшли
         Click, %foundX%, %foundY%, 2
         Sleep, 100
         Click, %foundX%, %foundY%, 2
-        
+
         ; Короткий звуковий сигнал
         if FileExist(A_WinDir "\Media\Alarm01.wav") {
             SoundPlay, %A_WinDir%\Media\Alarm01.wav
         } else {
             SoundBeep, 800, 300
         }
-        
+
         SetTimer, RemoveWaitToolTip, -3000
     }
 return
@@ -492,6 +562,7 @@ RemoveWaitToolTip:
 return
 
 TriggerCall:
+    GoSub, KcStopDuty
     if (isWaitingCall) {
         isWaitingCall := 0
         SetTimer, LoopWaitCall, Off
@@ -516,10 +587,10 @@ LoopWaitCall:
         ToolTip, , , , 2
         return
     }
-    
+
     cYOffset := callY + 50
     ToolTip, 📞 Автоприйом дзвінка...`nНатисни %hkCall% для зупинки., %callX%, %cYOffset%, 2
-    
+
     ; Шукаємо тільки в зоні прицілу (±150 пікселів)
     cX1 := callX - 150
     cY1 := callY - 150
@@ -541,14 +612,14 @@ LoopWaitCall:
         Click, %clkX%, %clkY%, 2
         Sleep, 100
         Click, %clkX%, %clkY%, 2
-        
+
         isWaitingCall := 0
         SetTimer, LoopWaitCall, Off
         ToolTip, 🟢 ДЗВІНОК ПРИЙНЯТО!, %foundCallX%, % foundCallY - 30, 2
-        
+
         logFile := A_ScriptDir "\siv_debug.log"
         FileAppend, `n[DEBUG] %A_Now% - Event: Call Found and Answered at %foundCallX%x%foundCallY%`n, %logFile%
-        
+
         SetTimer, RemoveCallToolTip, -3000
     }
 return
@@ -590,12 +661,9 @@ LoadPromoBase:
             KnownPromos[kLow] := 1
     }
 return
-
-; ========================================================
-; БАЗА КУХОНЬ
-; ========================================================
 LoadKitchens:
-    Kitchens := []
+    RcLoadZoneMap()
+    global Kitchens, RcKitchensOk:= []
     if !FileExist(KitchensPath)
         return
     ; читаємо файл напряму як UTF-8 (IniRead через WinAPI ламає кирилицю)
@@ -605,10 +673,10 @@ LoadKitchens:
     Loop, Parse, raw, `n, `r
     {
         line := Trim(A_LoopField)
-        if (line = "" || SubStr(line, 1, 1) = ";")
+        if (line == "" || SubStr(line, 1, 1) == ";")
             continue
         ; секція
-        if (SubStr(line, 1, 1) = "[" && SubStr(line, 0) = "]") {
+        if (SubStr(line, 1, 1) == "[" && SubStr(line, 0) == "]") {
             if (curObj)
                 Kitchens.Push(curObj)
             curSec := SubStr(line, 2, StrLen(line) - 2)
@@ -617,25 +685,25 @@ LoadKitchens:
         }
         ; key=value
         eqPos := InStr(line, "=")
-        if (eqPos = 0 || !curObj)
+        if (eqPos == 0 || !curObj)
             continue
         k := Trim(SubStr(line, 1, eqPos - 1))
         v := Trim(SubStr(line, eqPos + 1))
-        if (k = "City")
+        if (k == "City")
             curObj.City := v
-        else if (k = "Address")
+        else if (k == "Address")
             curObj.Address := v
-        else if (k = "KmlKey")
+        else if (k == "KmlKey")
             curObj.KmlKey := v
-        else if (k = "Remark")
+        else if (k == "Remark")
             curObj.Remark := v
-        else if (k = "Center")
+        else if (k == "Center")
             curObj.Center := v
-        else if (k = "Pickup")
+        else if (k == "Pickup")
             curObj.Pickup := v
-        else if (k = "FarZone")
+        else if (k == "FarZone")
             curObj.FarZone := v
-        else if (k = "StopList")
+        else if (k == "StopList")
             curObj.StopList := v
     }
     if (curObj)
@@ -644,6 +712,186 @@ LoadKitchens:
     kCnt := Kitchens.MaxIndex() ? Kitchens.MaxIndex() : 0
     FileAppend, `n[DEBUG] %A_Now% - Event: Kitchens loaded = %kCnt%`n, %logFile%
 return
+
+SyncKitchensFromSheet:
+    global RcKitchenLastSyncTick
+    syncScript := A_ScriptDir "\..\server\sync_rollclub_kitchens.py"
+    if !FileExist(syncScript)
+        return
+    RunWait, %ComSpec% /c python sync_rollclub_kitchens.py --quiet, %A_ScriptDir%\..\server, Hide UseErrorLevel
+    if (ErrorLevel) {
+        logFile := A_ScriptDir "\siv_debug.log"
+        FileAppend, `n[DEBUG] %A_Now% - Event: Kitchens sheet sync failed, ErrorLevel=%ErrorLevel%`n, %logFile%
+    } else {
+        RcKitchenLastSyncTick := A_TickCount
+        logFile := A_ScriptDir "\siv_debug.log"
+        FileAppend, `n[DEBUG] %A_Now% - Event: Kitchens sheet sync OK`n, %logFile%
+    }
+return
+
+RcKitchensSyncIfStale:
+    global RcKitchenLastSyncTick, RcKitchenSyncCooldownMs
+    if (RcKitchensSyncBlocked())
+        return
+    if (RcKitchenLastSyncTick && (A_TickCount - RcKitchenLastSyncTick < RcKitchenSyncCooldownMs))
+        return
+    GoSub, SyncKitchensFromSheet
+    GoSub, LoadKitchens
+return
+
+RcKitchensBackgroundSync:
+    GoSub, RcKitchensSyncIfStale
+return
+
+RcKitchensSyncBlocked() {
+    global rhPunchBusy, kcBusy, _inDutyTake, dutyOn, kcForce
+    if (rhPunchBusy || kcBusy || _inDutyTake || dutyOn || kcForce)
+        return 1
+    return 0
+}
+
+RcFindKitchenFromText(text) {
+    global Kitchens
+    hay := text
+    StringLower, hay, hay
+    if (hay == "")
+        return ""
+    for _, k in Kitchens {
+        n := k.Name, a := k.Address, key := k.KmlKey
+        StringLower, n, n
+        StringLower, a, a
+        StringLower, key, key
+        if ((n != "" && InStr(hay, n)) || (key != "" && InStr(hay, key)) || (a != "" && InStr(hay, a)))
+            return k
+    }
+    return ""
+}
+
+RcKitchenFromKmlZone(zoneName) {
+    global RcZoneMap
+    if (!IsObject(RcZoneMap))
+        RcLoadZoneMap()
+    zoneExact := Trim(zoneName)
+    if (RcZoneMap.HasKey(zoneExact)) {
+        return RcZoneMap[zoneExact]
+    }
+    ; fallback
+    zoneClean := Trim(RegExReplace(zoneName, "[\[\]]", ""))
+    type := RcDeliveryKindFromZone(zoneClean)
+    dbgkterms := ""
+    global Kitchens
+    for _, k in Kitchens {
+        kTerm := (k.KmlKey != "") ? k.KmlKey : k.Name
+        if (kTerm != "" && InStr(zoneClean, kTerm)) {
+            return {Kitchen: k.Name, Type: type}
+        }
+    }
+    return ""
+}
+
+RcDeliveryKindFromZone(zone) {
+    z := zone
+    StringLower, z, z
+    if (RegExMatch(z, "i)(даль|дал|збільш|підвищ|повыш|збільшеного|збільшена)"))
+        return "FAR"
+    return "STANDARD"
+}
+
+RcKitchenMinutes(kind, defaultMin) {
+    global RcCurrentKitchen
+    if (!IsObject(RcCurrentKitchen))
+        return defaultMin
+    val := ""
+    if (kind = "pickup")
+        val := RcCurrentKitchen.Pickup
+    else if (kind = "far")
+        val := RcCurrentKitchen.FarZone
+    else
+        val := RcCurrentKitchen.Center
+    return RcParseKitchenMinutes(val, defaultMin)
+}
+
+RcParseKitchenMinutes(text, defaultMin) {
+    t := Trim(text)
+    if (t == "")
+        return defaultMin
+    StringLower, t, t
+    if InStr(t, "стандарт")
+        return defaultMin
+    if InStr(t, "стоп")
+        return "стоп"
+    t := StrReplace(t, "–", "-")
+    t := StrReplace(t, "—", "-")
+    t := StrReplace(t, ",", ".")
+    if RegExMatch(t, "(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)", m)
+        return RcValueToMinutes(m2)
+    if RegExMatch(t, "(\d+(?:\.\d+)?)", m)
+        return RcValueToMinutes(m1)
+    return defaultMin
+}
+
+RcValueToMinutes(value) {
+    n := value + 0
+    if (n <= 0)
+        return 0
+    if (n <= 8)
+        return Round(n * 60)
+    return Round(n)
+}
+
+RcGetEffectiveTime(kitchenKey, zoneType, isPickup, ByRef outCenterRaw, ByRef outFarRaw, ByRef outMinFar) {
+    global Kitchens
+    k := ""
+    for _, obj in Kitchens {
+        if (obj.Name == kitchenKey) {
+            k := obj
+            break
+        }
+    }
+    if (!k)
+        return isPickup ? 40 : 90
+        
+    outCenterRaw := k.Center
+    outFarRaw := k.FarZone
+    outMinFar := 0
+    eff := 0
+    
+    if (isPickup) {
+        eff := RcParseKitchenMinutes(k.Pickup, 40)
+        return eff
+    }
+        
+    centerMins := RcParseKitchenMinutes(k.Center, 90)
+    if (centerMins == "стоп") {
+        eff := "стоп"
+    } else if (zoneType == "STANDARD" || zoneType == "center") {
+        eff := centerMins
+    } else {
+        farMins := RcParseKitchenMinutes(k.FarZone, 90)
+        if (farMins == "стоп") {
+            eff := "стоп"
+        } else {
+            outMinFar := centerMins + 30
+            if (farMins > centerMins)
+                eff := farMins
+            else
+                eff := outMinFar
+        }
+    }
+    logTime := "DELIVERY_TIME:`nkitchen=[" kitchenKey "]`nzoneType=[" zoneType "]`ncenterRaw=[" k.Center "]`nfarRaw=[" k.FarZone "]`ncenterMinutes=[" centerMins "]`nfarMinutes=[" (farMins?farMins:"") "]`nminimumFar=[" outMinFar "]`neffectiveMinutes=[" eff "]`n`n"
+    FileAppend, % logTime, %A_ScriptDir%\parse_debug.log
+    return eff
+}
+
+RcSetReadyByMinutes(minutes) {
+    if (minutes == "стоп")
+        return
+    total := A_Hour*60 + A_Min + minutes
+    HH := Mod(Floor(total / 60), 24)
+    MM := Mod(total, 60)
+    GuiControl, Roll:, ReadyTimeH, % Format("{:02}", HH)
+    GuiControl, Roll:, ReadyTimeM, % Format("{:02}", MM)
+}
 
 DetectKitchenStatus:
     detectedCity    := ""
@@ -654,13 +902,13 @@ DetectKitchenStatus:
     searchText := rawAddress
     if (hasPickup && pickupPoint != "")
         searchText := searchText . " " . pickupPoint
-    if (searchText = "" && hasPickup && rawComment != "")
+    if (searchText == "" && hasPickup && rawComment != "")
         searchText := rawComment
     logFile := A_ScriptDir "\siv_debug.log"
     rawAddrShort := SubStr(rawAddress, 1, 200)
     pickShort    := SubStr(pickupPoint, 1, 200)
     FileAppend, `n[DEBUG] %A_Now% - Event: rawAddress = "%rawAddrShort%" pickup = "%pickShort%"`n, %logFile%
-    if (searchText = "")
+    if (searchText == "")
         return
     ; визначаємо місто (порядок важливий: довші назви спершу)
     ; \b у PCRE не працює для кирилиці — використовуємо власні межі через look-around
@@ -673,17 +921,17 @@ DetectKitchenStatus:
         }
     }
     ; нормалізація аліасів
-    if (detectedCity = "Франківськ" || detectedCity = "ІФ")
+    if (detectedCity == "Франківськ" || detectedCity == "ІФ")
         detectedCity := "Івано-Франківськ"
-    if (detectedCity = "Ровно")
+    if (detectedCity == "Ровно")
         detectedCity := "Рівне"
-    if (detectedCity = "Днепр")
+    if (detectedCity == "Днепр")
         detectedCity := "Дніпро"
-    
+
     if (hasPickup)
         citySource := " (самовивіз)"
     FileAppend, [DEBUG] %A_Now% - Event: detectedCity = "%detectedCity%"%citySource%`n, %logFile%
-    if (detectedCity = "")
+    if (detectedCity == "")
         return
     ; Більше не показуємо всі кухні міста списком, бо маємо точну зону KML
     kitchenLine := ""
@@ -691,7 +939,7 @@ DetectKitchenStatus:
 return
 
 AppendPromoToBase:
-    if (promoFound = "")
+    if (promoFound == "")
         return
     kLow := promoFound
     StringLower, kLow, kLow
@@ -743,6 +991,8 @@ SilentMagicClean:
     warnReason   := ""
     parsedSticksNorm := ""
     parsedSticksEdu  := ""
+    extractedTimeAuto := 0
+    RcCurrentKitchen := ""
     ; Нові флаги
     hasFilaClub     := 0
     hasBirthday     := 0
@@ -759,6 +1009,8 @@ SilentMagicClean:
     pickupPoint     := ""
     addrMismatch   := 0
     commentStreet  := ""
+    blockedHit     := 0
+    blockedInfo    := ""
 
     ; --- Викидаємо хвіст "Доставка перенесена на точку ..." для подальшого парсингу ---
     workComment := RegExReplace(rawComment, "i)Доставка перенесена на точку.*$", "")
@@ -893,8 +1145,9 @@ SilentMagicClean:
     }
 
     ; --- Виделка/Ніж/Ложка → авто-пробитие через окремий PLU ---
-    ; Підтримує: "Виделка/Ніж/Ложка x4", "Виделка x2", "Ніж x1"
-    if RegExMatch(workComment, "i)(Виделк[аи]\/Ніж\/Ложк[аи]|Виделк[аи]|Ніж|Ложк[аи])\s*(?:x|х|×)?\s*(\d+)?", mUten) {
+    ; Підтримує тільки явні прибори: "Виделка/Ніж/Ложка x4", "Виделка x2", "Ніж x1".
+    ; Слово "Прибори:" саме по собі не означає вилку/ніж: сайт так само пише "Прибори: Звичайні x2" для паличок.
+    if RegExMatch(workComment, "i)(?<![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z0-9])(Виделк[аи]\/Ніж\/Ложк[аи]|Виделк[аи]|Ніж|Ложк[аи])(?![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z0-9])\s*(?:x|х|×)?\s*(\d+)?", mUten) {
         hasUtensils := 1
         utensilsText := Trim(mUten1)
         if (mUten2 != "") {
@@ -905,13 +1158,13 @@ SilentMagicClean:
             autoUtensils := 1
         }
         logFile := A_ScriptDir "\siv_debug.log"
-        FileAppend, `n[DEBUG] %A_Now% - Event: Utensils detected (%utensilsText% x%parsedUtensils%) — auto-PLU %pluUtensils%`n, %logFile%
+        FileAppend, `n[DEBUG] %A_Now% - Event: Utensils detected (%utensilsText% x%parsedUtensils%) — fork=%pluFork% knife=%pluKnife%`n, %logFile%
     }
 
     ; --- День народження ---
     if RegExMatch(workComment, "i)(день\s*народ|день\s*рождени|-10%\s*до\s*дня|знижка\s+до\s+дня\s+народ|знижка\s+на\s+день\s+народ|(?<![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])ДН(?![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])\s*знижка)") {
         hasBirthday := 1
-        if (cardText = "")
+        if (cardText == "")
             cardText := "ДН " . A_DD . "." . A_MM . "." . A_YYYY
         else
             cardText .= " | ДН " . A_DD . "." . A_MM . "." . A_YYYY
@@ -929,6 +1182,8 @@ SilentMagicClean:
     }
 
     ; --- Час ---
+    if (hasPickup && pickupPoint != "")
+        RcCurrentKitchen := RcFindKitchenFromText(pickupPoint)
     if (isFutureDate) {
         extractedTime := ""   ; передзамовлення — час вже виставлений в CRM, не чіпаємо
     } else {
@@ -936,14 +1191,17 @@ SilentMagicClean:
         RegExMatch(workComment, "(\d{2}:\d{2})", timeMatch)
         if (timeMatch1 != "") {
             extractedTime := timeMatch1
+            extractedTimeAuto := 0
         } else {
-            ; Самовивіз — 41 хв, доставка — 91 хв
+            ; Самовивіз/доставка — з Google Sheet/RkKitchens.ini, якщо є; інакше старий fallback.
+            readyOffset := hasPickup ? RcKitchenMinutes("pickup", 40) : RcKitchenMinutes("center", 90)
             tHH := A_Hour + 0
-            tMM := A_Min + (hasPickup ? 41 : 91)
+            tMM := A_Min + readyOffset
             tHH += Floor(tMM / 60)
             tMM := Mod(tMM, 60)
             tHH := Mod(tHH, 24)
             extractedTime := Format("{:02}:{:02}", tHH, tMM)
+            extractedTimeAuto := 1
         }
     }
 
@@ -955,11 +1213,11 @@ SilentMagicClean:
         paymentNum    := mCash1
         autoCash      := 1
     }
-    if (paymentMethod = "" && RegExMatch(workComment, "i)(?:---ОПЛАЧЕНО---\s*)?(?:Картою[^№\r\n]*|ОПЛАЧЕНО\s*)№(\d+)", mCard)) {
+    if (paymentMethod == "" && RegExMatch(workComment, "i)(?:---ОПЛАЧЕНО---\s*)?(?:Картою[^№\r\n]*|ОПЛАЧЕНО\s*)№(\d+)", mCard)) {
         paymentMethod := "Оплачено"
         paymentNum    := mCard1
     }
-    if (paymentMethod = "" && RegExMatch(workComment, "i)QR\s*code[^\d]*(\d{5,})", mQR)) {
+    if (paymentMethod == "" && RegExMatch(workComment, "i)QR\s*code[^\d]*(\d{5,})", mQR)) {
         paymentMethod := "QR"
         paymentNum    := mQR1
     }
@@ -984,7 +1242,7 @@ SilentMagicClean:
 
     if RegExMatch(workComment, "i)!!!ПЕРШЕМОБ") {
         autoGunkan := 1
-        if (cardText = "")
+        if (cardText == "")
             cardText := "ПЕРШЕМОБ"
         else
             cardText := "ПЕРШЕМОБ | " . cardText
@@ -1165,6 +1423,86 @@ SilentMagicClean:
             addrNote := (addrNote != "") ? (addrNote . " | " . textForAddr) : textForAddr
     }
 
+    ; --- Python AI Parse (Enhancement) ---
+    pyResp := RhGet("/api/iiko/parse_ahk?text=" . RcUriEncode(workComment))
+    if (pyResp != "") {
+        Loop, Parse, pyResp, `n, `r
+        {
+            eqPos := InStr(A_LoopField, "=")
+            if (eqPos > 0) {
+                pKey := SubStr(A_LoopField, 1, eqPos - 1)
+                pVal := SubStr(A_LoopField, eqPos + 1)
+
+                if (pKey == "isPickup" && pVal == "1")
+                    hasPickup := 1
+                if (pKey == "isFastDelivery" && pVal == "1")
+                    isFastDelivery := 1
+                if (pKey == "FilaClub" && pVal == "1")
+                    hasFilaClub := 1
+                if (pKey == "Allergy" && pVal == "1")
+                    hasAllergy := 1
+                if (pKey == "Birthday" && pVal == "1")
+                    hasBirthday := 1
+                if (pKey == "SticksNorm" && pVal != "0") {
+                    parsedSticksNorm := pVal
+                    autoSticksNorm := 1
+                }
+                if (pKey == "SticksEdu" && pVal != "0") {
+                    parsedSticksEdu := pVal
+                    autoSticksEdu := 1
+                }
+                if (pKey == "Utensils" && pVal != "0" && hasUtensils) {
+                    parsedUtensils := pVal
+                    autoUtensils := 1
+                }
+                if (pKey == "RestChange" && pVal != "") {
+                    clientChange := pVal
+                    autoCash := 1
+                }
+                if (pKey == "addrNote" && pVal != "") {
+                    if (!InStr(addrNote, pVal))
+                        addrNote := (addrNote != "") ? (pVal . " | " . addrNote) : pVal
+                }
+                if (pKey == "kitchenNote" && pVal != "") {
+                    if (!InStr(kitchenNote, pVal))
+                        kitchenNote := (kitchenNote != "") ? (kitchenNote . " | " . pVal) : pVal
+                }
+                if (pKey == "infoText" && pVal != "")
+                    infoText := pVal
+                if (pKey == "isPost" && pVal == "1")
+                    isPost := 1
+                if (pKey == "postNum" && pVal != "")
+                    postNum := pVal
+                if (pKey == "needCall" && pVal == "1")
+                    needCall := 1
+            }
+        }
+    }
+
+    ; --- Клієнт замовив прибори (Виделка/Ніж/Ложка) → палички НЕ пробиваємо ---
+    if (hasUtensils)
+    {
+        parsedSticksNorm := "0"
+        parsedSticksEdu  := "0"
+        autoSticksNorm := 0
+        autoSticksEdu  := 0
+    }
+
+    ; ==== DEBUG: дамп розбору ====
+    FormatTime, _dbgT,, yyyy-MM-dd HH:mm:ss
+    _dbg := "==== " . _dbgT . " | No=" . kcLastNo . " ===="
+    _dbg .= "`nRAW    : " . workComment
+    _dbg .= "`nKITCHEN: " . infoText
+    _dbg .= "`nKITraw : " . kitchenNote
+    _dbg .= "`nADDR   : " . addrNote
+    _dbg .= "`nCUSTREQ: " . customerReqText
+    _dbg .= "`nPICKUP : " . hasPickup . " / " . pickupPoint . " -> " . PickupConcept(pickupPoint)
+    _dbg .= "`nPAY    : " . paymentMethod . " #" . paymentNum . " | change=" . clientChange
+    _dbg .= "`nSTICKS : norm=" . parsedSticksNorm . " edu=" . parsedSticksEdu
+    _dbg .= "`nUTENS  : text=[" . utensilsText . "] qty=" . parsedUtensils
+    _dbg .= "`n"
+    FileAppend, %_dbg%`n, %A_ScriptDir%\parse_debug.log, UTF-8
+
     cleanParts := []
 
     if RegExMatch(workComment, "i)(Знижка\s+на\s+таксі:\s*-\d+)", mTaxi)
@@ -1222,7 +1560,7 @@ SilentMagicClean:
         sw := RegExReplace(sw, "i)---ОПЛАЧЕНО---", " ")
         sw := RegExReplace(sw, "i)Готівкою\s*№?\s*\d*", " ")
         sw := RegExReplace(sw, "i)Картою[^№\r\n]*№\s*\d+", " ")
-        sw := RegExReplace(sw, "i)ОПЛАЧЕНО\s*№?\s*\d*", " ")
+        sw := RegExReplace(sw, "i)ОПЛАЧЕНО\s*№?\s*\d+", " ")
         sw := RegExReplace(sw, "i)QR\s*code\s*№?\s*\d+", " ")
         sw := RegExReplace(sw, "i)№\s*\d+", " ")
         sw := RegExReplace(sw, "i)Найближчим\s+часом", " ")
@@ -1242,9 +1580,9 @@ SilentMagicClean:
         sw := RegExReplace(sw, "(?<!\d)\d{1,2}:\d{2}(?!\d)", " ")
         sw := RegExReplace(sw, "\d+", " ")
         sw := RegExReplace(sw, "[^Ѐ-ӿ\s\-]", " ")   ; залишаємо тільки кириличні слова
-        
+
         sw := RegExReplace(sw, "i)(?:домофон|під'їзд|подъезд|поверх|этаж|квартир[аи]?|кв\s*\d|парадн|будинок|дом\b|код\s)[^.,;!?\r\n]*", " ")
-        
+
         sw := Trim(RegExReplace(sw, "\s+", " "))
         rcDebugLog .= "[2] after cleanup=`"" . sw . "`"`n"
 
@@ -1321,11 +1659,11 @@ SilentMagicClean:
             rcDebugLog .= "[7] nameInAddr=" . nameInAddr . " typeOk=" . typeOk . "`n"
             if (!nameInAddr || !typeOk) {
                 addrMismatch := 1
-                SoundBeep, 1800, 200
-                Sleep, 80
-                SoundBeep, 1800, 200
-                Sleep, 80
-                SoundBeep, 1800, 400
+                SoundPlay, %A_ScriptDir%\beep_err.wav
+                Sleep, 550
+                SoundPlay, %A_ScriptDir%\beep_err.wav
+                Sleep, 550
+                SoundPlay, %A_ScriptDir%\beep_err.wav
             }
         }
         rcDebugLog .= "[8] addrMismatch=" . addrMismatch . "`n"
@@ -1335,252 +1673,743 @@ SilentMagicClean:
         FileAppend, `n[ADDR-PARSE] %A_Now%`n%rcDebugLog%, %logFile%
     }
 
+    ; --- Перевірка перекритих вулиць (brands/rollclub/BlockedStreets.txt) ---
+    if (!hasPickup && rawAddress != "") {
+        blockedInfo := RcBlockedStreetHit(rawAddress)
+        if (blockedInfo != "") {
+            blockedHit := 1
+            SoundPlay, %A_ScriptDir%\beep_err.wav
+        }
+    }
+
 return
 
 ; ========================================================
 ; ПУЛЬТ КЕРУВАННЯ
 ; ========================================================
 DrawRollclub:
+    RhStaticColors := {}
     Gui, Roll:Destroy
     Gui, Roll:+AlwaysOnTop -MaximizeBox -MinimizeBox +ToolWindow
-    Gui, Roll:Color, FFFFFF, FFFFFF
-    Gui, Roll:Font, s9 cBlack, Segoe UI
 
-    curY := 8
+    RhApplyTheme()
+    RhB_Gift := RhB_Accent
 
-    ; ── Бренд + пошук точки на карті ──
-    Gui, Roll:Font, s9 bold cBlack, Segoe UI
-    Gui, Roll:Add, Text, x10 y%curY% w46 h22 +0x200, Бренд:
-    Gui, Roll:Font, s9 norm cBlack, Segoe UI
-    Gui, Roll:Add, DropDownList, x58 y%curY% w276 vBrandSel gBrandChangeRC AltSubmit Choose2, 🏠 Roll House|🟢 Roll Club
+    _brandName := (BRAND == "rollclub") ? "Roll Club" : "Roll House"
+    _orderType := isPickup ? "Самовивіз" : "Доставка"
+    _serverPill := RH_SERVER_OK ? "ONLINE" : "OFFLINE"
+    FormatTime, _rhNow,, dd.MM.yyyy HH:mm
+
+    Gui, Roll:Color, %RhC_BG%, %RhC_Panel%
+    Gui, Roll:Margin, 16, 16
+
+    x0 := 16
+    w0 := 328
+    gap := 8
+    curY := 14
+
+    ; Header
+    Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    Gui, Roll:Add, Text, x%x0% y%curY% w72 h18 +0x200, Бренд
+    Gui, Roll:Font, s14 bold c%RhC_Text%, %RhFontName%
+    Gui, Roll:Add, Text, x%x0% y32 w142 h26 +0x200, Roll Club
+
+    Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    Gui, Roll:Add, Text, x174 y14 w104 h18 Right +0x200, %_rhNow%
+    Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
+    Gui, Roll:Add, Text, x280 y14 w36 h22 Center +Border +0x200 HwndhSwitchBrand gSwitchToRollHouse, RH
+    Gui, Roll:Add, Text, x320 y14 w28 h22 Center +Border +0x200 HwndhSettingsGear gOpenSettings, Set
+    RhRegColor(hSwitchBrand, RhB_CardFill, RhB_Text)
+    RhRegColor(hSettingsGear, RhB_CardFill, RhB_Text)
+    ; --- Тумблер авто-режиму ---
+    Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
+    Gui, Roll:Add, Text, x166 y34 w178 h22 Center +Border +0x200 HwndhAutoToggle vRhAutoLbl gRhAutoToggle, 🤖 АВТО: ВИМК
+    RhRegColor(hAutoToggle, RhB_CardFill, RhB_Text)
+
+    Gui, Roll:Font, s8 bold cFFFFFF, %RhFontName%
+    Gui, Roll:Add, Text, x16 y54 w66 h20 Center +0x200 HwndhOnlinePill vRhServerPill, %_serverPill%
+    RhRegColor(hOnlinePill, (RH_SERVER_OK ? RhB_Green : RhB_Red), RhB_White)
+    Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
+    Gui, Roll:Add, Text, x90 y54 w52 h22 Center +Border +0x200 HwndhRestartServer gRestartRhServer, Srv
+    Gui, Roll:Add, Text, x150 y54 w194 h22 Center +Border +0x200 HwndhOpenKitchens gOpenKitchensEditor, Кухні
+    RhRegColor(hRestartServer, RhB_CardFill, RhB_Text)
+    RhRegColor(hOpenKitchens, RhB_CardFill, RhB_Text)
+    curY := 84
+
+    ; ZONE BLOCK — саме важливе, має бути одразу помітним!
+    Gui, Roll:Font, s9 bold c555555, %RhFontName%
+    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h28 Center +0x200 HwndhZoneBox vMapSearch, Визначення зони...
+    RhRegColor(hZoneBox, 0xE8E8E8, 0x555555)
     curY += 30
-    Gui, Roll:Font, s11 norm cBlack, Segoe UI
-    Gui, Roll:Add, Text, x10 y%curY% w26 h22 +0x200, 🔎
-    Gui, Roll:Font, s9 norm c808080, Segoe UI
-    _mapInit := (rawAddress != "" && !hasPickup) ? "🔄 Визначаю зону..." : "Знайти точку на карті..."
-    Gui, Roll:Add, Edit, x38 y%curY% w268 h22 vMapSearch, %_mapInit%
-    Gui, Roll:Font, s9 norm cBlack, Segoe UI
-    Gui, Roll:Add, Button, x310 y%curY% w24 h22 gRcLoadKmlFile, 📂
-    curY += 26
-    Gui, Roll:Font, s9 bold cRed, Segoe UI
-    Gui, Roll:Add, Text, x10 y%curY% w324 Center vKitchenStatusText
-    curY += 16
-    Gui, Roll:Font, s9 norm cBlack, Segoe UI
+    Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200 vKitchenStatusText,
+    curY += 20
 
-    ; ── АЛЕРТИ (компактні плашки) ──
+    ; Alerts
+    if (isFutureDate || hasFilaClub || hasBirthday || hasAllergy || promoFound != "" || hasCustomerReq || needCall || !isPost) {
+        Gui, Roll:Font, s8 bold c%RhC_Muted%, %RhFontName%
+        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200, ВАЖЛИВО
+        curY += 20
+    }
     if (isFutureDate) {
-        Gui, Roll:Color, FFF0F0
-        Gui, Roll:Font, s11 bold cRed, Segoe UI
-        futTxt := "⚠️ ПЕРЕДЗАМОВЛЕННЯ на " . warnReason
+        ; Противний сигнал — передзамовлення не можна пропустити!
+        SoundPlay, %A_ScriptDir%\beep_future.wav
+        Sleep, 300
+        SoundPlay, %A_ScriptDir%\beep_future.wav
+        Gui, Roll:Font, s9 bold cFFFFFF, %RhFontName%
+        _fdLabel := "ПЕРЕДЗАМОВЛЕННЯ"
         if (futureTime != "")
-            futTxt .= " о " . futureTime
-        Gui, Roll:Add, Text, x10 y%curY% w324 Center, %futTxt%
-        curY += 22
-        Gui, Roll:Font, s9 bold cRed, Segoe UI
-        Gui, Roll:Add, Text, x10 y%curY% w324 Center, ‼ ЗМІНИ ДАТУ В IIKO! НЕ СЬОГОДНІ!
-        curY += 20
-        Gui, Roll:Font, s9 norm cBlack, Segoe UI
+            _fdLabel .= " — " . futureTime
+        if (warnReason != "")
+            _fdLabel .= " (" . warnReason . ")"
+        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h24 Center +0x200 HwndhFutureDate, %_fdLabel%
+        RhRegColor(hFutureDate, RhB_Red, RhB_White)
+        curY += 28
     }
-
-    ; Заголовок міста та статус кухонь прибрано (тепер статус відображається прямо біля зони)
-
-    if (addrMismatch) {
-        Gui, Roll:Font, s10 bold cRed, Segoe UI
-        Gui, Roll:Add, Text, x10 y%curY% w324 Center, 🚨 ВУЛИЦЯ ≠ АДРЕСА!
-        curY += 18
-        Gui, Roll:Font, s8 bold cRed, Segoe UI
-        mismatchLine := "Комент: " . commentStreet . " / Адреса: " . SubStr(rawAddress, 1, 40)
-        Gui, Roll:Add, Text, x10 y%curY% w324 Center, %mismatchLine%
-        curY += 18
-        Gui, Roll:Font, s9 norm cBlack, Segoe UI
-    }
-
-    if (hasFilaClub) {
-        Gui, Roll:Font, s10 bold cRed, Segoe UI
-        Gui, Roll:Add, Text, x10 y%curY% w324 Center, ⚠ ПРОМОКОД FILACLUB — ПРОБИТИ!
-        curY += 22
-        Gui, Roll:Font, s9 norm cBlack, Segoe UI
-    }
-
     if (hasAllergy) {
-        Gui, Roll:Font, s10 bold cRed, Segoe UI
-        Gui, Roll:Add, Text, x10 y%curY% w324 Center, 🚨 АЛЕРГІЯ — окремий бокс, ПІДПИСАТИ!
-        curY += 22
-        Gui, Roll:Font, s9 norm cBlack, Segoe UI
+        Gui, Roll:Font, s9 bold cFFFFFF, %RhFontName%
+        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h24 Center +0x200 HwndhAllergy, АЛЕРГІЯ
+        RhRegColor(hAllergy, RhB_Red, RhB_White)
+        curY += 28
     }
-
+    if (hasFilaClub) {
+        Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
+        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h22 Center +0x200 HwndhFila, FILA CLUB
+        RhRegColor(hFila, RhB_StatusSoft, RhB_Text)
+        curY += 26
+    }
     if (hasBirthday) {
-        Gui, Roll:Font, s10 bold cFF6600, Segoe UI
-        Gui, Roll:Add, Text, x10 y%curY% w324 Center, 🎂 ДЕНЬ НАРОДЖЕННЯ — знижка!
-        curY += 22
-        Gui, Roll:Font, s9 norm cBlack, Segoe UI
+        Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
+        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h22 Center +0x200 HwndhBDay, ДЕНЬ НАРОДЖЕННЯ
+        RhRegColor(hBDay, RhB_StatusSoft, RhB_Text)
+        curY += 26
     }
-
-    if (hasPickup) {
-        pickLabel := "🥡 САМОВИВІЗ"
-        if (pickupPoint != "") {
-            pickLabel := pickLabel . " — " . pickupPoint
-            ; Перевірити статус цієї кухні
-            for _, k in Kitchens {
-                if (InStr(pickupPoint, k.Name) || InStr(k.Name, pickupPoint)) {
-                    pickExtra := ""
-                    if (k.Pickup != "Стандарт")
-                        pickExtra .= " ⏰ " . k.Pickup
-                    if (k.StopList != "")
-                        pickExtra .= " 🛑 " . k.StopList
-                    if (pickExtra != "") {
-                        pickLabel .= pickExtra
-                        SoundBeep, 600, 250
-                    }
-                    break
-                }
-            }
-        }
-        Gui, Roll:Font, s10 bold c1B5E20, Segoe UI
-        Gui, Roll:Add, Text, x10 y%curY% w324 Center, %pickLabel%
-        curY += 22
-        Gui, Roll:Font, s9 norm cBlack, Segoe UI
-    }
-
-    if (hasUtensils) {
-        Gui, Roll:Font, s9 bold cFF00AA, Segoe UI
-        Gui, Roll:Add, Text, x10 y%curY% w324 Center, 🍴 ПРИБОРИ %utensilsText% x%parsedUtensils% (PLU %pluUtensils%)
-        curY += 20
-        Gui, Roll:Font, s9 norm cBlack, Segoe UI
-    }
-
     if (promoFound != "") {
         if (promoKnown) {
-            Gui, Roll:Font, s9 bold c007700, Segoe UI
-            promoMsg := "✅ Промо: " . promoFound . " (в базі)"
-            Gui, Roll:Add, Text, x10 y%curY% w324 Center, %promoMsg%
-            curY += 20
+            Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
+            Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h22 Center +0x200 HwndhPromoBase, ПРОМО В БАЗІ: %promoFound%
+            RhRegColor(hPromoBase, RhB_StatusSoft, RhB_Text)
         } else {
-            Gui, Roll:Font, s9 bold cRed, Segoe UI
-            promoMsg := "❓ НОВИЙ ПРОМО: " . promoFound
-            Gui, Roll:Add, Text, x10 y%curY% w210 +0x200, %promoMsg%
-            Gui, Roll:Font, s8 norm cBlack, Segoe UI
-            Gui, Roll:Add, Button, x226 y%curY% w108 h20 gAppendPromoToBase, ➕ В базу
-            curY += 24
+            Gui, Roll:Font, s8 bold cFFFFFF, %RhFontName%
+            Gui, Roll:Add, Text, x%x0% y%curY% w212 h22 Center +0x200 HwndhPromoNew, НОВЕ ПРОМО: %promoFound%
+            RhRegColor(hPromoNew, RhB_Red, RhB_White)
+            Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
+            Gui, Roll:Add, Text, x236 y%curY% w108 h22 Center +Border +0x200 HwndhAppendPromo gAppendPromoToBase, В базу
+            RhRegColor(hAppendPromo, RhB_CardFill, RhB_Text)
         }
-        Gui, Roll:Font, s9 norm cBlack, Segoe UI
+        curY += 26
     }
-
     if (hasCustomerReq) {
-        Gui, Roll:Font, s9 bold c8000FF, Segoe UI
-        Gui, Roll:Add, Text, x10 y%curY% w324, 💬 ПРОХАННЯ КЛІЄНТА:
-        curY += 16
-        Gui, Roll:Font, s9 norm cBlack, Segoe UI
-        Gui, Roll:Add, Edit, x10 y%curY% w324 r2 ReadOnly, %customerReqText%
-        curY += 36
+        Gui, Roll:Font, s8 bold c%RhC_Muted%, %RhFontName%
+        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200, ПРОХАННЯ КЛІЄНТА
+        curY += 18
+        Gui, Roll:Font, s9 norm c%RhC_Text%, %RhFontName%
+        Gui, Roll:Add, Edit, x%x0% y%curY% w%w0% r2 ReadOnly -E0x200, %customerReqText%
+        curY += 44
     }
-
     if (needCall) {
-        Gui, Roll:Font, s10 bold cFF4400, Segoe UI
-        Gui, Roll:Add, Text, x10 y%curY% w324 Center, 📞 ПЕРЕДЗВОНИТИ КЛІЄНТУ!
-        curY += 22
-        Gui, Roll:Font, s9 norm cBlack, Segoe UI
+        Gui, Roll:Font, s9 bold cFFFFFF, %RhFontName%
+        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h22 Center +0x200 HwndhNeedCall, ПЕРЕДЗВОНИТИ КЛІЄНТУ
+        RhRegColor(hNeedCall, RhB_Red, RhB_White)
+        curY += 28
     } else if (!isPost) {
-        Gui, Roll:Font, s10 bold c0055CC, Segoe UI
-        Gui, Roll:Add, Text, x10 y%curY% w324 Center, 🆕 НОВИЙ КЛІЄНТ — зателефонуй!
-        curY += 22
-        Gui, Roll:Font, s9 norm cBlack, Segoe UI
+        Gui, Roll:Font, s9 bold c%RhC_Text%, %RhFontName%
+        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h22 Center +0x200 HwndhNewClient, НОВИЙ КЛІЄНТ — зателефонуй
+        RhRegColor(hNewClient, RhB_StatusSoft, RhB_Text)
+        curY += 28
     }
+    if (curY > 88)
+        curY += 8
 
-    ; ── Вихідний текст (кнопка-тогл) ──
-    Gui, Roll:Font, s9 norm c0C447C, Segoe UI
-    Gui, Roll:Add, Text, x10 y%curY% w270 +0x200 gRcToggleRawText, 👁️ Показати вихідний текст
-    Gui, Roll:Add, Text, x284 y%curY% w50 Right +0x200 gRcToggleRawText vRcRawArrow, ▶ показати
-    curY += 22
-
-    ; ── Коментар ──
-    Gui, Roll:Font, s9 bold cBlack, Segoe UI
-    Gui, Roll:Add, Text, x10 y%curY% w200, 📝 Коментар:
-    curY += 16
-    Gui, Roll:Font, s9 norm cBlack, Segoe UI
-    Gui, Roll:Add, Edit, x10 y%curY% w324 r2 vOrderComment, %cleanComment%
-    curY += 42
-
-    ; ── Карта / Кухня / Адреса (в рядок) ──
-    Gui, Roll:Font, s8 bold cBlack, Segoe UI
-    Gui, Roll:Add, Text, x10 y%curY% w52 h20 +0x200, 💳 Карта
-    Gui, Roll:Font, s9 norm, Segoe UI
-    Gui, Roll:Add, Edit, x64 y%curY% w270 h20 r1 vClientCard, %cardText%
-    curY += 24
-    Gui, Roll:Font, s8 bold cBlack, Segoe UI
-    Gui, Roll:Add, Text, x10 y%curY% w52 h20 +0x200, 🍳 Кухня
-    Gui, Roll:Font, s9 norm, Segoe UI
-    Gui, Roll:Add, Edit, x64 y%curY% w270 h20 r1 vClientInfo, %infoText%
-    curY += 24
-    Gui, Roll:Font, s8 bold cBlack, Segoe UI
-    Gui, Roll:Add, Text, x10 y%curY% w52 h20 +0x200, 🏠 Адреса
-    Gui, Roll:Font, s9 norm, Segoe UI
-    Gui, Roll:Add, Edit, x64 y%curY% w270 h20 r1 vAddressNote, %addrNote%
-    curY += 28
-
-    ; ── Сума + подарунки ──
-    Gui, Roll:Font, s9 bold c0C447C, Segoe UI
-    Gui, Roll:Add, Text, x10 y%curY% w324 +0x200, 💰 Сума %orderSum% грн
+    ; Client block
+    Gui, Roll:Font, s8 bold c%RhC_Muted%, %RhFontName%
+    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200, КЛІЄНТ
     curY += 20
-    Gui, Roll:Font, s8 norm cBlack, Segoe UI
-    Gui, Roll:Add, Checkbox, x10  y%curY% w100 vGiftGunkan   Checked%autoGunkan%,   Гункан
-    Gui, Roll:Add, Checkbox, x112 y%curY% w58  vGiftPepsi    Checked%autoPepsi%,    Пепсі
-    Gui, Roll:Add, Checkbox, x172 y%curY% w62  vGiftBurger   Checked%autoBurger%,   Бургер
-    Gui, Roll:Add, Checkbox, x236 y%curY% w98  vGiftSandwich Checked%autoSandwich%, Сендвіч
-    curY += 22
-    Gui, Roll:Add, Checkbox, x10  y%curY% w110 vGiftSticksNorm Checked%autoSticksNorm%, 🥢 Бамбук (%parsedSticksNorm%)
-    Gui, Roll:Add, Checkbox, x124 y%curY% w108 vGiftSticksEdu  Checked%autoSticksEdu%,  🥢 Навч (%parsedSticksEdu%)
-    Gui, Roll:Add, Checkbox, x236 y%curY% w98  vGiftUtensils   Checked%autoUtensils%,    🍴 Приб (%parsedUtensils%)
-    curY += 24
-    Gui, Roll:Font, s9 bold cD05000, Segoe UI
-    Gui, Roll:Add, Checkbox, x10 y%curY% w324 vDoAutoCash Checked%autoCash%, 💵 Готівка (Решта з %calcChange%)
-    curY += 28
 
-    ; ── Час + калькулятор ──
-    Gui, Roll:Font, s10 bold cBlack, Segoe UI
-    Gui, Roll:Add, Text, x10 y%curY% w28 h24 +0x200, ⏱️
-    Gui, Roll:Font, s10 norm, Segoe UI
-    Gui, Roll:Add, Edit, x40 y%curY% w56 h22 vReadyTime Center, %extractedTime%
-    Gui, Roll:Font, s8 bold, Segoe UI
-    Gui, Roll:Add, Button, x102 y%curY% w110 h24 gCalcPickup,   🏃 СВ (+40)
-    Gui, Roll:Add, Button, x216 y%curY% w118 h24 gCalcDelivery, 🚗 ДОСТ (+90)
-    curY += 32
-
-    ; ── Дії ──
-    Gui, Roll:Font, s9 bold cBlack, Segoe UI
-    Gui, Roll:Add, Button, x10  y%curY% w240 h28 gAddSticksOnly,     🥢 Пробити ПАЛОЧКИ
-    Gui, Roll:Font, s11 norm, Segoe UI
-    Gui, Roll:Add, Button, x256 y%curY% w36 h28 gOpenKitchensEditor, 🏪
-    Gui, Roll:Add, Button, x298 y%curY% w36 h28 gOpenSettings,       ⚙️
+    Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    Gui, Roll:Add, Text, x%x0% y%curY% w156 h16 +0x200, Кухня
+    Gui, Roll:Add, Text, x188 y%curY% w156 h16 +0x200, Карта
+    curY += 18
+    Gui, Roll:Font, s9 norm c%RhC_Text%, %RhFontName%
+    Gui, Roll:Add, Edit, x%x0% y%curY% w156 h24 r1 vClientInfo -E0x200, %infoText%
+    Gui, Roll:Add, Edit, x188 y%curY% w156 h24 r1 vClientCard -E0x200, %cardText%
     curY += 34
 
-    Gui, Roll:Font, s11 bold cBlack, Segoe UI
-    Gui, Roll:Add, Button, x10 y%curY% w324 h34 gApplyRollclub, ✔️ ВНЕСТИ В ЗАМОВЛЕННЯ
-    curY += 38
+    ; Address block
+    Gui, Roll:Font, s8 bold c%RhC_Muted%, %RhFontName%
+    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200, АДРЕСА
+    curY += 20
+    Gui, Roll:Font, s9 norm c%RhC_Text%, %RhFontName%
+    Gui, Roll:Add, Edit, x%x0% y%curY% w%w0% h24 r1 vAddressNote -E0x200, %addrNote%
+    curY += 28
 
-    ; ── Прихований Edit для вихідного тексту (розкривається знизу) ──
-    Gui, Roll:Font, s9 norm cBlack, Segoe UI
-    Gui, Roll:Add, Edit, x10 y%curY% w324 r5 vRcRawEdit ReadOnly +Hidden, %rawComment%
+    ; --- Плашка перекритої вулиці ---
+    if (blockedHit) {
+        Gui, Roll:Font, s9 bold cD32F2F, %RhFontName%
+        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h34 +0x0, % "ПЕРЕКРИТО - уточни ділянку у гостя:`n" . blockedInfo
+        curY += 40
+    }
 
-    Gui, Roll:Show, x350 y20, Rollclub PRO 33.0
+
+    ; Order block
+    Gui, Roll:Font, s8 bold c%RhC_Muted%, %RhFontName%
+    Gui, Roll:Add, Text, x%x0% y%curY% w180 h16 +0x200, ЗАМОВЛЕННЯ
+    Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
+    Gui, Roll:Add, Text, x232 y%curY% w112 h16 Right +0x200, %orderSum% грн
+    curY += 20
+
+    Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    Gui, Roll:Add, Text, x%x0% y%curY% w250 h16 +0x200, Коментар
+    _btnTxt := RcRawShown ? "Сховати" : "Вихідний"
+    Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
+    Gui, Roll:Add, Text, x276 y%curY% w68 h20 Center +0x200 gRcToggleRawText HwndhRcRawBtn, %_btnTxt%
+    RhRegColor(hRcRawBtn, RhB_CardFill, RhB_Text)
+    curY += 22
+
+    Gui, Roll:Font, s9 norm c%RhC_Text%, %RhFontName%
+    Gui, Roll:Add, Edit, x%x0% y%curY% w%w0% r2 vOrderComment -E0x200, %cleanComment%
+    _rawEditY := curY + 44
+    curY += 44
+
+    ; Raw comment hidden initially
+    Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    Gui, Roll:Add, Text, x%x0% y%_rawEditY% w%w0% h16 +0x200 vRawTxtLbl Hidden, Вихідний текст
+    Gui, Roll:Add, Edit, x%x0% y%_rawEditY%+18 w%w0% r4 ReadOnly -E0x200 vRawTxtBox Hidden, %rawComment%
+
+    ControlsToMove := []
+
+    ; Extras block
+    Gui, Roll:Font, s8 bold c%RhC_Muted%, %RhFontName%
+    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200 vLblGifts HwndhC1, ДОПИ
+    ControlsToMove.Push(hC1)
+    curY += 20
+
+    Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
+    Gui, Roll:Add, Text, x16  y%curY% w76 h24 Center +0x200 HwndhGiftG gToggleGiftG, Гункан
+    Gui, Roll:Add, Text, x100 y%curY% w76 h24 Center +0x200 HwndhGiftP gToggleGiftP, Пепсі
+    Gui, Roll:Add, Text, x184 y%curY% w76 h24 Center +0x200 HwndhGiftB gToggleGiftB, Бургер
+    Gui, Roll:Add, Text, x268 y%curY% w76 h24 Center +0x200 HwndhGiftS gToggleGiftS, Сендвіч
+    ControlsToMove.Push(hGiftG), ControlsToMove.Push(hGiftP), ControlsToMove.Push(hGiftB), ControlsToMove.Push(hGiftS)
+    RhRegColor(hGiftG, (autoGunkan   ? RhB_GiftGunkan   : RhB_Chip), RhB_Text)
+    RhRegColor(hGiftP, (autoPepsi    ? RhB_GiftPepsi    : RhB_Chip), RhB_Text)
+    RhRegColor(hGiftB, (autoBurger   ? RhB_GiftBurger   : RhB_Chip), RhB_Text)
+    RhRegColor(hGiftS, (autoSandwich ? RhB_GiftSandwich : RhB_Chip), RhB_Text)
+    curY += 34
+
+    Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200 vLblPayment HwndhC2, Оплата
+    ControlsToMove.Push(hC2)
+    curY += 18
+    Gui, Roll:Font, s9 bold c%RhC_Text%, %RhFontName%
+    _payText := "Готівка — решта з " . calcChange
+    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h28 Center +0x200 HwndhPayCash gToggleAutoCash, %_payText%
+    ControlsToMove.Push(hPayCash)
+    RhRegColor(hPayCash, (autoCash ? RhB_TintGreen : RhB_Chip), RhB_Text)
+    curY += 40
+
+    ; Time block
+    Gui, Roll:Font, s8 bold c%RhC_Muted%, %RhFontName%
+    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200 vLblTime HwndhC3, ЧАС ГОТОВНОСТІ
+    ControlsToMove.Push(hC3)
+    curY += 20
+    timeParts := StrSplit(extractedTime, ":")
+    timeH := timeParts[1]
+    timeM := timeParts[2]
+    Gui, Roll:Font, s10 norm c%RhC_Text%, %RhFontName%
+    Gui, Roll:Add, Edit, x16 y%curY% w36 h24 vReadyTimeH Center Number Limit2 -E0x200 HwndhC4, %timeH%
+    ControlsToMove.Push(hC4)
+    Gui, Roll:Font, s10 bold c%RhC_Muted%, %RhFontName%
+    Gui, Roll:Add, Text, x56 y%curY% w10 h24 Center +0x200 +BackgroundTrans HwndhC5, :
+    ControlsToMove.Push(hC5)
+    Gui, Roll:Font, s10 norm c%RhC_Text%, %RhFontName%
+    Gui, Roll:Add, Edit, x68 y%curY% w36 h24 vReadyTimeM Center Number Limit2 -E0x200 HwndhC6, %timeM%
+    ControlsToMove.Push(hC6)
+    _pickupMin := RcKitchenMinutes("pickup", 40)
+    _deliveryMin := RcKitchenMinutes(RcDeliveryKindFromZone(RcLastZone), 90)
+    Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
+    Gui, Roll:Add, Text, x116 y%curY% w108 h24 Center +0x200 HwndhCalcPickup vRhCalcPickupBtn gCalcPickup, % "СВ +" . _pickupMin
+    Gui, Roll:Add, Text, x236 y%curY% w108 h24 Center +0x200 HwndhCalcDelivery vRhCalcDeliveryBtn gCalcDelivery, % "ДОСТ +" . _deliveryMin
+    ControlsToMove.Push(hCalcPickup), ControlsToMove.Push(hCalcDelivery)
+    RhRegColor(hCalcPickup, RhB_TintGreen, RhB_Text)
+    RhRegColor(hCalcDelivery, RhB_TintAmber, RhB_Text)
+    curY += 40
+
+    ; SIV block
+    Gui, Roll:Font, s8 bold c%RhC_Muted%, %RhFontName%
+    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200 vLblSIV HwndhC7, СІВ
+    ControlsToMove.Push(hC7)
+    curY += 20
+    Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    Gui, Roll:Add, Text, x16 y%curY% w36 h16 +0x200 HwndhC8, Роли
+    Gui, Roll:Add, Text, x68 y%curY% w36 h16 +0x200 HwndhC9, Зв
+    Gui, Roll:Add, Text, x120 y%curY% w36 h16 +0x200 HwndhC10, Уч
+    Gui, Roll:Add, Text, x172 y%curY% w36 h16 +0x200 HwndhC14, Пр
+    ControlsToMove.Push(hC8), ControlsToMove.Push(hC9), ControlsToMove.Push(hC10), ControlsToMove.Push(hC14)
+    curY += 18
+    Gui, Roll:Font, s10 norm c%RhC_Text%, %RhFontName%
+    Gui, Roll:Add, Edit, x16 y%curY% w40 h24 Center vVisRolls gRhSivInlineUpdate Number -E0x200 HwndhC11, %VisRolls%
+    Gui, Roll:Add, Edit, x68 y%curY% w40 h24 Center vVisNorm gRhSivInlineUpdate Number -E0x200 HwndhC12, %parsedSticksNorm%
+    Gui, Roll:Add, Edit, x120 y%curY% w40 h24 Center vVisEdu gRhSivInlineUpdate Number -E0x200 HwndhC13, %parsedSticksEdu%
+    Gui, Roll:Add, Edit, x172 y%curY% w40 h24 Center vVisUtensils gRhSivInlineUpdate Number -E0x200 HwndhC15, %parsedUtensils%
+    ControlsToMove.Push(hC11), ControlsToMove.Push(hC12), ControlsToMove.Push(hC13), ControlsToMove.Push(hC15)
+    curY += 28
+    Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
+    Gui, Roll:Add, Text, x16 y%curY% w328 h20 +0x200 vRhSivPreview HwndhRhSivPreview, Соус 0 · Імбир 0 · Васабі 0
+    ControlsToMove.Push(hRhSivPreview)
+    curY += 32
+
+    GuiBaseHeight := curY
+    Gui, Roll:Show, x350 y20 w360 h%GuiBaseHeight%, Rollclub PRO 33.0
     Gui, Roll:+LastFound
-    RollHwnd    := WinExist()
-    RcRawShown  := 0
-    GuiControlGet, _rp, Roll:Pos, RcRawEdit
-    RcRawEditH  := _rph + 6
+    RollHwnd := WinExist()
+    GoSub, RhRepaintRollPult
+    GoSub, RhSivInlineUpdate
+
+    if (RcRawShown) {
+        RcRawShown := 0
+        GoSub, RcToggleRawText
+    }
+
     if (rawAddress != "" && !hasPickup)
         SetTimer, RcCheckZone, -450
-    MouseMove, 570, 250, 0
+    ; Звірка точки відбувається при натисканні Внести (GoSub RcCheckZone на початку ApplyRollclub)
+return
+; ========================================================
+; TOGGLE ГІФТИ ТА КЕШ
+; ========================================================
+ToggleGiftG:
+    autoGunkan := !autoGunkan
+    autoPepsi := 0, autoBurger := 0, autoSandwich := 0
+    GoSub, RefreshGifts
+return
+ToggleGiftP:
+    autoPepsi := !autoPepsi
+    autoGunkan := 0, autoBurger := 0, autoSandwich := 0
+    GoSub, RefreshGifts
+return
+ToggleGiftB:
+    autoBurger := !autoBurger
+    autoGunkan := 0, autoPepsi := 0, autoSandwich := 0
+    GoSub, RefreshGifts
+return
+ToggleGiftS:
+    autoSandwich := !autoSandwich
+    autoGunkan := 0, autoPepsi := 0, autoBurger := 0
+    GoSub, RefreshGifts
+return
+RefreshGifts:
+    RhRegColor(hGiftG, (autoGunkan   ? RhB_GiftGunkan   : RhB_Chip), RhB_Text)
+    RhRegColor(hGiftP, (autoPepsi    ? RhB_GiftPepsi    : RhB_Chip), RhB_Text)
+    RhRegColor(hGiftB, (autoBurger   ? RhB_GiftBurger   : RhB_Chip), RhB_Text)
+    RhRegColor(hGiftS, (autoSandwich ? RhB_GiftSandwich : RhB_Chip), RhB_Text)
+    DllCall("InvalidateRect", "Ptr", hGiftG, "Ptr", 0, "Int", 1)
+    DllCall("InvalidateRect", "Ptr", hGiftP, "Ptr", 0, "Int", 1)
+    DllCall("InvalidateRect", "Ptr", hGiftB, "Ptr", 0, "Int", 1)
+    DllCall("InvalidateRect", "Ptr", hGiftS, "Ptr", 0, "Int", 1)
 return
 
-; ========================================================
-; ЛОКАЛЬНІ ГАРЯЧІ КЛАВІШІ
-; ========================================================
+ToggleAutoCash:
+    autoCash := !autoCash
+    RhRegColor(hPayCash, (autoCash ? RhB_TintGreen : RhB_Chip), RhB_Text)
+    DllCall("InvalidateRect", "Ptr", hPayCash, "Ptr", 0, "Int", 1)
+return
+
+RcToggleRawText:
+    RcRawShown := !RcRawShown
+    offset := 86
+    if (RcRawShown) {
+        GuiControl, Roll:Show, RawTxtLbl
+        GuiControl, Roll:Show, RawTxtBox
+        GuiControl, Roll:, hRcRawBtn, Сховати
+        for index, ctrl in ControlsToMove {
+            GuiControlGet, pos, Roll:Pos, %ctrl%
+            newY := posY + offset
+            GuiControl, Roll:Move, %ctrl%, y%newY%
+        }
+        newH := GuiBaseHeight + offset
+        WinMove, ahk_id %RollHwnd%, , , , , %newH%
+    } else {
+        GuiControl, Roll:Hide, RawTxtLbl
+        GuiControl, Roll:Hide, RawTxtBox
+        GuiControl, Roll:, hRcRawBtn, Вихідний
+        for index, ctrl in ControlsToMove {
+            GuiControlGet, pos, Roll:Pos, %ctrl%
+            newY := posY - offset
+            GuiControl, Roll:Move, %ctrl%, y%newY%
+        }
+        newH := GuiBaseHeight
+        WinMove, ahk_id %RollHwnd%, , , , , %newH%
+    }
+return
+
+RhSivInlineUpdate:
+    Gui, Roll:Submit, NoHide
+    _r := (VisRolls != "" ? VisRolls + 0 : 0)
+    _u := (VisUtensils != "" ? VisUtensils + 0 : 0)
+    _soyC := Ceil(_r / 2.0)
+    _soyM := (_r < 2) ? _r : 2
+    _soy  := (_soyC > _soyM) ? _soyC : _soyM
+    _gw   := Ceil(_r / 4.0)
+    if (_r == 0) {
+        _soy := 0
+        _gw  := 0
+    }
+    _sivText := "Соєвий " . _soy . " · Імбир " . _gw . " · Васабі " . _gw
+    if (_u > 0)
+        _sivText .= " · Прибори " . _u
+    GuiControl, Roll:, RhSivPreview, %_sivText%
+return
+
+RhAutoToggle:
+    ; ГОЛОВНИЙ РУБИЛЬНИК: якщо авто-КЦ вимкнено — F4 нічого не робить (швидкий ручний пульт).
+    if (rhPunchBusy || _inDutyTake)
+    {
+        SetTimer, KcMonitor, Off
+        autoMode := 0
+        return
+    }
+    if (!AUTO_KC_ENABLED) {
+        SetTimer, KcMonitor, Off
+        autoMode := 0
+        return
+    }
+    autoMode := !autoMode
+    FormatTime, _atT,, yyyy-MM-dd HH:mm:ss
+    FileAppend, % "==== F4/TOGGLE " . _atT . " -> autoMode=" . autoMode . " (kcBusy=" . kcBusy . " kcPaused=" . kcPaused . ")`n", %A_ScriptDir%\parse_debug.log
+    if (autoMode)
+        GuiControl, Roll:, RhAutoLbl, AUTO: ON
+    else
+        GuiControl, Roll:, RhAutoLbl, AUTO: OFF
+    if (autoMode)
+    {
+        kcLastNo := ""
+        SetTimer, KcMonitor, 1800
+        ToolTip, Full-auto ON
+    }
+    else
+    {
+        SetTimer, KcMonitor, Off
+        ToolTip, Full-auto OFF
+    }
+    SetTimer, RemoveFinishTip, -2000
+return
+
+KcStopDuty:
+    ; будь-яка РУЧНА дія оператора (тільда/F1/F2/F3/Enter/Ctrl+Enter) → вимкнути дежурство + вікно "оператор працює".
+    ; _inDutyTake=1 → викликано самим дежурством під час взяття, НЕ гасимо і вікно НЕ ставимо.
+    if (!_inDutyTake)
+        _punchUntil := A_TickCount + 12000     ; 12с оператор працює руками → дежурство/пошук не лізуть
+    if (dutyOn && !_inDutyTake)
+    {
+        dutyOn := 0
+        kcStop := 1
+        SetTimer, KcDutyTick, Off
+        ToolTip, Дежурство ВИМКНЕНО (ручний режим)
+        SetTimer, RemoveToolTip, -1500
+    }
+return
+
+KcDutyToggle:
+    ; Ctrl+F4: дежурство — сам ловить перший вільний годний заказ, бере і зупиняється з гучним сигналом
+    FileAppend, % "[" . A_Now . "] Ctrl+F4-TOGGLE (was dutyOn=" . dutyOn . ")`n", %A_ScriptDir%\parse_debug.log
+    if (rhPunchBusy || _inDutyTake)
+    {
+        dutyOn := 0
+        kcStop := 1
+        SetTimer, KcDutyTick, Off
+        SetTimer, KcMonitor, Off
+        FileAppend, % "[" . A_Now . "] Ctrl+F4 BLOCKED — punchBusy=" . rhPunchBusy . " inTake=" . _inDutyTake . "`n", %A_ScriptDir%\parse_debug.log
+        ToolTip, Ctrl+F4 заблоковано: йде пробиття
+        SetTimer, RemoveToolTip, -1500
+        return
+    }
+    if (A_TickCount < _punchUntil)
+    {
+        FileAppend, % "[" . A_Now . "] Ctrl+F4 IGNORED — під час пробиття (спрацював не фізичний Ctrl+F4?)`n", %A_ScriptDir%\parse_debug.log
+        return
+    }
+    dutyOn := !dutyOn
+    if (dutyOn)
+    {
+        kcStop := 0
+        kcTook := 0
+        ToolTip, ⏳ Дежурю по заказах... (Ctrl+F4 — стоп)
+        SetTimer, KcDutyTick, 1500
+    }
+    else
+    {
+        kcStop := 1                 ; перервати захід, що вже виконується
+        SetTimer, KcDutyTick, Off
+        ToolTip, Дежурство ВИМКНЕНО
+        SetTimer, RemoveToolTip, -3000
+    }
+return
+
+KcDutyTick:
+    FileAppend, % "[" . A_Now . "] DUTY-TICK dutyOn=" . dutyOn . " kcBusy=" . kcBusy . "`n", %A_ScriptDir%\parse_debug.log
+    if (rhPunchBusy || _inDutyTake)
+    {
+        dutyOn := 0
+        kcStop := 1
+        SetTimer, KcDutyTick, Off
+        SetTimer, KcMonitor, Off
+        FileAppend, % "[" . A_Now . "] DUTY-TICK BLOCKED — punchBusy=" . rhPunchBusy . " inTake=" . _inDutyTake . "`n", %A_ScriptDir%\parse_debug.log
+        return
+    }
+    if (!dutyOn)
+    {
+        SetTimer, KcDutyTick, Off
+        return
+    }
+    if (kcBusy)
+        return
+    kcForce := 1
+    kcPaused := 0
+    kcTook := 0
+    GoSub, KcMonitor
+    if (kcTook)
+    {
+        dutyOn := 0
+        SetTimer, KcDutyTick, Off
+        GoSub, LoudAlarm
+    }
+return
+
+LoudAlarm:
+    Loop, 6
+    {
+        SoundBeep, 900, 220
+        SoundBeep, 1350, 220
+    }
+return
+
+KcTakeOnce:
+    ; один примусовий захід напівавтомата (минаючи авто-таймер і паузу)
+    if (rhPunchBusy || _inDutyTake)
+        return
+    if (A_TickCount < _punchUntil)
+        return
+    if (kcBusy)
+        return
+    kcForce := 1
+    kcPaused := 0
+    GoSub, KcMonitor
+return
+
+KcMonitor:
+    FileAppend, % "[" . A_Now . "] KcMON enter dutyOn=" . dutyOn . " kcForce=" . kcForce . " autoMode=" . autoMode . " AUTO=" . AUTO_KC_ENABLED . " kcBusy=" . kcBusy . " inTake=" . _inDutyTake . "`n", %A_ScriptDir%\parse_debug.log
+    if (rhPunchBusy || _inDutyTake)
+    {
+        dutyOn := 0
+        kcForce := 0
+        kcStop := 1
+        SetTimer, KcDutyTick, Off
+        SetTimer, KcMonitor, Off
+        FileAppend, % "[" . A_Now . "] KcMON BLOCKED — punchBusy=" . rhPunchBusy . " inTake=" . _inDutyTake . "`n", %A_ScriptDir%\parse_debug.log
+        return
+    }
+    if (!kcForce && (!AUTO_KC_ENABLED || !autoMode))
+    {
+        SetTimer, KcMonitor, Off
+        autoMode := 0
+        return
+    }
+    if (kcBusy)
+        return
+    if (kcPaused && !kcForce)
+        return
+    if (A_TickCount < _punchUntil)          ; недавня ручна дія оператора → дежурство пропускає круг
+    {
+        kcForce := 0
+        return
+    }
+    kcForce := 0
+    kcBusy := 1
+    kcStop := 0                     ; свіжий захід — скинути прапор стопу
+    ; === ПРАВИЛЬНИЙ ПОРЯДОК: вікно → стерти старий № → оновити КЦ (Ctrl+Tab×2) → аж тоді питати сервер ===
+    SetTitleMatchMode, 2
+    if !WinExist("Syrve Office")
+    {
+        ToolTip, Ctrl+F4: вікно РК (Syrve Office) не знайдено — відкрий Доставки
+        SetTimer, RemoveToolTip, -6000
+        kcBusy := 0
+        return
+    }
+    WinActivate, Syrve Office
+    WinWaitActive, Syrve Office,, 2
+    SetTitleMatchMode, 1
+    Sleep, 200
+    Send, {Esc}                    ; закрити випадкові випадашки/фокус у карточці
+    Sleep, 120
+    ; 1) оновити КЦ без кулдауна: на сусідню вкладку і назад.
+    ; ВАЖЛИВО: до цього моменту НЕ клікаємо PoiskX/PoiskY — на карточці це поле "Оператор".
+    Send, ^{Tab}
+    Sleep, 220
+    Send, ^{Tab}
+    Sleep, 330
+    if (kcStop)
+    {
+        kcBusy := 0
+        ToolTip, Стоп (Ctrl+F4)
+        SetTimer, RemoveToolTip, -1500
+        return
+    }
+    ; 2) список свіжий — тепер питаємо сервер (+ серверний таймінг у bridge.log)
+    ToolTip, Ctrl+F4: питаю сервер про годний заказ...
+    listResp := RhGet("/api/iiko/kc-list", 12000)
+    if InStr(listResp, "ACTIVE_ORDER_CARD")
+    {
+        ToolTip, Ctrl+F4: активна карточка — переходжу на Доставки...
+        Send, {Esc}
+        Sleep, 180
+        Send, ^{Tab}
+        Sleep, 700
+        listResp := RhGet("/api/iiko/kc-list", 12000)
+    }
+    if InStr(listResp, "ACTIVE_ORDER_CARD")
+    {
+        kcBusy := 0
+        ToolTip, Ctrl+F4: досі карточка заказа — відкрий вкладку Доставки
+        SetTimer, RemoveToolTip, -6000
+        return
+    }
+    Sleep, 30                       ; дати шанс F4-стопу під час блокуючого запиту
+    if (kcStop)
+    {
+        kcBusy := 0
+        ToolTip, Стоп (Ctrl+F4) — заказ не чіпаю
+        SetTimer, RemoveToolTip, -1500
+        return
+    }
+    takeNo := ""
+    RegExMatch(listResp, "take_no\D+(\d+)", tM)
+    takeNo := tM1
+    FileAppend, % "[" . A_Now . "] KC takeNo=" . takeNo . " paused=" . kcPaused . " poiskX=" . poiskX . " rowX=" . rowX . " resp=" . SubStr(listResp,1,160) . "`n", %A_ScriptDir%\ahk_debug.log
+    if (takeNo == "" || takeNo == "0")
+    {
+        _reason := ""
+        RegExMatch(listResp, "reason""\s*:\s*""([^""]*)", _rM)
+        _reason := _rM1
+        ToolTip, % "Ctrl+F4: нема вільних для взяття`n" . _reason
+        SetTimer, RemoveToolTip, -8000
+        kcBusy := 0
+        return
+    }
+    ToolTip, Ctrl+F4: беру заказ №%takeNo%...
+    ; 3) тільки зараз можна чіпати поле Поиск: сервер підтвердив, що активний список Доставки.
+    ; --- capture: Poisk -> open first row ---
+    if (poiskX != 0)
+    {
+        Click, %poiskX%, %poiskY%
+        Sleep, 200
+        Send, ^a
+        Sleep, 50
+        Send, {Delete}          ; примусово стерти старий № перед вводом (інакше SendInput дописує → задвоєний фільтр → список порожній → холостий круг)
+        Sleep, 80
+        SendInput, %takeNo%
+        Sleep, 800
+    }
+    ; --- ПЕРЕВІРКА перед пробиттям: список має звузитись РІВНО до нашого № ---
+    ; якщо ні (ми не на Доставках / фільтр не спрацював) — НЕ пробиваємо, пропускаємо цей круг.
+    _chk := RhGet("/api/iiko/kc-list", 6000)
+    _cnt := ""
+    RegExMatch(_chk, "count""\s*:\s*(\d+)", _cM)
+    _cnt := _cM1
+    if (_cnt != "1" || !InStr(_chk, takeNo))
+    {
+        ToolTip, % "Ctrl+F4: список не звузився до №" . takeNo . " — НЕ пробиваю (не на Доставках?)"
+        SetTimer, RemoveToolTip, -5000
+        kcBusy := 0
+        return
+    }
+    ToolTip                     ; прибрати підказку — вона перекривала рядок, клік потрапляв у неї
+    Sleep, 60
+    if (kcStop)
+    {
+        kcBusy := 0
+        ToolTip, Стоп (Ctrl+F4) — заказ не відкриваю
+        SetTimer, RemoveToolTip, -1500
+        return
+    }
+    if (rowX != 0)
+    {
+        Click, %rowX%, %rowY%
+        Sleep, 120
+        Click, %rowX%, %rowY%
+        Sleep, 700
+    }
+    ; --- ЗАХИСТ: діалог "Подтверждение: Доставка обрабатывается оператором ... продолжить?" ---
+    ;    З'являється НЕ миттєво після кліку — ЧЕКАЄМО його до 2с. Є → Нет (Esc) і ПРОПУСКАЄМО.
+    SetTitleMatchMode, 2
+    _busy := 0
+    WinWait, Подтверждение,, 2
+    if (!ErrorLevel)
+        _busy := 1
+    if (!_busy && WinExist("ahk_class #32770"))
+        _busy := 1
+    if (!_busy && WinExist("Підтвердження"))
+        _busy := 1
+    if (!_busy && WinExist("", "обрабат"))
+        _busy := 1
+    if (!_busy && WinExist("", "обробля"))
+        _busy := 1
+    SetTitleMatchMode, 1
+    if (_busy)
+    {
+        Send, {Esc}
+        Sleep, 250
+        Send, {Esc}
+        Sleep, 150
+        ToolTip, % "Заказ №" . takeNo . " вже взяв інший оператор — пропускаю"
+        SetTimer, RemoveToolTip, -4000
+        kcBusy := 0
+        return
+    }
+    ; opened -> read (tilde) + punch + sound + pause
+    if (kcStop)
+    {
+        kcBusy := 0
+        ToolTip, Стоп (Ctrl+F4) — не пробиваю
+        SetTimer, RemoveToolTip, -1500
+        return
+    }
+    Sleep, 300
+    ; Заказ уже открыт: с этого момента F4/КЦ-дежурство больше не имеет права
+    ; искать следующий заказ, пока текущий читается и пробивается.
+    dutyOn := 0
+    kcPaused := 1
+    SetTimer, KcDutyTick, Off
+    SetTimer, KcMonitor, Off
+    _inDutyTake := 1
+    GoSub, TriggerMain
+    Sleep, 3000
+    GoSub, ApplyRollclub
+    _inDutyTake := 0
+    Sleep, 500
+    GoSub, SoundOk
+    kcTook := 1
+    ToolTip, ✅ ВЗЯВ №%takeNo% — перевір і натисни Ctrl+Enter
+    SetTimer, RemoveToolTip, -15000
+    kcPaused := 1
+    kcBusy := 0
+return
+
 #IfWinActive Rollclub PRO 33.0
 Enter::GoSub, ApplyRollclub
 NumpadEnter::GoSub, ApplyRollclub
 +Enter::Send, {Enter}
 +NumpadEnter::Send, {Enter}
+^Enter::GoSub, FinishOrder
+^+Enter::GoSub, FinishOrder
+^NumpadEnter::GoSub, FinishOrder
+^+NumpadEnter::GoSub, FinishOrder
+#IfWinActive
+
+#IfWinActive ahk_exe BackOffice.exe
+^Enter::GoSub, FinishOrder
+^+Enter::GoSub, FinishOrder
+^NumpadEnter::GoSub, FinishOrder
+^+NumpadEnter::GoSub, FinishOrder
 #IfWinActive
 
 #IfWinActive СИВ (Модуль)
@@ -1588,15 +2417,46 @@ Enter::GoSub, SivVisApply
 NumpadEnter::GoSub, SivVisApply
 #IfWinActive
 
+^!r::Reload                ; Ctrl+Alt+R — перезавантажити скрипт (підхопити свіжий код з диску)
+F6::GoSub, KcTakeOnce      ; F6 — один захід (ручний, без циклу)
+^F4::GoSub, KcDutyToggle   ; Ctrl+F4 — дежурство: сам лови вільний заказ (повторний Ctrl+F4 — стоп)
+
 ; ========================================================
 ; НАЛАШТУВАННЯ
 ; ========================================================
 OpenSettings:
     Gui, Settings:Destroy
-    Gui, Settings:+AlwaysOnTop +ToolWindow
-    Gui, Settings:Font, s10 bold, Segoe UI
-    Gui, Settings:Add, Text, w300 Center, 🎯 ПРИЦІЛЫ (Координати)
-    Gui, Settings:Font, s9 norm, Segoe UI
+    Gui, Settings:+AlwaysOnTop +ToolWindow +OwnDialogs +HwndSettingsHwnd
+
+    RhApplyTheme()
+    Gui, Settings:Color, %RhC_BG%, %RhC_Panel%
+
+    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Tab3, x6 y6 w348 h870 vSettingsTab, WinAPI|Координати та інше
+
+    ; ── Вкладка 1: WinAPI scanner ───────────────────────────
+    Gui, Settings:Tab, 1
+    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Text, x16 y36 w320 Center, ЗБЕРЕЖЕНІ WinAPI ЕЛЕМЕНТИ
+    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, ListView, x16 y62 w322 h190 vUiaListView gUiaListClick Grid, Назва (роль)|AutomationId / Name
+    Gui, Settings:Default
+    Gui, ListView, UiaListView
+    LV_ModifyCol(1, 142)
+    LV_ModifyCol(2, 166)
+    GoSub, LoadUiaMapToListView
+    Gui, Settings:Font, s9 bold c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Button, x16 y262 w156 h32 gLaunchScanner, Додати елемент
+    Gui, Settings:Add, Button, x182 y262 w156 h32 gDeleteSelectedUiaBinding, Видалити вибране
+    Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    Gui, Settings:Add, Text, x16 y302 w322 h42, Наведіть курсор на кнопку в Syrve та натисніть ліву кнопку миші.`nВиберіть рядок і натисніть «Видалити».
+
+    ; ── Вкладка 2: резервні координати та інші налаштування ──
+    Gui, Settings:Tab, 2
+
+    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Text, w300 Center, ПРИЦІЛИ (координати)
+    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
     Gui, Settings:Add, Button, w140 x10 y+10 gSetCommTarget,  1. Коментар
     Gui, Settings:Add, Button, w140 x+10 yp  gSetCardTarget,  2. Карта Клієнта
     Gui, Settings:Add, Button, w140 x10  y+5 gSetInfoTarget,  3. Кухня
@@ -1606,14 +2466,37 @@ OpenSettings:
     Gui, Settings:Add, Button, w140 x10  y+5 gSetCrossTarget, Хрестик Опл.
     Gui, Settings:Add, Button, w140 x+10 yp  gSetCashTarget,  Поле Оплати
     Gui, Settings:Add, Button, w140 x10  y+5 gSetSumTarget,   Сума Замовлення
-    Gui, Settings:Add, Button, w140 x+10 yp  gCalibrateWaitZoneFromSettings,  🔲 Зона CRM (zxc)
+    Gui, Settings:Add, Button, w140 x+10 yp  gCalibrateWaitZoneFromSettings,  Зона CRM (zxc)
     Gui, Settings:Add, Button, w140 x10  y+5 gSetCallTarget,  Авто-Прийом Дзв. (zxc1)
-    Gui, Settings:Add, Button, w140 x+10 yp  gSetAdrReadTarget, 📍 Поле читання Адреси
-    Gui, Settings:Add, Button, w290 x10  y+5 gSetKontsTarget,  🏪 Концепція (самовивіз)
+    Gui, Settings:Add, Button, w140 x+10 yp  gSetAdrReadTarget, Поле читання адреси
+    Gui, Settings:Add, Button, w290 x10  y+5 gSetKontsTarget,  Концепція (самовивіз)
+    Gui, Settings:Add, Button, w140 x10  y+5 gSetConfirmTarget, Подтвердить (фініш)
+    Gui, Settings:Add, Button, w140 x+10 yp  gSetSaveTarget,    Зберегти на точку
+    Gui, Settings:Add, Button, w290 x10  y+5 gSetNaitiTarget,  Найти точку (кнопка iiko)
+    Gui, Settings:Add, Button, w290 x10  y+5 gSetTochkaTarget, Точка (поле для звірки зони)
+    Gui, Settings:Add, Button, w140 x10  y+5 gSetPoiskTarget,  Поле Поиск (КЦ)
+    Gui, Settings:Add, Button, w140 x+10 yp  gSetRowTarget,    1-й рядок списку
 
-    Gui, Settings:Font, s10 bold, Segoe UI
-    Gui, Settings:Add, Text, w300 Center x10 y+15, 🎁 PLU КОДИ ПОДАРУНКІВ
-    Gui, Settings:Font, s9 norm, Segoe UI
+    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Text, w300 Center x10 y+15, ФУНКЦІЇ
+    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Checkbox, w290 x10 y+10 vNewCheckPoint Checked%CHECK_POINT_ENABLED%, 📍 Авто-Звірка Точки (клік iiko + порівняння)
+
+    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Text, w300 Center x10 y+15, ТЕМА
+    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Text, x10 y+10 w60, Стиль:
+    _themeIdx := (uiTheme == "dark") ? 2 : 1
+    Gui, Settings:Add, DropDownList, x+5 yp-3 w220 vNewUiTheme Choose%_themeIdx%, Light Premium|Neon Dark
+
+    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Text, w300 Center x10 y+15, ЗОНИ ДОСТАВКИ (KML)
+    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Button, x10 y+10 w290 h28 gRcLoadKmlFile, Завантажити KML-файл зон
+
+    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Text, w300 Center x10 y+15, PLU КОДИ ПОДАРУНКІВ
+    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
     Gui, Settings:Add, Text, x10 y+10 w60, Гункан:
     Gui, Settings:Add, Edit, x+5 yp-3 w80 vNewGunkan Center, %pluGunkan%
     Gui, Settings:Add, Text, x+10 yp+3 w50, Пепсі:
@@ -1622,7 +2505,7 @@ OpenSettings:
     Gui, Settings:Add, Edit, x+5 yp-3 w80 vNewBurger Center, %pluBurger%
     Gui, Settings:Add, Text, x+10 yp+3 w55, Сендвіч:
     Gui, Settings:Add, Edit, x+5 yp-3 w80 vNewSandwich Center, %pluSandwich%
-    
+
     Gui, Settings:Add, Text, x10 y+10 w60, Бамбукові:
     Gui, Settings:Add, Edit, x+5 yp-3 w80 vNewSticksNorm Center, %pluSticksNorm%
     Gui, Settings:Add, Text, x+10 yp+3 w55, Навчальні:
@@ -1631,9 +2514,9 @@ OpenSettings:
     Gui, Settings:Add, Text, x10 y+10 w70, Прибори В/Н/Л:
     Gui, Settings:Add, Edit, x+5 yp-3 w80 vNewUtensils Center, %pluUtensils%
 
-    Gui, Settings:Font, s10 bold, Segoe UI
-    Gui, Settings:Add, Text, w300 Center x10 y+15, ⌨️ ГАРЯЧІ КЛАВІШІ
-    Gui, Settings:Font, s9 norm, Segoe UI
+    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Text, w300 Center x10 y+15, ГАРЯЧІ КЛАВІШІ
+    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
     Gui, Settings:Add, Text, x10 y+10 w140, Головне меню:
     Gui, Settings:Add, Hotkey, x+5 yp-3 w140 vNewHkMain, %hkMain%
     Gui, Settings:Add, Text, x10 y+10 w140, Швидкий СИВ:
@@ -1642,14 +2525,21 @@ OpenSettings:
     Gui, Settings:Add, Hotkey, x+5 yp-3 w140 vNewHkWait, %hkWait%
     Gui, Settings:Add, Text, x10 y+10 w140, Автоприйом Дзвінка:
     Gui, Settings:Add, Hotkey, x+5 yp-3 w140 vNewHkCall, %hkCall%
+    Gui, Settings:Add, Text, x10 y+10 w140, Фініш (Зберегти):
+    Gui, Settings:Add, Hotkey, x+5 yp-3 w140 vNewHkFinish, %hkFinish%
 
-    Gui, Settings:Font, s10 bold, Segoe UI
-    Gui, Settings:Add, Button, w290 h35 x10 y+15 gSaveSettings, 💾 Зберегти та Перезапустити
+    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Button, w290 h35 x10 y+15 gSaveSettings, Зберегти та Перезапустити
     Gui, Settings:Show,, Налаштування PRO
 return
 
 SaveSettings:
     Gui, Settings:Submit
+    uiThemeSave := InStr(NewUiTheme, "Dark") ? "dark" : "light"
+    IniWrite, %uiThemeSave%, RkConfig.ini, UI, Theme
+
+    CHECK_POINT_ENABLED := NewCheckPoint
+    IniWrite, %NewCheckPoint%, RkConfig.ini, Main, CheckPoint
     IniWrite, %NewGunkan%,   RkConfig.ini, PLU, Gunkan
     IniWrite, %NewPepsi%,    RkConfig.ini, PLU, Pepsi
     IniWrite, %NewBurger%,   RkConfig.ini, PLU, Burger
@@ -1661,6 +2551,7 @@ SaveSettings:
     IniWrite, %NewHkSiv%,    RkConfig.ini, Hotkeys, Siv
     IniWrite, %NewHkWait%,   RkConfig.ini, Hotkeys, WaitOrder
     IniWrite, %NewHkCall%,   RkConfig.ini, Hotkeys, WaitCall
+    IniWrite, %NewHkFinish%, RkConfig.ini, Hotkeys, Finish
     MsgBox, 64, Збережено, Налаштування збережено! Перезапуск..., 2
     Reload
 return
@@ -1696,7 +2587,7 @@ return
 SetInfoTarget:
     Gui, Settings:Hide
     Sleep, 300
-    MsgBox, 4160, Налаштування, Клікни в поле КУХНЯ.
+    MsgBox, 4160, Налаштування - КУХНЯ, КУХНЯ = комірка "Комментарий" у РЯДКУ СТРАВИ (стовпець Комментарий навпроти блюда).`n`nНЕ став на "Улица" і НЕ на "Информация о клиенте" - туди не можна (вулиця зітреться, кухня буде порожня).`n`nКлікни в ту комірку коментаря страви.
     KeyWait, LButton, Down
     MouseGetPos, infoX, infoY
     IniWrite, %infoX%, RkConfig.ini, Targets, InfoX
@@ -1706,7 +2597,7 @@ return
 SetAddrTarget:
     Gui, Settings:Hide
     Sleep, 300
-    MsgBox, 4160, Налаштування, Клікни в поле АДРЕСА.
+    MsgBox, 4160, Налаштування - АДРЕСА, АДРЕСА = поле "Примечание к адресу" (блок Доставка праворуч, під Районом).`n`nКлікни туди.
     KeyWait, LButton, Down
     MouseGetPos, addrX, addrY
     IniWrite, %addrX%, RkConfig.ini, Targets, AddrX
@@ -1742,6 +2633,12 @@ SetCrossTarget:
     IniWrite, %crossX%, RkConfig.ini, Targets, CrossX
     IniWrite, %crossY%, RkConfig.ini, Targets, CrossY
     Gui, Settings:Show
+return
+    total := A_Hour*60 + A_Min + CalcType
+    HH := Mod(Floor(total / 60), 24)
+    MM := Mod(total, 60)
+    GuiControl, Roll:, ReadyTimeH, % Format("{:02}", HH)
+    GuiControl, Roll:, ReadyTimeM, % Format("{:02}", MM)
 return
 SetCashTarget:
     Gui, Settings:Hide
@@ -1800,6 +2697,82 @@ SetKontsTarget:
     Gui, Settings:Show
 return
 
+SetConfirmTarget:
+    Gui, Settings:Hide
+    Sleep, 300
+    MsgBox, 4160, Налаштування, Клікни в кнопку "Подтвердить" (унизу зліва вікна заказу iiko).
+    KeyWait, LButton, Down
+    MouseGetPos, confirmX, confirmY
+    IniWrite, %confirmX%, RkConfig.ini, Targets, ConfirmX
+    IniWrite, %confirmY%, RkConfig.ini, Targets, ConfirmY
+    Gui, Settings:Show
+return
+
+SetSaveTarget:
+    Gui, Settings:Hide
+    Sleep, 300
+    MsgBox, 4160, Налаштування, Клікни в кнопку "Сохранить на точку" (унизу справа вікна заказу iiko).
+    KeyWait, LButton, Down
+    MouseGetPos, saveX, saveY
+    IniWrite, %saveX%, RkConfig.ini, Targets, SaveX
+    IniWrite, %saveY%, RkConfig.ini, Targets, SaveY
+    Gui, Settings:Show
+return
+
+SetNaitiTarget:
+    Gui, Settings:Hide
+    Sleep, 300
+    MsgBox, 4160, Налаштування, Клікни в кнопку "Найти точку" (справа у блоці Доставка iiko).
+    KeyWait, LButton, Down
+    MouseGetPos, naitiX, naitiY
+    IniWrite, %naitiX%, RkConfig.ini, Targets, NaitiX
+    IniWrite, %naitiY%, RkConfig.ini, Targets, NaitiY
+    Gui, Settings:Show
+return
+
+SetTochkaTarget:
+    Gui, Settings:Hide
+    Sleep, 300
+    MsgBox, 4160, Налаштування - ТОЧКА, ТОЧКА = поле "Точка*" (зверху форми, під Концепцією; те, що iiko заповнює після "Найти точку").`n`nКлікни в це поле.
+    KeyWait, LButton, Down
+    MouseGetPos, tochkaX, tochkaY
+    IniWrite, %tochkaX%, RkConfig.ini, Targets, TochkaX
+    IniWrite, %tochkaY%, RkConfig.ini, Targets, TochkaY
+    Gui, Settings:Show
+return
+
+SetPoiskTarget:
+    Gui, Settings:Hide
+    Sleep, 300
+    MsgBox, 4160, Nalashtuvannya, Click in the "Poisk" field (top of Dostavki list in iiko).
+    KeyWait, LButton, Down
+    MouseGetPos, poiskX, poiskY
+    IniWrite, %poiskX%, RkConfig.ini, Targets, PoiskX
+    IniWrite, %poiskY%, RkConfig.ini, Targets, PoiskY
+    Gui, Settings:Show
+return
+
+SetRowTarget:
+    Gui, Settings:Hide
+    Sleep, 300
+    MsgBox, 4160, Nalashtuvannya, Click on the FIRST row of the Dostavki list in iiko.
+    KeyWait, LButton, Down
+    MouseGetPos, rowX, rowY
+    IniWrite, %rowX%, RkConfig.ini, Targets, RowX
+    IniWrite, %rowY%, RkConfig.ini, Targets, RowY
+    Gui, Settings:Show
+return
+
+; ── Звуки для авто-режиму (чути в навушниках) ──
+SoundOk:        ; усе зійшлось → підійди й тисни Ctrl+Enter
+    SoundBeep, 880, 90
+    SoundBeep, 1318, 130
+return
+SoundErr:       ; щось не зійшлось / увага
+    SoundBeep, 440, 180
+    SoundBeep, 311, 280
+return
+
 ; ========================================================
 ; РЕДАКТОР СТАТУСІВ КУХОНЬ
 ; ========================================================
@@ -1832,7 +2805,7 @@ OpenKitchensEditor:
                 presetNotes .= (presetNotes != "" ? "|" : "") . line
         }
     }
-    if (presetNotes = "")
+    if (presetNotes == "")
         presetNotes := "Стандарт|Стоп|по узгодженню"
 
     rowY := 80
@@ -1865,10 +2838,11 @@ OpenKitchensEditor:
 
     rowY += 10
     Gui, Kitch:Font, s10 bold, Segoe UI
-    Gui, Kitch:Add, Button, x10  y%rowY% w155 h32 gOpenPresetsEditor, ⚙ Пресети
-    Gui, Kitch:Add, Button, x175 y%rowY% w180 h32 gSaveKitchens,     💾 Зберегти
-    Gui, Kitch:Add, Button, x365 y%rowY% w200 h32 gResetKitchensOk,  🔄 Скинути в Стандарт
-    Gui, Kitch:Add, Button, x575 y%rowY% w180 h32 gKitchClose,       ✖ Закрити
+    Gui, Kitch:Add, Button, x10  y%rowY% w120 h32 gSyncKitchensGoogle, Google
+    Gui, Kitch:Add, Button, x140 y%rowY% w120 h32 gOpenPresetsEditor, Пресети
+    Gui, Kitch:Add, Button, x270 y%rowY% w150 h32 gSaveKitchens,     Зберегти
+    Gui, Kitch:Add, Button, x430 y%rowY% w180 h32 gResetKitchensOk,  Скинути в Стандарт
+    Gui, Kitch:Add, Button, x620 y%rowY% w135 h32 gKitchClose,       Закрити
     Gui, Roll:Hide
     Gui, Kitch:Show, , Кухні — статуси
     WinActivate, Кухні — статуси
@@ -1882,7 +2856,7 @@ SaveKitchens:
         vPic := "KPic_" . idx
         vFar := "KFar_" . idx
         vSto := "KSto_" . idx
-        
+
         Kitchens[idx].Remark   := %vRem%
         Kitchens[idx].Center   := (%vCen% != "") ? %vCen% : "Стандарт"
         Kitchens[idx].Pickup   := (%vPic% != "") ? %vPic% : "Стандарт"
@@ -1894,6 +2868,20 @@ SaveKitchens:
     Gui, Kitch:Destroy
     GoSub, DetectKitchenStatus
     Gui, Roll:Show
+    GoSub, RhRepaintRollPult
+return
+
+SyncKitchensGoogle:
+    if (RcKitchensSyncBlocked()) {
+        MsgBox, % 48 + 262144, Кухні, Зараз іде активний сценарій.`nСпробуй оновити Google після завершення пробиття.
+        return
+    }
+    Gui, Kitch:Submit, NoHide
+    GoSub, SyncKitchensFromSheet
+    GoSub, LoadKitchens
+    MsgBox, % 64 + 262144, Кухні, Дані з Google Sheet оновлено., 1
+    Gui, Kitch:Destroy
+    GoSub, OpenKitchensEditor
 return
 
 ResetKitchensOk:
@@ -1971,7 +2959,7 @@ RcBuildKitchOpts(val, presets) {
     hasMatch := 0
     Loop, Parse, presets, |
     {
-        if (A_LoopField = val)
+        if (A_LoopField == val)
             hasMatch := 1
     }
 
@@ -1981,13 +2969,13 @@ RcBuildKitchOpts(val, presets) {
     ; Результат: "A|B||C|D" де B — вибраний
     out := ""
     justSelected := 0
-    
+
     ; Якщо значення не в пресетах — додаємо його на початок як вибране
     if (val != "" && !hasMatch) {
         out := val . "||"
         justSelected := 1
     }
-    
+
     Loop, Parse, presets, |
     {
         if (justSelected) {
@@ -1999,7 +2987,7 @@ RcBuildKitchOpts(val, presets) {
                 out .= "|"
             out .= A_LoopField
         }
-        if (A_LoopField = val) {
+        if (A_LoopField == val) {
             out .= "||"
             justSelected := 1
         }
@@ -2039,28 +3027,48 @@ KitchGuiClose:
 KitchGuiEscape:
     Gui, Kitch:Destroy
     Gui, Roll:Show
+    GoSub, RhRepaintRollPult
 return
 
 ; ========================================================
 ; РОЗРАХУНОК ЧАСУ
 ; ========================================================
 CalcPickup:
-    CalcType := 40
+    CalcType := RcGetEffectiveTime(RcCurrentKitchen.Name, "", true, cRaw, fRaw, minFar)
     GoSub, ProcessTimeCalc
 return
 CalcDelivery:
-    CalcType := 90
+    mappedZone := RcKitchenFromKmlZone(RcLastZone)
+    zType := "STANDARD"
+    if (IsObject(mappedZone))
+        zType := mappedZone.Type
+    CalcType := RcGetEffectiveTime(RcCurrentKitchen.Name, zType, false, cRaw, fRaw, minFar)
     GoSub, ProcessTimeCalc
 return
 ProcessTimeCalc:
-    HH := A_Hour
-    MM := A_Min
-    MM += CalcType
-    HH += Floor(MM / 60)
-    MM := Mod(MM, 60)
-    HH := Mod(HH, 24)
-    CalculatedTime := Format("{:02}:{:02}", HH, MM)
-    GuiControl, Roll:, ReadyTime, %CalculatedTime%
+    if (CalcType == "стоп")
+        return
+    total := A_Hour*60 + A_Min + CalcType
+    HFinishOrder:
+    GoSub, KcStopDuty          ; ручний фініш (Ctrl+Enter) → дежурство стоп
+    FileAppend, % "[" . A_Now . "] FINISH UIA/Coord attempt`n", %A_ScriptDir%\ahk_debug.log
+    
+    ; 1. Нативный UIA-клик Подтвердить (или fallback по координатам)
+    if (!RcClickConfirm()) {
+        if (confirmX != 0)
+            Click, %confirmX%, %confirmY%
+    }
+    Sleep, 400
+    
+    ; 2. Нативный UIA-клик Сохранить на точку (или fallback по координатам)
+    if (!RcClickSaveAndClose()) {
+        if (saveX != 0)
+            Click, %saveX%, %saveY%
+    }
+    Sleep, 400
+    kcPaused := 0
+    ToolTip, Confirmed + saved (UIA).
+    SetTimer, RemoveFinishTip, -2000
 return
 
 ; ========================================================
@@ -2082,14 +3090,28 @@ AddSticksOnly:
         Sleep, 300
         Send, {Down}
         Sleep, 200
-        Send, {Enter}
-        Sleep, 300
-        Send, ^a{BackSpace}
-        Sleep, 50
-        SendInput, %parsedSticksNorm%{Enter}
-        Sleep, 500
+
+        Loop, 3 {
+            Send, {Enter}
+            Sleep, 300
+            Send, ^a{BackSpace}
+            Sleep, 50
+            SendInput, %parsedSticksNorm%
+            Sleep, 150
+
+            Clipboard := ""
+            Send, ^a
+            Sleep, 50
+            Send, ^c
+            ClipWait, 0.5
+            if (Clipboard != "" && InStr(Clipboard, parsedSticksNorm)) {
+                Send, {Enter}
+                Sleep, 400
+                break
+            }
+        }
     }
-    
+
     if (parsedSticksEdu != "" && parsedSticksEdu > 0) {
         Click, %itemX%, %itemY%
         Sleep, 400
@@ -2101,34 +3123,30 @@ AddSticksOnly:
         Sleep, 300
         Send, {Down}
         Sleep, 200
-        Send, {Enter}
-        Sleep, 300
-        Send, ^a{BackSpace}
-        Sleep, 50
-        SendInput, %parsedSticksEdu%{Enter}
-        Sleep, 500
-    }
 
-    if (parsedUtensils != "" && parsedUtensils > 0) {
-        Click, %itemX%, %itemY%
-        Sleep, 400
-        Send, {PgDn}
-        Sleep, 300
-        Send, {Enter}
-        Sleep, 400
-        SendInput, %pluUtensils%
-        Sleep, 300
-        Send, {Down}
-        Sleep, 200
-        Send, {Enter}
-        Sleep, 300
-        Send, ^a{BackSpace}
-        Sleep, 50
-        SendInput, %parsedUtensils%{Enter}
-        Sleep, 500
+        Loop, 3 {
+            Send, {Enter}
+            Sleep, 300
+            Send, ^a{BackSpace}
+            Sleep, 50
+            SendInput, %parsedSticksEdu%
+            Sleep, 150
+
+            Clipboard := ""
+            Send, ^a
+            Sleep, 50
+            Send, ^c
+            ClipWait, 0.5
+            if (Clipboard != "" && InStr(Clipboard, parsedSticksEdu)) {
+                Send, {Enter}
+                Sleep, 400
+                break
+            }
+        }
     }
 
     Gui, Roll:Show
+    GoSub, RhRepaintRollPult
 return
 
 ; ========================================================
@@ -2161,12 +3179,19 @@ SivVisGuiClose:
 SivVisGuiEscape:
     Gui, SivVis:Destroy
     Gui, Roll:Show
+    GoSub, RhRepaintRollPult
 return
 
     ; ========================================================
     ; СИВ — ПРОБИТТЯ
 ; ========================================================
 SivVisApply:
+    rhPunchBusy := 1
+    dutyOn := 0
+    kcForce := 0
+    kcStop := 1
+    SetTimer, KcDutyTick, Off
+    SetTimer, KcMonitor, Off
     Gui, SivVis:Submit
     Gui, SivVis:Destroy
 
@@ -2181,75 +3206,41 @@ SivVisApply:
     VisNorm := RegExReplace(VisNorm, "[^\d]", "")
     VisEdu := RegExReplace(VisEdu, "[^\d]", "")
 
-    VisRolls := (VisRolls = "") ? 0 : VisRolls + 0
-    VisNorm := (VisNorm = "") ? 0 : VisNorm + 0
-    VisEdu := (VisEdu = "") ? 0 : VisEdu + 0
+    VisRolls := (VisRolls == "") ? 0 : VisRolls + 0
+    VisNorm := (VisNorm == "") ? 0 : VisNorm + 0
+    VisEdu := (VisEdu == "") ? 0 : VisEdu + 0
 
-    ; Соуси тепер пробиваються автоматично системою iiko
-    soyQty := 0
-    gwQty := 0
-    
+    ; Соуси (СІВ): рахуємо від кількості ролів (поле «Роли»)
+    _soyC := Ceil(VisRolls / 2.0)
+    _soyM := (VisRolls < 2) ? VisRolls : 2
+    soyQty := (VisRolls > 0) ? ((_soyC > _soyM) ? _soyC : _soyM) : 0
+    gwQty  := (VisRolls > 0) ? Ceil(VisRolls / 4.0) : 0
+
     logFile := A_ScriptDir "\siv_debug.log"
     FileAppend, `n=== ПАЛОЧКИ СТАРТ === %A_Now%`n, %logFile%
     FileAppend, ДАНІ: Бамбукові=%VisNorm% | Навчальні=%VisEdu%`n, %logFile%
     FileAppend, ІНФО: Соуси (соєвий, імбир, васабі) пробиваються автоматично!`n, %logFile%
 
-    ; ---- КРОК 1: Пробитие палочек через координати (без модифікаторів) ----
-    if (VisNorm > 0 || VisEdu > 0) {
-        ; Пробиваем через основное окно заказа (как купоны)
-        if (VisNorm > 0 && itemX != 0) {
-            Click, %itemX%, %itemY%
-            Sleep, 400
-            Send, {PgDn}
-            Sleep, 300
-            Send, {Enter}
-            Sleep, 400
-            SendInput, %pluSticksNorm%
-            Sleep, 300
-            Send, {Down}
-            Sleep, 200
-            Send, {Enter}
-            Sleep, 300
-            Send, ^a{BackSpace}
-            Sleep, 50
-            SendInput, %VisNorm%{Enter}
-            Sleep, 500
-        }
-          
-        if (VisEdu > 0 && itemX != 0) {
-            Click, %itemX%, %itemY%
-            Sleep, 400
-            Send, {PgDn}
-            Sleep, 300
-            Send, {Enter}
-            Sleep, 400
-            SendInput, %pluSticksEdu%
-            Sleep, 300
-            Send, {Down}
-            Sleep, 200
-            Send, {Enter}
-            Sleep, 300
-            Send, ^a{BackSpace}
-            Sleep, 50
-            SendInput, %VisEdu%{Enter}
-            Sleep, 500
-        }
-    }
+    ; ---- Пробивання: один RcStartPunch, потім серія RcPunchByPlu ----
+    FileAppend, % "`n=== СИВ F1 === " . A_Now . " norm=" . VisNorm . " edu=" . VisEdu . " soy=" . soyQty . " gw=" . gwQty . "`n", %A_ScriptDir%\siv_debug.log
 
-    ; ---- КРОК 2: СОУСИ (тепер пробиваються автоматично системою iiko) ----
-    logFile := A_ScriptDir "\siv_debug.log"
-    FileAppend, `n=== СИВ СТАРТ === %A_Now%`n, %logFile%
-    FileAppend, soyQty=%soyQty% gwQty=%gwQty% VisRolls=%VisRolls%`n, %logFile%
-
-    if (soyQty > 0 || gwQty > 0) {
-        FileAppend, ІНФО: Соуси (соєвий, імбир, васабі) тепер пробиваються автоматично системою iiko!`n, %logFile%
-        FileAppend, Розрахунок для довідки: Соя=%soyQty% | Імбир/Васабі=%gwQty%`n, %logFile%
-    } else {
-        FileAppend, soyQty=0 і gwQty=0 — соуси не потрібні`n, %logFile%
+    if (itemX != 0) {
+        if (VisNorm > 0)
+            RcPunchByPlu(pluSticksNorm, VisNorm)
+        if (VisEdu > 0)
+            RcPunchByPlu(pluSticksEdu, VisEdu)
+        if (soyQty > 0)
+            RcPunchByPlu(pluSoy, soyQty)
+        if (gwQty > 0) {
+            RcPunchByPlu(pluGinger, gwQty)
+            RcPunchByPlu(pluWasabi, gwQty)
+        }
     }
 
     MouseMove, %originalMouseX%, %originalMouseY%, 0
     Gui, Roll:Show
+    GoSub, RhRepaintRollPult
+    rhPunchBusy := 0
 return
 
 ; --------------------------------------------------------
@@ -2269,66 +3260,36 @@ SivSave:
     MsgBox, 48, СИВ, Не знайшов кнопку Зберегти!
 return
 
-; --------------------------------------------------------
-; Обгортки для кожного елементу
-SivClickStickNorm:
-    sivImg := "img\item_sticks_norm.png"
-    sivAmt := VisNorm
-    sivOff := 228
-    GoSub, SivDoClickWorker
-return
-
-SivClickStickEdu:
-    sivImg := "img\item_sticks_edu.png"
-    sivAmt := VisEdu
-    sivOff := 169
-    GoSub, SivDoClickWorker
-return
-
-SivClickSoy:
-    sivImg := "img\item_soy.png"
-    sivAmt := soyQty
-    sivOff := SIVOffsetX
-    GoSub, SivDoClickWorker
-return
-
-SivClickGinger:
-    sivImg := "img\item_ginger.png"
-    sivAmt := gwQty
-    sivOff := SIVOffsetX
-    GoSub, SivDoClickWorker
-return
-
-SivClickWasabi:
-    sivImg := "img\item_wasabi.png"
-    sivAmt := gwQty
-    sivOff := SIVOffsetX
-    GoSub, SivDoClickWorker
-return
-
-; --------------------------------------------------------
-; Головний клікер по полю кількості
-SivDoClickWorker:
-    ImageSearch, fX, fY, 0, 0, A_ScreenWidth, A_ScreenHeight, *75 %sivImg%
-    if (ErrorLevel == 0) {
-        tX := fX + sivOff
-        tY := fY + 8
-        Click, %tX%, %tY%, 2
-        Sleep, 50
-        SendInput, ^a{BackSpace}%sivAmt%{Enter}
-        Sleep, 50
-        return
-    }
-    logFile := A_ScriptDir "\siv_debug.log"
-    FileAppend, >> ПОМИЛКА: не знайдено %sivImg%`n, %logFile%
-return
-
 ; ========================================================
 ; ФІНАЛЬНЕ ВНЕСЕННЯ
 ; ========================================================
 ApplyRollclub:
-    Gui, Roll:Submit
+    rhPunchBusy := 1
+    dutyOn := 0
+    kcForce := 0
+    kcStop := 1
+    SetTimer, KcDutyTick, Off
+    SetTimer, KcMonitor, Off
+    FileAppend, % "[" . A_Now . "] APPLY_LOCK on`n", %A_ScriptDir%\parse_debug.log
+    GoSub, KcStopDuty          ; ручне пробиття (Enter) → дежурство стоп + вікно "оператор працює"
+    SetTimer, RcCheckZone, Off   ; скасувати старий таймер (якщо був)
+    Gui, Roll:Submit, NoHide
     Gui, Roll:Destroy
+    ; Звірка точки — синхронно, ДО решти кліків (тільки доставка, тільки якщо увімкнено)
+    if (!hasPickup && CHECK_POINT_ENABLED && naitiX != 0 && tochkaX != 0)
+        GoSub, RcCheckZone
+
+    ; ==== DEBUG: лог запису ====
+    FormatTime, _wT,, yyyy-MM-dd HH:mm:ss
+    _w := "==== WRITE " . _wT . " | No=" . kcLastNo . " hasPickup=" . hasPickup . " ===="
+    _w .= "`n comm : x=" . commX . " txt=[" . OrderComment . "]"
+    _w .= "`n info : x=" . infoX . " txt=[" . ClientInfo . "]"
+    _w .= "`n addr : x=" . addrX . " txt=[" . AddressNote . "]"
+    _w .= "`n time : x=" . timeX . " h=" . ReadyTimeH . " m=" . ReadyTimeM
+    _w .= "`n cash : do=" . autoCash . " crossX=" . crossX . " cashX=" . cashX
+    _w .= "`n card : x=" . cardX . " txt=[" . ClientCard . "]"
+    _w .= "`n"
+    FileAppend, %_w%`n, %A_ScriptDir%\parse_debug.log, UTF-8
 
     MouseGetPos, originalMouseX, originalMouseY
     Sleep, 400
@@ -2356,14 +3317,18 @@ ApplyRollclub:
     if (ClientInfo != "" && infoX != 0) {
         Clipboard := ClientInfo
         Sleep, 150
-        Click, %infoX%, %infoY%
-        Sleep, 100
-        Send, ^a
-        Sleep, 50
+        Click, %infoX% %infoY% 2     ; подвійний клік -> режим редагування комірки коментаря страви
+        Sleep, 200
+        Send, ^a{BackSpace}
+        Sleep, 60
         Send, ^v
+        Sleep, 150
+        Send, {Enter}                ; підтвердити комірку
+        Sleep, 200
     }
 
-    if (AddressNote != "" && addrX != 0) {
+    ; При самовивозі поле "Примечание к адресу" в iiko заблоковане — НЕ пишемо туди.
+    if (AddressNote != "" && addrX != 0 && !hasPickup) {
         Clipboard := AddressNote
         Click, %addrX%, %addrY%
         Sleep, 200
@@ -2371,22 +3336,19 @@ ApplyRollclub:
         Sleep, 300
     }
 
-    if (ReadyTime != "" && timeX != 0) {
+    if (ReadyTimeH != "" && ReadyTimeM != "" && timeX != 0) {
         Sleep, 300
         Click, %timeX%, %timeY%
         Sleep, 200
-        timeParts := StrSplit(ReadyTime, ":")
-        p1 := timeParts[1]
-        p2 := timeParts[2]
-        SendInput, ^a{BackSpace}%p1%{Right}%p2%{Enter}
+        SendInput, ^a{BackSpace}%ReadyTimeH%{Right}%ReadyTimeM%{Enter}
         Sleep, 200
     }
 
-    if (DoAutoCash == 1 && crossX != 0 && cashX != 0) {
+    if (autoCash == 1 && crossX != 0 && cashX != 0) {
         Sleep, 400
         Click, %crossX%, %crossY%
         Sleep, 400
-        Click, %cashX%, %cashY%
+        IikoUI_NoChange()
         Sleep, 400
         SetKeyDelay, 40
         Send, Готівка
@@ -2404,79 +3366,215 @@ ApplyRollclub:
         Sleep, 500
     }
 
-    if ((GiftGunkan || GiftPepsi || GiftBurger || GiftSandwich) && itemX != 0) {
-        if (GiftBurger) {
+    if ((autoGunkan || autoPepsi || autoBurger || autoSandwich) && itemX != 0) {
+        if (autoBurger) {
             GoSub, NewGiftMacro
             SendInput, %pluBurger%
+            matched := 0
+            iikoPointClean := Trim(iikoPoint)
+            global RcCurrentZoneMapped, RcCurrentKitchen, RcCurrentDeliveryType, lastZoneName
+            
+            if (RcZonesOk && RcZones.MaxIndex() > 0) {
+                if (RcCurrentZoneMapped && RcCurrentKitchen) {
+                    matched := (RcKitchenFromIikoPoint(iikoPointClean) == RcCurrentKitchen.Name)
+                    FileAppend, % "[" A_Now "] ZONE_MAP: zone=""" lastZoneName """ kitchen=""" RcCurrentKitchen.Name """ type=""" RcCurrentDeliveryType """ iikoPoint=""" iikoPointClean """ match=" (matched ? "true" : "false") "`n", %A_ScriptDir%\siv_debug.log
+                } else {
+                    for j, _ in RcZones {
+                        if (InStr(iikoPointClean, RcZones[j].ZoneName))
+                            matched := 1
+                        if (InStr(RcZones[j].ZoneName, iikoPointClean))
+                            matched := 1
+                        if (matched)
+                            break
+                    }
+                }
+            }  
             GoSub, FinishGiftMacro
-        } else if (GiftSandwich) {
+        } else if (autoSandwich) {
             GoSub, NewGiftMacro
             SendInput, %pluSandwich%
             GoSub, FinishGiftMacro
-        } else if (GiftPepsi) {
+        } else if (autoPepsi) {
             GoSub, NewGiftMacro
             SendInput, %pluPepsi%
             GoSub, FinishGiftMacro
         }
-        if (GiftGunkan) {
+        if (autoGunkan) {
             GoSub, NewGiftMacro
             SendInput, %pluGunkan%
             GoSub, FinishGiftMacro
         }
     }
-    
-    ; Автопробитие палочек (как гункан, но с количеством)
-    if ((GiftSticksNorm || GiftSticksEdu) && itemX != 0) {
-        if (GiftSticksNorm && parsedSticksNorm != "" && parsedSticksNorm > 0) {
-            GoSub, NewGiftMacro
-            SendInput, %pluSticksNorm%
-            Sleep, 300
-            Send, {Down}
-            Sleep, 200
-            Send, {Enter}
-            Sleep, 300
-            Send, ^a{BackSpace}
-            Sleep, 50
-            SendInput, %parsedSticksNorm%{Enter}
-            Sleep, 500
+
+    ; Пробиваємо СИВ (Палички та соуси)
+    VisRolls := (VisRolls = "") ? 0 : RegExReplace(VisRolls, "[^\d]", "") + 0
+    VisNorm := (VisNorm = "") ? 0 : RegExReplace(VisNorm, "[^\d]", "") + 0
+    VisEdu := (VisEdu = "") ? 0 : RegExReplace(VisEdu, "[^\d]", "") + 0
+    VisUtensils := (VisUtensils = "") ? 0 : RegExReplace(VisUtensils, "[^\d]", "") + 0
+
+    if (itemX != 0 && (VisNorm > 0 || VisEdu > 0)) {
+        ; Розраховуємо соуси як у Roll House
+        _soyQty := Floor((VisRolls + 1) / 2)
+        _gwQty  := Floor((VisRolls + 3) / 4)
+        if (VisRolls == 0) {
+            _soyQty := 0
+            _gwQty  := 0
         }
-        if (GiftSticksEdu && parsedSticksEdu != "" && parsedSticksEdu > 0) {
-            GoSub, NewGiftMacro
-            SendInput, %pluSticksEdu%
-            Sleep, 300
-            Send, {Down}
-            Sleep, 200
-            Send, {Enter}
-            Sleep, 300
-            Send, ^a{BackSpace}
-            Sleep, 50
-            SendInput, %parsedSticksEdu%{Enter}
-            Sleep, 500
+        ; Обмежуємо кількість соусів сумою паличок
+        _totalSt := VisNorm + VisEdu
+        if (_totalSt > 0) {
+            _soyQty := (_soyQty > _totalSt) ? _totalSt : _soyQty
+            _gwQty  := (_gwQty  > _totalSt) ? _totalSt : _gwQty
+        }
+        _rcLog := A_ScriptDir "\siv_debug.log"
+        FileAppend, % "[" . A_Now . "] STICKS_START itemX=" . itemX . " norm=" . VisNorm . " edu=" . VisEdu . "`n", %_rcLog%
+        if (VisNorm > 0)
+            RcPunchByPlu(pluSticksNorm, VisNorm)
+        if (VisEdu > 0)
+            RcPunchByPlu(pluSticksEdu, VisEdu)
+        if (_soyQty > 0)
+            RcPunchByPlu(pluSoy, _soyQty)
+        if (_gwQty > 0) {
+            RcPunchByPlu(pluGinger, _gwQty)
+            RcPunchByPlu(pluWasabi, _gwQty)
         }
     }
 
-    ; --- Самовивіз Садовий проїзд: виставляємо концепцію та точку ---
-    if (hasPickup && InStr(pickupPoint, "Садовий") && kontsX != 0) {
-        Sleep, 400
-        Click, %kontsX%, %kontsY%       ; клік на поле "Концепція"
-        Sleep, 300
-        SetKeyDelay, 40
-        Send, Дома                      ; вводимо назву концепції
-        Sleep, 300
-        Send, {Tab}                     ; Tab → підтвердити концепцію / перейти далі
-        Sleep, 200
-        Send, {Tab}                     ; Tab → поле "Точка"
-        Sleep, 200
-        Send, {Space}                   ; відкриваємо список
-        Sleep, 200
-        Send, {PgUp}                    ; прокручуємо до потрібної точки
-        Sleep, 200
-        Send, {Enter}                   ; підтверджуємо
-        SetKeyDelay, -1
+    ; --- Прибори: вилка (Fork 00140) + ніж (Knife 00142). Ложку НЕ б'ємо, палички вже погашені. ---
+    if (itemX != 0 && VisUtensils > 0) {
+        _rcLog := A_ScriptDir "\siv_debug.log"
+        FileAppend, % "[" . A_Now . "] UTENSILS_START itemX=" . itemX . " qty=" . VisUtensils . "`n", %_rcLog%
+        RcPunchByPlu(pluFork,  VisUtensils)
+        RcPunchByPlu(pluKnife, VisUtensils)
+    }
+
+    ; --- Самовивіз: авто Концепція + Точка за точкою з коментаря (1:1) ---
+    ; Концепцію беремо з таблиці PickupConcept(), вписуємо її → Tab → Space →
+    ; PgUp → Enter (перевірена послідовність: після концепції список точок
+    ; фільтрується, PgUp бере потрібну, "Ролл Клаб КЦ" не чіпаємо).
+    if (hasPickup && kontsX != 0) {  ; завжди ставимо точку для самовивозу (незалежно від autoMode)
+        pickKonts := PickupConcept(pickupPoint)
+        if (pickKonts != "") {
+            Sleep, 400
+            Click, %kontsX%, %kontsY%        ; поле "Концепція"
+            Sleep, 300
+            SetKeyDelay, 40
+            Send, ^a{BackSpace}
+            Sleep, 80
+            Send, %pickKonts%                ; вписуємо назву концепції
+            Sleep, 350
+            Send, {Tab}                      ; підтвердити концепцію + перейти на "Точка"
+            Sleep, 250
+            Send, {Space}                    ; відкрити список точок
+            Sleep, 250
+            Send, {PgUp}                      ; вгору списку = потрібна точка під цю концепцію
+            Sleep, 250
+            Send, {Enter}                    ; підтвердити точку
+            SetKeyDelay, -1
+            SetTimer, RcPickupVerifyPoint, -100
+        }
+    }
+
+    if (autoMode) {
+    ; --- Подарунок: сервер обирає найдорожчий → пробиваємо по PLU (к-сть 1) ---
+    Sleep, 500
+    giftResp := RhGet("/api/iiko/gift", 15000)
+    FileAppend, % "[" . A_Now . "] GIFT resp=" . SubStr(giftResp,1,250) . "`n", %A_ScriptDir%\ahk_debug.log
+    giftPlu := ""
+    if RegExMatch(giftResp, "gift_plu\x22\s*:\s*\x22(\d+)", gM)
+        giftPlu := gM1
+    if (giftPlu != "" && itemX != 0)
+        PunchGiftPlu(giftPlu)
+
+    ; --- Пакет: якщо в підказках "Потрібно додати ПАКЕТ" → пробити (02901) ---
+    if (itemX != 0 && RegExMatch(giftResp, "package\x22\s*:\s*true"))
+        PunchGiftPlu("02901")
     }
 
     MouseMove, %originalMouseX%, %originalMouseY%, 0
+    rhPunchBusy := 0
+    FileAppend, % "[" . A_Now . "] APPLY_LOCK off`n", %A_ScriptDir%\parse_debug.log
 return
+
+; ── ФІНІШ: Подтвердить → Зберегти на точку (Ctrl+Enter). Окремо, безпечно. ──
+FinishOrder:
+    GoSub, KcStopDuty          ; ручний фініш (Ctrl+Enter) → дежурство стоп
+    FileAppend, % "[" . A_Now . "] FINISH via IikoUI Driver`n", %A_ScriptDir%\ahk_debug.log
+    
+    ; 1. Подтвердить (UIA + fallback)
+    IikoUI_ConfirmDelivery()
+    Sleep, 400
+    
+    ; 2. Сохранить на точку (UIA + fallback)
+    IikoUI_SaveAndClose()
+    Sleep, 400
+    
+    kcPaused := 0
+    ToolTip, Confirmed + saved (IikoUI Driver).
+    SetTimer, RemoveFinishTip, -2000
+return
+
+RemoveFinishTip:
+    ToolTip
+return
+
+; ── Пробити подарунок по PLU (кількість 1, ціна 0) ──
+PunchGiftPlu(plu) {
+    global itemX, itemY
+    Click, %itemX%, %itemY%
+    Sleep, 400
+    Send, {PgDn}
+    Sleep, 300
+    Send, {Enter}
+    Sleep, 400
+    SendInput, %plu%
+    Sleep, 400
+    Send, {Down}
+    Sleep, 250
+    Send, {Enter}
+    Sleep, 500
+}
+
+; ── Концепція самовивозу за точкою з коментаря (1:1). Точку обираємо тією ж назвою. ──
+; Підправляти тут, якщо для якоїсь точки назва Точки в iiko ≠ назві Концепції.
+PickupConcept(pt) {
+    ; ── КИЇВ ──
+    if (InStr(pt, "Драгоманова"))
+        return "Київ Драгоманова"
+    if (InStr(pt, "Антонова") || InStr(pt, "Солом'янськ"))
+        return "Київ Антонова"
+    if (InStr(pt, "Стрільців") || InStr(pt, "Лук'янівка"))
+        return "Київ Стрільців"
+    if (InStr(pt, "Лаврухіна"))
+        return "Київ Лаврухіна"
+    ; ── ХАРКІВ ──
+    if (InStr(pt, "Конституції"))
+        return "РК Харків Конституції Доставка"
+    if (InStr(pt, "Садовий"))
+        return "Харків Нові Дома"
+    ; ── ЛЬВІВ ──
+    if (InStr(pt, "Липа"))
+        return "Львов Липа"
+    ; ── ДНІПРО ──
+    if (InStr(pt, "Мудрого") || InStr(pt, "Авіаторськ"))
+        return "Дніпро Мудрого"
+    ; ── БІЛА ЦЕРКВА ──
+    if (InStr(pt, "Вернадського") || InStr(pt, "Біла Церква"))
+        return "Біла Церква"
+    ; ── ОДЕСА ──
+    if (InStr(pt, "Незалежності") || InStr(pt, "Приморська") || InStr(pt, "Котовського") || InStr(pt, "Пересипськ"))
+        return "Приморська"
+    ; ── ІВАНО-ФРАНКІВСЬК ──
+    if (InStr(pt, "Фудотека") || InStr(pt, "Промприлад") || InStr(pt, "Перемоги") || InStr(pt, "Франківськ") || InStr(pt, "ІФ"))
+        return "Франківськ Фудотека"
+    ; ── РІВНЕ ──
+    if (InStr(pt, "Кулика") || InStr(pt, "Екватор"))
+        return "Рівне"
+    ; ── ВІННИЦЯ ──
+    if (InStr(pt, "600") || InStr(pt, "Мегамолл") || InStr(pt, "Вінниц") || InStr(pt, "Винниц"))
+        return "Вінниця"
+    return ""
+}
 
 NewGiftMacro:
     Click, %itemX%, %itemY%
@@ -2493,6 +3591,91 @@ FinishGiftMacro:
     Sleep, 300
     Send, {Enter}
     Sleep, 500
+return
+
+; ========================================================
+; RcPunchByPlu — пробивання PLU з кількістю + верифікація
+; Точна копія оригінальної GOLDEN-логіки + Ctrl+A+C перевірка.
+; Кожен виклик: Click → PgDn → Enter → PLU → Down → Enter →
+;               ^a{BackSpace} → qty → ^a^c verify → Enter/Escape
+; ========================================================
+RcPunchByPlu(pluCode, qty) {
+    global itemX, itemY, rcLogPath, rhPunchBusy, dutyOn, kcForce, kcStop
+    rhPunchBusy := 1
+    dutyOn := 0
+    kcForce := 0
+    kcStop := 1
+    SetTimer, KcDutyTick, Off
+    SetTimer, KcMonitor, Off
+    FileAppend, % "[" . A_Now . "] PUNCH_CALL plu=" . pluCode . " qty=" . qty . " itemX=" . itemX . "`n", %rcLogPath%
+    if (qty <= 0 || pluCode = "" || pluCode = "0000") {
+        FileAppend, % "[" . A_Now . "] SKIP bad`n", %rcLogPath%
+        return
+    }
+    if (itemX = 0 || itemX = "ERROR") {
+        FileAppend, % "[" . A_Now . "] SKIP itemX=0`n", %rcLogPath%
+        return
+    }
+
+    ; Позиціонування — клік + PgDn (кожен раз, як в GOLDEN)
+    Click, %itemX%, %itemY%
+    Sleep, 400
+    Send, {PgDn}
+    Sleep, 300
+    ; {Enter} для активації НЕ потрібен — одразу набиваємо PLU
+
+    ; PLU → вниз (автокомплет) → Enter → перехід на qty
+    SendInput, %pluCode%
+    Sleep, 400
+    Send, {Down}
+    Sleep, 300
+    Send, {Enter}
+    Sleep, 400
+
+    ; qty вводимо одразу — DevExpress виділяє поле при вході, заміна відбувається автоматично
+    SendInput, %qty%
+    Sleep, 200
+
+    ; Верифікація: ^a → ^c — читаємо що реально в полі qty
+    Send, ^a
+    Sleep, 50
+    Clipboard := ""
+    Send, ^c
+    ClipWait, 1.0
+    ; iiko показує qty як "4,000" (кома = десятковий роздільник) — беремо тільки цілу частину
+    _got := RegExReplace(Clipboard, ",.*$", "")   ; відрізаємо ",000"
+    _got := RegExReplace(_got, "[^\d]", "")        ; лишаємо тільки цифри
+    FileAppend, % "[" . A_Now . "] VERIFY exp=" . qty . " got=[" . _got . "] raw=[" . Clipboard . "]`n", %rcLogPath%
+
+    if (_got + 0 = qty + 0) {
+        SoundPlay, %A_ScriptDir%\beep_ok.wav
+        ToolTip, % "✓ OK  PLU:" . pluCode . "  x" . _got, 600, 400, 2
+        Send, {Enter}                 ; коміт рядку
+        Sleep, 400
+        SetTimer, RcClearOkTip, -1200
+    } else {
+        ToolTip, % "❌ ERR  PLU:" . pluCode . "  exp:" . qty . "  got:" . _got, 600, 400, 2
+        Send, {Escape}
+        Sleep, 150
+        SoundPlay, %A_ScriptDir%\beep_err.wav
+        Sleep, 550
+        SoundPlay, %A_ScriptDir%\beep_err.wav
+        Sleep, 550
+        SoundPlay, %A_ScriptDir%\beep_err.wav
+        SetTimer, RcClearOkTip, -2500
+    }
+}
+
+RcClearOkTip:
+    ToolTip, , , , 2
+return
+
+CloseSummaAlert:
+    if WinExist("Сумма заказа") {
+        WinActivate, Сумма заказа
+        Sleep, 100
+        Send, {Enter}
+    }
 return
 
 ; ========================================================
@@ -2522,22 +3705,33 @@ BrandChangeRC:
     }
 return
 
-; ── Попап «Вихідний текст» (за кліком на «показати») ──
-RcToggleRawText:
-    global RcRawShown, RcRawEditH, RollHwnd
-    WinGetPos, , , , _h, ahk_id %RollHwnd%
-    if (!RcRawShown) {
-        GuiControl, Roll:Show, RcRawEdit
-        GuiControl, Roll:, RcRawArrow, ▼ сховати
-        WinMove, ahk_id %RollHwnd%, , , , , % _h + RcRawEditH
-        RcRawShown := 1
+RestartRhServer:
+    global RH_SERVER_OK
+
+    RH_SERVER_OK := 0
+    if WinExist("Rollclub PRO 33.0 ahk_class AutoHotkeyGUI")
+        GuiControl, Roll:, RhServerPill, RESTART
+    TrayTip, RollClub PRO, 🔄 Перезапускаю сервер iiko-моста..., 2, 1
+
+    Run, cmd /c start.bat, %A_ScriptDir%\..\server, Hide
+    Loop, 20 {
+        Sleep, 500
+        if (RhPing())
+            break
+    }
+
+    if (RH_SERVER_OK) {
+        if WinExist("Rollclub PRO 33.0 ahk_class AutoHotkeyGUI")
+            GuiControl, Roll:, RhServerPill, ONLINE
+        TrayTip, RollClub PRO, 🟢 Сервер перезапущено, 2, 1
     } else {
-        GuiControl, Roll:Hide, RcRawEdit
-        GuiControl, Roll:, RcRawArrow, ▶ показати
-        WinMove, ahk_id %RollHwnd%, , , , , % _h - RcRawEditH
-        RcRawShown := 0
+        if WinExist("Rollclub PRO 33.0 ahk_class AutoHotkeyGUI")
+            GuiControl, Roll:, RhServerPill, OFFLINE
+        TrayTip, RollClub PRO, ⚠️ Сервер не відповідає після рестарту, 4, 2
     }
 return
+
+
 
 ; ═══════════════════════════════════════════════════════════
 ; ЗОНА НА КАРТІ — авто-визначення по адресі замовлення
@@ -2568,7 +3762,7 @@ return
 
 ; ── Таймер: запускається після показу вікна, оновлює MapSearch ──
 RcCheckZone:
-    global rawAddress, hasPickup, RcZones, RcZonesOk, detectedCity
+    global rawAddress, hasPickup, RcZones, RcZonesOk, detectedCity, RcCurrentKitchen, extractedTimeAuto
     SetTimer, RcCheckZone, Off
     addr := Trim(rawAddress)
     if (addr = "" || hasPickup) {
@@ -2577,12 +3771,19 @@ RcCheckZone:
     }
     addr := RegExReplace(addr, "i)[,\s]+(эт|поверх|кв|квартира|под|під|п|к|парадна)\.?\s*\d+.*$", "")
     addr := RegExReplace(addr, "i)^(Днепр|Дніпро|Харьков|Харків|Одесса|Одеса|Киев|Київ|Львов|Львів|Винница|Вінниця|Рівне|Ровно)[,\s]+", "")
+    addr := RegExReplace(addr, "\s*\(.*?\)\s*", " ")
     addr := RegExReplace(addr, "i)Тополь[\-\s]*(\d)", "Тополя-$1")
     addr := RegExReplace(addr, "i)Победа[\-\s]*(\d)", "Перемога-$1")
     addr := RegExReplace(addr, "i)Сокол[\-\s]*(\d)", "Сокіл-$1")
     addr := RegExReplace(addr, "i)Красный Камень", "Червоний Камінь")
     addr := RegExReplace(addr, "i)Коммунар", "Покровський")
     addr := Trim(addr)
+
+    ; Show loading state
+    GuiControl, Roll:, MapSearch, Шукаємо адресу...
+    RhRegColor(hZoneBox, RhB_CardFill, RhB_Text)
+    DllCall("InvalidateRect", "Ptr", hZoneBox, "Ptr", 0, "Int", 1)
+
     if (detectedCity != "") {
         encCity   := RcUriEncode(detectedCity)
         encStreet := RcUriEncode(addr)
@@ -2592,7 +3793,7 @@ RcCheckZone:
     }
     resp := RcHttpGet(url, 6000)
     if (resp = "") {
-        GuiControl, Roll:, MapSearch, ❓ Мережа недоступна
+        GuiControl, Roll:, MapSearch, Мережа недоступна
         return
     }
     if (!RegExMatch(resp, """lat"":""([^""]+)""", mLat) || !RegExMatch(resp, """lon"":""([^""]+)""", mLon)) {
@@ -2607,12 +3808,12 @@ RcCheckZone:
                 if (resp3 = "" || (!RegExMatch(resp3, """lat"":""([^""]+)""", mLat) || !RegExMatch(resp3, """lon"":""([^""]+)""", mLon)))
                     resp3 := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&q=" . RcUriEncode(addrNoHouse), 6000)
                 if (!RegExMatch(resp3, """lat"":""([^""]+)""", mLat) || !RegExMatch(resp3, """lon"":""([^""]+)""", mLon)) {
-                    GuiControl, Roll:, MapSearch, ❓ Адресу не знайдено
+                    GuiControl, Roll:, MapSearch, Адресу не знайдено
                     return
                 }
                 resp := resp3
             } else {
-                GuiControl, Roll:, MapSearch, ❓ Адресу не знайдено
+                GuiControl, Roll:, MapSearch, Адресу не знайдено
                 return
             }
         } else {
@@ -2626,59 +3827,314 @@ RcCheckZone:
         RcLoadKml(kmlPath)
     if (RcZonesOk && RcZones.MaxIndex() > 0) {
         zone := RcFindZone(lng, lat)
+        global RcCurrentDeliveryType, RcZoneMap, RcCurrentZoneMapped, lastZoneName
+        lastZoneName := zone
+        RcCurrentDeliveryType := ""
+        RcCurrentZoneMapped := 0
         if (zone != "") {
             kAlertText := ""
             kAlertBeep := 0
-            for _, k in Kitchens {
-                kSearchTerm := (k.KmlKey != "") ? k.KmlKey : k.Name
-                if (InStr(zone, kSearchTerm)) {
-                    parts := ""
-                    if (k.Center != "Стандарт") {
-                        parts .= "⏰ Центр: " . k.Center
-                        kAlertBeep := 1
+            
+            if (RcZoneMap.HasKey(zone)) {
+                RcCurrentZoneMapped := 1
+                RcCurrentDeliveryType := RcZoneMap[zone].Type
+                mappedKitchName := RcZoneMap[zone].Kitchen
+                for _, k in Kitchens {
+                    if (k.Name = mappedKitchName) {
+                        RcCurrentKitchen := k
+                        break
                     }
-                    if (k.FarZone != "Стандарт") {
-                        if (parts != "") parts .= " / "
-                        parts .= "Дальня: " . k.FarZone
-                        kAlertBeep := 1
-                    }
-                    if (k.Pickup != "Стандарт") {
-                        if (parts != "") parts .= " / "
-                        parts .= "🥡 Самовивіз: " . k.Pickup
-                        kAlertBeep := 1
-                    }
-                    if (k.StopList != "") {
-                        if (parts != "") parts .= "   "
-                        parts .= "🛑 " . k.StopList
-                        kAlertBeep := 1
-                    }
-                    if (k.Remark != "") {
-                        if (parts != "") parts .= "   "
-                        parts .= "📌 " . k.Remark
-                    }
-                    kAlertText := parts
-                    break
                 }
+            } else {
+                for _, k in Kitchens {
+                    kSearchTerm := (k.KmlKey != "") ? k.KmlKey : k.Name
+                    if (InStr(zone, kSearchTerm)) {
+                        RcCurrentKitchen := k
+                        break
+                    }
+                }
+            }
+            
+            if (RcCurrentKitchen) {
+                k := RcCurrentKitchen
+                parts := ""
+                if (k.Center != "Стандарт") {
+                    parts .= "Центр: " . k.Center
+                    kAlertBeep := 1
+                }
+                if (k.FarZone != "Стандарт") {
+                    if (parts != "") parts .= " / "
+                    parts .= "Дальня: " . k.FarZone
+                    kAlertBeep := 1
+                }
+                if (k.Pickup != "Стандарт") {
+                    if (parts != "") parts .= " / "
+                    parts .= "Самовивіз: " . k.Pickup
+                    kAlertBeep := 1
+                }
+                if (k.StopList != "") {
+                    if (parts != "") parts .= "   "
+                    parts .= "СТОП: " . k.StopList
+                    kAlertBeep := 1
+                }
+                if (k.Remark != "") {
+                    if (parts != "") parts .= "   "
+                    parts .= k.Remark
+                }
+                kAlertText := parts
             }
             if (kAlertBeep)
                 SoundBeep, 600, 250
-            result := "📍 " . zone
+            result := zone
+            RcLastZone := zone
+            GuiControl, Roll:, MapSearch, %result%
+            mappedZone := RcKitchenFromKmlZone(RcLastZone)
+            zType := "STANDARD"
+            if (IsObject(mappedZone))
+                zType := mappedZone.Type
+            _deliveryMin := RcGetEffectiveTime(RcCurrentKitchen.Name, zType, false, cRaw, fRaw, minFar)
+            GuiControl, Roll:, RhCalcDeliveryBtn, % "ДОСТ +" . _deliveryMin
+            if (extractedTimeAuto && !hasPickup)
+                RcSetReadyByMinutes(_deliveryMin)
+            RhRegColor(hZoneBox, RhB_Green, RhB_White)
+            DllCall("InvalidateRect", "Ptr", hZoneBox, "Ptr", 0, "Int", 1)
             GuiControl, Roll:, KitchenStatusText, %kAlertText%
         } else {
-            result := "⚠️ Поза зонами доставки"
+            RcLastZone := ""
+            result := "Точку не знайдено в зонах доставки"
+            GuiControl, Roll:, MapSearch, %result%
+            RhRegColor(hZoneBox, RhB_Red, RhB_White)
+            DllCall("InvalidateRect", "Ptr", hZoneBox, "Ptr", 0, "Int", 1)
             GuiControl, Roll:, KitchenStatusText,
         }
+
+        ; (звірку точки тепер планує DrawRollclub незалежно від геокодингу)
     } else if (!FileExist(kmlPath)) {
-        result := "⚠️ KML не знайдено"
+        result := "Завантажте KML-файл зон (Налаштування → KML)"
+        GuiControl, Roll:, MapSearch, %result%
+        RhRegColor(hZoneBox, RhB_TintAmber, RhB_Text)
+        DllCall("InvalidateRect", "Ptr", hZoneBox, "Ptr", 0, "Int", 1)
         GuiControl, Roll:, KitchenStatusText,
     } else if (!RcZonesOk) {
-        result := "⚠️ KML: помилка читання"
+        result := "KML: помилка читання"
+        GuiControl, Roll:, MapSearch, %result%
+        RhRegColor(hZoneBox, RhB_TintAmber, RhB_Text)
+        DllCall("InvalidateRect", "Ptr", hZoneBox, "Ptr", 0, "Int", 1)
         GuiControl, Roll:, KitchenStatusText,
     } else {
-        result := "📍 " . lat . ", " . lng
+        result := lat . ", " . lng
+        GuiControl, Roll:, MapSearch, %result%
+        RhRegColor(hZoneBox, RhB_CardFill, RhB_Text)
+        DllCall("InvalidateRect", "Ptr", hZoneBox, "Ptr", 0, "Int", 1)
         GuiControl, Roll:, KitchenStatusText,
     }
-    GuiControl, Roll:, MapSearch, %result%
+return
+
+; === RcBlockedStreetHit: чи адреса на перекритій вулиці? Повертає "Вулиця — ділянка" або "". ===
+RcBlockedStreetHit(addr) {
+    blkFile := A_ScriptDir . "\brands\rollclub\BlockedStreets.txt"
+    if !FileExist(blkFile)
+        return ""
+    FileRead, raw, *P65001 %blkFile%
+    if (raw = "")
+        return ""
+
+    addrLow  := RcBlkNorm(addr)
+    cityGate := ""
+
+    Loop, Parse, raw, `n, `r
+    {
+        line := Trim(A_LoopField)
+        if (line = "")
+            continue
+        ; місто-гейт: "# МІСТО: Київ" або "[Київ]"
+        if RegExMatch(line, "i)^[#;]\s*(?:МІСТО|MICTO|ГОРОД|CITY)\s*[:=]\s*(.+)$", mCity) {
+            cityGate := RcBlkNorm(mCity1)
+            continue
+        }
+        if RegExMatch(line, "^\[(.+)\]$", mSec) {
+            cityGate := RcBlkNorm(mSec1)
+            continue
+        }
+        c1 := SubStr(line, 1, 1)
+        if (c1 = "#" || c1 = ";")
+            continue
+        ; якщо задано місто — адреса має його містити
+        if (cityGate != "" && !InStr(addrLow, cityGate))
+            continue
+
+        ; назва вулиці = частина до "(" ; ділянка = у дужках
+        segTxt   := ""
+        namePart := line
+        if RegExMatch(line, "^(.*?)\((.*)\)\s*$", mSeg) {
+            namePart := Trim(mSeg1)
+            segTxt   := Trim(mSeg2)
+        }
+        nameNorm := RcBlkNorm(namePart)
+        if (nameNorm = "" || StrLen(nameNorm) < 3)
+            continue
+        if InStr(addrLow, nameNorm) {
+            disp := Trim(RegExReplace(namePart, "i)^\s*(?:вул|просп|пров|бульв|пл|наб)\.?\s+", ""))
+            if (segTxt != "")
+                disp .= " — " . segTxt
+            return disp
+        }
+    }
+    return ""
+}
+
+; === RcBlkNorm: нижній регістр, прибрати типи вулиць і не-кирилицю, стиснути пробіли. ===
+RcBlkNorm(s) {
+    StringLower, s, s
+    s := RegExReplace(s, "[^Ѐ-ӿ\s]", " ")            ; лишити тільки кирилицю
+    s := " " . Trim(RegExReplace(s, "\s+", " ")) . " "
+    types := "проспект|провулок|вулиця|бульвар|набережна|проїзд|узвіз|шосе|алея|площа|просп|пров|бульв|вул"
+    Loop, Parse, types, |
+        s := RegExReplace(s, "i)(?<=\s)" . A_LoopField . "(?=\s)", " ")
+    s := Trim(RegExReplace(s, "\s+", " "))
+    return s
+}
+
+; === RcCheckZone:
+    SetTimer, RcCheckZone, Off
+    if (!CHECK_POINT_ENABLED || hasPickup || naitiX = 0 || tochkaX = 0) {
+        return
+    }
+    ToolTip, Звірка доставки: підготовка...
+    SoundBeep, 700, 90
+    
+    _prepRes := RhGet("/api/iiko/diagnose_point_prepare", 10000)
+    isOk := false
+    if (RegExMatch(_prepRes, """ok""\s*:\s*(true|1)", _mOk))
+        isOk := true
+    sessionId := ""
+    if (RegExMatch(_prepRes, """session_id""\s*:\s*""([^""]+)""", mSession))
+        sessionId := Trim(mSession1)
+        
+    if (iikoWinExe != "" && iikoWinExe != "ERROR")
+        WinActivate, ahk_exe %iikoWinExe%
+    Sleep, 150
+    IikoUI_AssignDeliveryTerminal()
+    
+    diagSuccess := false
+    iikoPoint := ""
+    if (isOk && sessionId != "") {
+        _diagRes := RhGet("/api/iiko/diagnose_point_collect?session_id=" sessionId, 25000)
+        if (RegExMatch(_diagRes, """point""\s*:\s*""([^""]*)""", _mPt)) {
+            iikoPoint := Trim(_mPt1)
+            diagSuccess := true
+        }
+    }
+    
+    if (!diagSuccess) {
+        Sleep, 1000
+        Loop, 4 {
+            if WinExist("Сумма заказа") {
+                WinActivate, Сумма заказа
+                Sleep, 150
+                Send, {Enter}
+                Sleep, 300
+            } else if WinExist("Внимание") {
+                WinActivate, Внимание
+                Sleep, 150
+                Send, {Enter}
+                Sleep, 300
+            } else
+                break
+        }
+        Sleep, 600
+        Clipboard := ""
+        Click, %tochkaX%, %tochkaY%
+        Sleep, 250
+        Send, {End}
+        Sleep, 50
+        Send, +{Home}
+        Sleep, 50
+        Send, ^c
+        ClipWait, 0.8
+        iikoPoint := Trim(Clipboard)
+        Send, {Escape}
+    }
+    
+    mappedZone := RcKitchenFromKmlZone(RcLastZone)
+    expectedKey := mappedZone ? mappedZone.Kitchen : ""
+    actualKey := RcKitchenFromIikoPoint(iikoPoint)
+    
+    matched := (expectedKey != "" && expectedKey == actualKey)
+    
+    logMsg := "DELIVERY_IDENTITY:`nzone=[" RcLastZone "]`nexpected=[" expectedKey "]`npoint=[" iikoPoint "]`nactual=[" actualKey "]`nmatch=" matched "`n`n"
+    FileAppend, % logMsg, %A_ScriptDir%\parse_debug.log
+    
+    if (matched) {
+        ToolTip, % "✅ Доставка ОК: " . actualKey
+        SoundPlay, %A_ScriptDir%\beep_ok.wav
+        SetTimer, RemoveToolTip, -3000
+    } else {
+        _msg := "⚠ ДОСТАВКА РІЗНИТЬСЯ!`nExpected: " . expectedKey . "`nActual:  " . actualKey
+        ToolTip, %_msg%
+        SoundPlay, %A_ScriptDir%\beep_err.wav
+        Sleep, 550
+        SoundPlay, %A_ScriptDir%\beep_err.wav
+        SetTimer, RemoveToolTip, -8000
+    }
+return
+
+RcPickupVerifyPoint:
+    SetTimer, RcPickupVerifyPoint, Off
+    if (!CHECK_POINT_ENABLED || !hasPickup)
+        return
+        
+    pickKonts := PickupConcept(pickupPoint)
+    expectedKey := RcFindKitchenByConcept(pickKonts)
+    
+    ToolTip, Перевірка самовивозу...
+    
+    startMs := A_TickCount
+    actualKey := ""
+    iikoPoint := ""
+    
+    Loop {
+        elapsed := A_TickCount - startMs
+        if (elapsed > 2000)
+            break
+            
+        res := RhGet("/api/iiko/read_identity_fast", 1500)
+        if (RegExMatch(res, """point""\s*:\s*""([^""]*)""", mPt)) {
+            pt := StrReplace(Trim(mPt1), "\u0022", """")
+            pt := StrReplace(pt, "\u005C", "\")
+            iikoPoint := pt
+            actualKey := RcKitchenFromIikoPoint(pt)
+            
+            if (actualKey == expectedKey && actualKey != "") {
+                break
+            }
+        }
+        Sleep, 100
+    }
+    
+    matched := (expectedKey != "" && expectedKey == actualKey)
+    elapsedTotal := A_TickCount - startMs
+    
+    logMsg := "PICKUP_IDENTITY:`npickupPoint=[" pickupPoint "]`nconcept=[" pickKonts "]`nexpected=[" expectedKey "]`npoint=[" iikoPoint "]`nactual=[" actualKey "]`nmatch=" matched "`nwaitMs=" elapsedTotal "`n`n"
+    FileAppend, % logMsg, %A_ScriptDir%\parse_debug.log
+    
+    if (matched) {
+        ToolTip, % "✅ Самовивіз ОК: " . actualKey
+        SoundPlay, %A_ScriptDir%\beep_ok.wav
+        SetTimer, RemoveToolTip, -3000
+    } else {
+        _msg := "⚠ САМОВИВІЗ РІЗНИТЬСЯ!`nExpected: " . expectedKey . "`nActual:  " . actualKey
+        ToolTip, %_msg%
+        SoundPlay, %A_ScriptDir%\beep_err.wav
+        Sleep, 550
+        SoundPlay, %A_ScriptDir%\beep_err.wav
+        SetTimer, RemoveToolTip, -8000
+    }
+return
+
+RemoveToolTip:
+    SetTimer, RemoveToolTip, Off
+    ToolTip
 return
 
 RcHttpGet(url, timeoutMs := 5000) {
@@ -2708,25 +4164,79 @@ RcUriEncode(str) {
     return out
 }
 
+RcLoadZoneMap() {
+    global RcZoneMap
+    RcZoneMap := {}
+    mapPath := A_ScriptDir "\brands\rollclub\zones_map.ini"
+    if (!FileExist(mapPath))
+        return
+    IniRead, SectionNames, %mapPath%
+    Loop, Parse, SectionNames, `n
+    {
+        sec := Trim(A_LoopField)
+        if (sec = "")
+            continue
+        IniRead, n, %mapPath%, %sec%, Name
+        IniRead, k, %mapPath%, %sec%, Kitchen
+        IniRead, t, %mapPath%, %sec%, Type
+        if (n != "" && n != "ERROR")
+            RcZoneMap[n] := {Kitchen: k, Type: t}
+    }
+}
+
+RcKitchenFromIikoPoint(point) {
+    if (point == "" || point == "Ролл Клаб КЦ: Ролл Клаб КЦ")
+        return ""
+    if InStr(point, "РК Харків Конституції")
+        return "РЕСТОРАН"
+    if InStr(point, "РК Харків Нові Дома")
+        return "НД"
+    if InStr(point, "Одеса Приморська")
+        return "Приморська"
+    if InStr(point, "РК Дніпро Мудрого")
+        return "Мудрого"
+    if InStr(point, "РК Київ Антонова")
+        return "Антонова"
+    if InStr(point, "РК Київ Драгоманова")
+        return "Драгоманова"
+    if InStr(point, "РК Київ Стрільців")
+        return "Лук'янівка"
+    if InStr(point, "РК Київ Лаврухіна")
+        return "Троєщина"
+    if InStr(point, "Крива Липа")
+        return "Крива Липа"
+    if InStr(point, "Біла Церква")
+        return "БЦ"
+    if InStr(point, "РК Франківськ")
+        return "Фудотека"
+    if InStr(point, "РК Рівне")
+        return "ТРЦ Екватор"
+    if InStr(point, "РК Вінниця Мегамолл")
+        return "Мегамолл"
+    return ""
+}
+
 RcLoadKml(kmlPath) {
     global RcZones, RcZonesOk
     RcZones   := []
     RcZonesOk := 0
     xml := ComObjCreate("MSXML2.DOMDocument.6.0")
     xml.async := false
+    xml.setProperty("SelectionLanguage", "XPath")
     if (!xml.load(kmlPath))
         return
-    placemarks := xml.getElementsByTagName("Placemark")
+    placemarks := xml.selectNodes("//*[local-name()='Placemark']")   ; ігнор namespace KML
     Loop % placemarks.length {
         pm := placemarks.item(A_Index - 1)
-        nameNodes := pm.getElementsByTagName("name")
-        zoneName  := (nameNodes.length > 0) ? Trim(RegExReplace(nameNodes.item(0).text, "[\r\n]+", " ")) : ("Зона " A_Index)
-        coordNodes := pm.getElementsByTagName("coordinates")
-        if (coordNodes.length = 0)
+        nameNode := pm.selectSingleNode(".//*[local-name()='name']")
+        zoneName := (nameNode) ? Trim(RegExReplace(nameNode.text, "[\r\n]+", " ")) : ("Зона " A_Index)
+        coordNode := pm.selectSingleNode(".//*[local-name()='coordinates']")
+        if (!coordNode)
             continue
-        coordText := Trim(coordNodes.item(0).text)
+        coordText := Trim(coordNode.text)
         coords := []
-        Loop, Parse, coordText, `n, `r
+        cTextFixed := RegExReplace(coordText, "[\r\n\t]+", " ")
+        Loop, Parse, cTextFixed, %A_Space%
         {
             lf := Trim(A_LoopField)
             if (lf = "")
@@ -2767,11 +4277,46 @@ RcFindZone(lng, lat) {
 }
 
 ; ── RollHelper: HTTP до сервера iiko-моста ──
+RhKillDuplicateInstances() {
+    global RhSingleInstanceMutex
+
+    currentPid := DllCall("GetCurrentProcessId", "UInt")
+    thisScript := A_ScriptFullPath
+    logPath := A_ScriptDir "\siv_debug.log"
+
+    try wmi := ComObjGet("winmgmts:")
+    catch {
+        RhSingleInstanceMutex := DllCall("CreateMutex", "Ptr", 0, "Int", 0, "Str", "Global\RollHelper_RollClub_Engine_AHK_V1", "Ptr")
+        if (RhSingleInstanceMutex && A_LastError = 183) {
+            TrayTip, RollClub PRO, ⚠️ АНК Roll Club вже запущено. Другу копію не відкриваю., 4, 2
+            ExitApp
+        }
+        return
+    }
+
+    for proc in wmi.ExecQuery("Select ProcessId, CommandLine, Name from Win32_Process where Name like 'AutoHotkey%'") {
+        pid := proc.ProcessId + 0
+        cmd := proc.CommandLine . ""
+        if (pid && pid != currentPid && InStr(cmd, thisScript)) {
+            FileAppend, %A_Now% DUPLICATE_AHK_CLOSE pid=%pid% cmd=%cmd%`n, %logPath%
+            Process, Close, %pid%
+        }
+    }
+
+    Sleep, 250
+    RhSingleInstanceMutex := DllCall("CreateMutex", "Ptr", 0, "Int", 0, "Str", "Global\RollHelper_RollClub_Engine_AHK_V1", "Ptr")
+    if (RhSingleInstanceMutex && A_LastError = 183) {
+        TrayTip, RollClub PRO, ⚠️ АНК Roll Club вже запущено. Другу копію не відкриваю., 4, 2
+        ExitApp
+    }
+}
+
 RhGet(endpoint, recvMs := 3000) {
     global RH_SERVER
     try {
         whr := ComObjCreate("WinHttp.WinHttpRequest.5.1")
         whr.Open("GET", RH_SERVER . endpoint, false)
+        whr.SetProxy(1)   ; HTTPREQUEST_PROXYSETTING_DIRECT — мимо будь-якого проксі (лікує залишок mitmproxy)
         whr.SetTimeouts(1500, 1500, recvMs, recvMs)
         whr.Send()
         return whr.ResponseText
@@ -2792,3 +4337,375 @@ OpenWebPult:
     if (ErrorLevel)
         Run, %_wpUrl%
 return
+
+
+; ========================================================
+; THEME ENGINE
+; ========================================================
+RhApplyTheme() {
+    global uiTheme
+    global RhFontName, RhC_BG, RhC_Panel, RhC_Header, RhC_Header2, RhC_HeaderText, RhC_HeaderSub, RhC_Neon, RhC_Text, RhC_Muted, RhC_Subtle, RhC_Soft, RhC_SoftText
+    global RhC_Card, RhC_Shadow, RhC_BlueSoft, RhC_TealSoft, RhC_GreenSoft, RhC_OrangeSoft, RhC_RedSoft, RhC_StatusBar
+    global RhB_Accent, RhB_Neon, RhB_Apply, RhB_ButtonOff, RhB_Cash, RhB_Card, RhB_Gift, RhB_Siv, RhB_Text, RhB_Muted, RhB_White, RhB_Header, RhB_SettingsGear
+    global RhB_Blue, RhB_Teal, RhB_Green, RhB_Orange, RhB_Red, RhB_CardFill, RhB_StatusSoft
+    global RhB_Chip, RhB_TintGreen, RhB_TintAmber, RhB_TintRed, RhB_GiftGunkan, RhB_GiftPepsi, RhB_GiftBurger, RhB_GiftSandwich
+
+    RhFontName := "Segoe UI"
+
+    if (uiTheme = "dark") {
+        RhC_BG := "070B14"
+        RhC_Panel := "111827"
+        RhC_Header := "09111F"
+        RhC_Header2 := "102A38"
+        RhC_HeaderText := "EAF2FF"
+        RhC_HeaderSub := "7DD3FC"
+        RhC_Neon := "22D3EE"
+        RhC_Text := "EAF2FF"
+        RhC_Muted := "A7B0C2"
+        RhC_Subtle := "060A12"
+        RhC_Soft := "102A38"
+        RhC_SoftText := "7DD3FC"
+        RhC_Card := "111827"
+        RhC_Shadow := "050814"
+        RhC_BlueSoft := "0B1B35"
+        RhC_TealSoft := "07313A"
+        RhC_GreenSoft := "092B22"
+        RhC_OrangeSoft := "3A2107"
+        RhC_RedSoft := "3A1010"
+        RhC_StatusBar := "0C1422"
+
+        RhB_Accent := 0x4AA316
+        RhB_Neon := 0xEED322
+        RhB_Apply := 0x5EC522
+        RhB_ButtonOff := 0x554133
+        RhB_Cash := 0x1673F9
+        RhB_Card := 0xEB6325
+        RhB_Gift := 0x9948EC
+        RhB_Siv := 0xA6B814
+        RhB_Text := 0xFFF2EA
+        RhB_Muted := 0xC2B0A7
+        RhB_White := 0xFFFFFF
+        RhB_Header := 0x1F1109
+        RhB_SettingsGear := 0xEED322
+        RhB_Blue := 0xEB6325
+        RhB_Teal := 0xA6B814
+        RhB_Green := 0x5EC522
+        RhB_Orange := 0x1673F9
+        RhB_Red := 0x4444EF
+        RhB_CardFill := 0x271811
+        RhB_StatusSoft := 0x22140C
+
+        RhB_Chip         := 0x2A2A2A
+        RhB_TintGreen    := 0x143A1E
+        RhB_TintAmber    := 0x0C2A3A
+        RhB_TintRed      := 0x101040
+        RhB_GiftGunkan   := 0x2A1840
+        RhB_GiftPepsi    := 0x2A2418
+        RhB_GiftBurger   := 0x102840
+        RhB_GiftSandwich := 0x183040
+    } else {
+        RhC_BG := "F5F6F8"
+        RhC_Panel := "FFFFFF"
+        RhC_Header := "FFFFFF"
+        RhC_Header2 := "F5F6F8"
+        RhC_HeaderText := "1F1F1F"
+        RhC_HeaderSub := "6B6B6B"
+        RhC_Neon := "2563EB"
+        RhC_Text := "1F1F1F"
+        RhC_Muted := "6B6B6B"
+        RhC_Subtle := "F5F6F8"
+        RhC_Soft := "E5E7EB"
+        RhC_SoftText := "374151"
+        RhC_Card := "FFFFFF"
+        RhC_Shadow := "E5E7EB"
+        RhC_BlueSoft := "EEF2FF"
+        RhC_TealSoft := "F5F6F8"
+        RhC_GreenSoft := "F5F6F8"
+        RhC_OrangeSoft := "F5F6F8"
+        RhC_RedSoft := "FEF2F2"
+        RhC_StatusBar := "F5F6F8"
+
+        RhB_Accent := 0xEB6325
+        RhB_Neon := 0xEB6325
+        RhB_Apply := 0xEB6325
+        RhB_ButtonOff := 0xFFFFFF
+        RhB_Cash := 0xEB6325
+        RhB_Card := 0xEB6325
+        RhB_Gift := 0xEB6325
+        RhB_Siv := 0xEB6325
+        RhB_Text := 0x1F1F1F
+        RhB_Muted := 0x6B6B6B
+        RhB_White := 0xFFFFFF
+        RhB_Header := 0xFFFFFF
+        RhB_SettingsGear := 0xEB6325
+        RhB_Blue := 0xEB6325
+        RhB_Teal := 0xEB6325
+        RhB_Green := 0x4AA316
+        RhB_Orange := 0xEB6325
+        RhB_Red := 0x2626DC
+        RhB_CardFill := 0xFFFFFF
+        RhB_StatusSoft := 0xF8F6F5
+
+        ; --- сигнальні tint-кольори (BGR; відображаються як #RRGGBB) ---
+        RhB_Chip         := 0xECE9E8   ; #E8E9EC  нейтральна кнопка (не активна)
+        RhB_TintGreen    := 0xE1F0D9   ; #D9F0E1  стан OK
+        RhB_TintAmber    := 0xD0EFFC   ; #FCEFD0  увага
+        RhB_TintRed      := 0xD5D9FA   ; #FAD9D5  критично
+        RhB_GiftGunkan   := 0xFBE7ED   ; #EDE7FB  фіолет
+        RhB_GiftPepsi    := 0xF4ECE4   ; #E4ECF4  холодний
+        RhB_GiftBurger   := 0xD2E7FC   ; #FCE7D2  оранж
+        RhB_GiftSandwich := 0xCCF1FB   ; #FBF1CC  жовтий
+    }
+}
+
+
+RhRegColor(hwnd, bg, tx) {
+    global RhStaticColors
+    RhStaticColors[hwnd] := {bg: bg, tx: tx}
+}
+
+RhRepaintRollPult:
+    RhForceRepaintRollPult()
+    SetTimer, RhRepaintRollPultLate1, -80
+    SetTimer, RhRepaintRollPultLate2, -220
+return
+
+RhRepaintRollPultLate1:
+    RhForceRepaintRollPult()
+return
+
+RhRepaintRollPultLate2:
+    RhForceRepaintRollPult()
+return
+
+RhForceRepaintRollPult() {
+    global RollHwnd, RhStaticColors
+    if (!RollHwnd)
+        return
+    for hwnd, _ in RhStaticColors {
+        DllCall("user32\InvalidateRect", "Ptr", hwnd, "Ptr", 0, "Int", 1)
+        DllCall("user32\UpdateWindow", "Ptr", hwnd)
+    }
+    ; RDW_INVALIDATE|RDW_ERASE|RDW_ALLCHILDREN|RDW_UPDATENOW = 0x185
+    DllCall("user32\RedrawWindow", "Ptr", RollHwnd, "Ptr", 0, "Ptr", 0, "UInt", 0x185)
+}
+
+WM_CTLCOLORSTATIC(wParam, lParam) {
+    global RhStaticColors, RhStaticBrush
+    if (lParam < 0)
+        lParam += 0x100000000      ; 32-бітний AHK віддає hwnd зі знаком → нормалізуємо
+    if (!RhStaticColors.HasKey(lParam))
+        return
+    o := RhStaticColors[lParam]
+    DllCall("gdi32\SetTextColor", "Ptr", wParam, "UInt", o.tx)
+    DllCall("gdi32\SetBkColor",   "Ptr", wParam, "UInt", o.bg)
+    if (!RhStaticBrush.HasKey(o.bg))
+        RhStaticBrush[o.bg] := DllCall("gdi32\CreateSolidBrush", "UInt", o.bg, "Ptr")
+    return RhStaticBrush[o.bg]
+}
+
+; --- ПРОВЕРКА СЕРВЕРНОЙ ДИАГНОСТИКИ ТОЧКИ ---
+^F12::
+RcDiagnosePointTest:
+    if (naitiX = 0 || naitiY = 0) {
+        ToolTip, % "Спочатку проскануй замовлення, щоб знайти кнопку 'Найти точку'."
+        SetTimer, RemoveToolTip, -3000
+        return
+    }
+    ToolTip, PREPARE: отримання базового стану...
+    
+    _prepRes := RhGet("/api/iiko/diagnose_point_prepare", 10000)
+    FileAppend, % "[" A_Now "] PREPARE: " _prepRes "`n", %A_ScriptDir%\siv_debug.log
+    
+    isOk := false
+    if (RegExMatch(_prepRes, """ok""\s*:\s*(true|1)", _mOk)) {
+        isOk := true
+    }
+    
+    sessionId := ""
+    if (RegExMatch(_prepRes, """session_id""\s*:\s*""([^""]+)""", mSession)) {
+        sessionId := Trim(mSession1)
+    }
+    
+    if (!isOk || sessionId = "") {
+        ToolTip, PREPARE ERROR — клік скасовано
+        SetTimer, RemoveToolTip, -3000
+        return
+    }
+    
+    if (iikoWinExe != "" && iikoWinExe != "ERROR")
+        WinActivate, ahk_exe %iikoWinExe%
+    Sleep, 150
+    ToolTip, CLICK: Натискаю "Найти точку"...
+    Click, %naitiX%, %naitiY%
+    
+    ToolTip, COLLECT: Очікування popup та читання Точки...
+    _diagRes := RhGet("/api/iiko/diagnose_point_collect?session_id=" sessionId, 25000)
+    FileAppend, % "[" A_Now "] COLLECT: " _diagRes "`n", %A_ScriptDir%\siv_debug.log
+    
+    pointStr := "N/A"
+    pointBeforeStr := "N/A"
+    popupsCount := 0
+    elapsedMs := 0
+    compReason := "N/A"
+    
+    if (RegExMatch(_diagRes, """point""\s*:\s*""([^""]*)""", _matchPt))
+        pointStr := Trim(_matchPt1)
+    if (RegExMatch(_diagRes, """point_before""\s*:\s*""([^""]*)""", _matchPb))
+        pointBeforeStr := Trim(_matchPb1)
+    if (RegExMatch(_diagRes, """popups_handled""\s*:\s*(\d+)", _matchC))
+        popupsCount := _matchC1
+    if (RegExMatch(_diagRes, """elapsed_ms""\s*:\s*([\d\.]+)", _matchT))
+        elapsedMs := Round(_matchT1)
+    if (RegExMatch(_diagRes, """completion_reason""\s*:\s*""([^""]+)""", _matchR))
+        compReason := Trim(_matchR1)
+        
+    if (InStr(_diagRes, "unknown_popup")) {
+        ToolTip, % "Увага! Невідомий popup! Див. лог.`nЧас: " elapsedMs " ms"
+    } else {
+        ToolTip, % "Точка: " pointStr "`nБуло: " pointBeforeStr "`nPopup: " popupsCount "`nПричина: " compReason "`nЧас: " elapsedMs " ms"
+    }
+    SetTimer, RemoveToolTip, -5000
+return
+; --------------------------------------------
+
+RcFindKitchenByConcept(concept) {
+    if (concept = "Київ Драгоманова")
+        return "Драгоманова"
+    if (concept = "Київ Антонова")
+        return "Антонова"
+    if (concept = "Київ Стрільців")
+        return "Лук'янівка"
+    if (concept = "Київ Лаврухіна")
+        return "Троєщина"
+    if (concept = "РК Харків Конституції Доставка")
+        return "РЕСТОРАН"
+    if (concept = "Харків Нові Дома")
+        return "НД"
+    if (concept = "Львов Липа")
+        return "Крива Липа"
+    if (concept = "Дніпро Мудрого")
+        return "Мудрого"
+    if (concept = "Біла Церква")
+        return "БЦ"
+    if (concept = "Приморська")
+        return "Приморська"
+    if (concept = "Франківськ Фудотека")
+        return "Фудотека"
+    if (concept = "Рівне")
+        return "ТРЦ Екватор"
+    if (concept = "Вінниця")
+        return "Мегамолл"
+    return ""
+}
+
+
+; === Identity Gatherer ===
+    ToolTip, Читання ідентифікаторів...
+    res := RhGet("/api/iiko/read_identity_fast")
+    FileAppend, % "[" A_Now "] IDENTITY_RAW: " res "`n", %A_ScriptDir%\iiko_identity.log, UTF-8
+    RegExMatch(res, """concept""\s*:\s*""([^""]*)""", mC)
+    RegExMatch(res, """point""\s*:\s*""([^""]*)""", mP)
+    conceptVal := Trim(mC1)
+    pointVal := Trim(mP1)
+    
+    ToolTip, % "Concept: " conceptVal "`nPoint: " pointVal
+    SetTimer, RemoveToolTip, -3000
+    
+    logLine := "[" A_Now "] Concept: [" conceptVal "] Point: [" pointVal "]`n"
+    FileAppend, %logLine%, %A_ScriptDir%\iiko_identity.log, UTF-8
+return
+
+; ========================================================
+;  WINAPI SCANNER — Roll Club
+; ========================================================
+LoadUiaMapToListView:
+    Gui, Settings:Default
+    Gui, ListView, UiaListView
+    LV_Delete()
+    IniRead, _uiaKeys, %UIA_MAP_CONFIG%, UiaMap
+    if (_uiaKeys = "" || _uiaKeys = "ERROR")
+        return
+    Loop, Parse, _uiaKeys, `n, `r
+    {
+        if (A_LoopField = "")
+            continue
+        _pair := StrSplit(A_LoopField, "=", "", 2)
+        if (_pair.Length() < 2)
+            continue
+        _name := Trim(_pair[1])
+        _id := Trim(_pair[2])
+        if (_name != "" && _id != "")
+            LV_Add("", _name, _id)
+    }
+return
+
+UiaListClick:
+    if (A_GuiEvent = "DoubleClick")
+        GoSub, DeleteSelectedUiaBinding
+return
+
+DeleteSelectedUiaBinding:
+    Gui, Settings:Default
+    Gui, ListView, UiaListView
+    _row := LV_GetNext(0, "S")
+    if (!_row) {
+        MsgBox, 48, WinAPI Сканер, Спочатку виберіть елемент у списку.
+        return
+    }
+    LV_GetText(_delName, _row, 1)
+    LV_GetText(_delValue, _row, 2)
+    Gui, Settings:+OwnDialogs +Disabled
+    MsgBox, 292, Видалення WinAPI елемента, Видалити прив'язку?`n`nРоль: %_delName%`nID: %_delValue%
+    Gui, Settings:-Disabled
+    WinActivate, ahk_id %SettingsHwnd%
+    IfMsgBox, No
+        return
+    IniDelete, %UIA_MAP_CONFIG%, UiaMap, %_delName%
+    IniRead, _remainingUiaMap, %UIA_MAP_CONFIG%, UiaMap
+    if (_remainingUiaMap = "" || _remainingUiaMap = "ERROR")
+        IniDelete, %UIA_MAP_CONFIG%, UiaMap
+    GoSub, LoadUiaMapToListView
+    FileAppend, % "[" . A_Now . "] UIA_MAP_DELETE role=" . _delName . " value=" . _delValue . "`n", %A_ScriptDir%\ahk_debug.log
+    MsgBox, 64, Видалено, Прив'язку "%_delName%" видалено з конфігурації Roll Club.
+return
+
+LaunchScanner:
+    Gui, Settings:Hide
+    Sleep, 200
+    MsgBox, 4160, WinAPI Сканер, Наведіть курсор на потрібну кнопку в Syrve та натисніть ліву кнопку миші.
+    KeyWait, LButton, Down
+    MouseGetPos, _mx, _my, _mHwnd
+    try {
+        _uia := UIA_Interface()
+        _root := ""
+        if (_mHwnd)
+            try _root := _uia.ElementFromHandle(_mHwnd)
+        if (_root)
+            _el := _uia.SmallestElementFromPoint(_mx, _my, true, _root)
+        else
+            _el := _uia.SmallestElementFromPoint(_mx, _my)
+        _aId := ""
+        _aName := ""
+        try _aId := _el.CurrentAutomationId
+        try _aName := _el.CurrentName
+        _saveVal := _aId != "" ? _aId : (_aName != "" ? "Name=" . _aName : "")
+        if (_saveVal = "") {
+            MsgBox, 48, Помилка, Не вдалося знайти AutomationId або Name цього елемента.
+            GoSub, OpenSettings
+            return
+        }
+        InputBox, _newName, Збереження WinAPI елемента, Знайдено: %_saveVal%`n`nВведіть назву ролі (наприклад, КнопкаПодзвонити):,,,,,,,,
+        if (ErrorLevel = 0 && _newName != "") {
+            IniWrite, %_saveVal%, %UIA_MAP_CONFIG%, UiaMap, %_newName%
+            MsgBox, 64, Збережено, Елемент "%_newName%" збережено.
+        }
+    } catch _ex {
+        MsgBox, 48, Помилка UIA, Не вдалося зчитати елемент:`n%_ex%
+    }
+    GoSub, OpenSettings
+return
+
+
+#Include %A_ScriptDir%\test_uia_hotkeys.ahk
+

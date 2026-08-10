@@ -1,0 +1,142 @@
+My Billing Account 1 – Overview – Billing – Google Cloud console
+Skip to main content
+Keyboard shortcuts
+Accessibility help
+Accessibility feedback
+Search
+Billing
+/
+Overview
+Billing account
+My Billing Account 1
+Overview
+Cost management
+Reports
+Cost table
+Cost breakdown
+Budgets & alerts
+Billing export
+Anomalies
+Cost optimisation
+FinOps hub
+Committed-use discounts (CUDs)
+CUD analysis
+Pricing
+Cost estimation
+Credits
+Payments
+Invoices
+Transactions
+Payment settings
+Payment method
+Billing management
+Account management
+Release notes
+Overview
+Paid account
+Manage billing account
+Learn
+Cost summary
+How you pay
+Introducing a new multi-project experience for project owners
+Empower your project owners to view cost data on all their linked projects at once in billing console.
+Learn more
+Your total cost (1 – 2 July 2026)
+Last seven days
+Current month
+Cost
+$0.23
+—
+Savings
+$0.00
+View details
+=
+Total cost
+$0.23
+Forecasted total cost
+$10.10
+42% vs. June
+Untitled
+This chart is described by one or more grids. A grid row represents a time series. A grid column corresponds to a timestamp. By default, charts hide most columns. To display the hidden columns next to the activated column, use the Read previous item (up arrow) key until you access the column header, and then use the Activate button (enter) key.
+Data values on this chart range from a minimum of 0 to a maximum of $0.31.
+Data in this chart spans a time range from Wednesday, 1 July 2026 at 00:00:00 UTC+3 to Friday, 3 July 2026 at 00:00:00 UTC+3.
+Unpinning the X-axis cursor allows the cursor to follow the mouse while hovering over the chart.
+ The X-axis cursor will always be pinned while using keyboard navigation to indicate that the
+ values reflected in the tooltip or the legend are associated with the position of the X-axis
+ cursor.
+Populate data for table, {LAYER_TITLE}, on chart, {CHART_TITLE}
+Navigate this grid using arrow keys. Page up and page down moves focus up and down by 10 rows. Home and End moves focus to the first and last cell in the current row. Ctrl+Home and Ctrl+End moves focus to the first and last cell of the grid.
+Grid for data, {LAYER_TITLE}, on chart, {CHART_TITLE}. Navigate this grid using arrow keys. Page up and Page down moves focus up and down by 10 rows. Home and End moves focus to the first and last cell in the current row. Ctrl+Home and Ctrl+End moves focus to the first and last cell of the grid.
+Audio
+To save memory, this table is inactive by default. To populate this table, click the
+ 'Populate data for table, {LAYER_TITLE}, on chart, {CHART_TITLE}' button just prior to this table.
+If subsequent columns are omitted, activating a column header will reveal all subsequent columns
+ up to the next revealed column.
+If subsequent rows are omitted, activating a row header will reveal all subsequent rows up to the
+ next revealed row.
+Activating a grid cell will open the tooltip at this data point.
+View details on reports
+FinOps hub with utilisation insights
+Optimise cloud costs by reducing wasted usage.
+View details
+Save up to
+$0.00
+0% of last month's total cost
+FinOps score
+2.3
+/ 5.0
+FinOps maturity:
+Medium
+View details on FinOps hub
+Create a budget alert
+Set a monthly budget for your billing account. You'll receive email notifications as your
+ costs approach and exceed the budget amount.
+$8.10
+$10
+$15
+$
+Create
+View budgets and alerts
+Your AI spend
+Preview
+Get insights about your AI costs with
+Gemini
+How can Gemini help you?
+Break down my costs by API key
+Analyse token usage and costs
+Root cause a cost spike and identify anomalies
+Investigate cost drivers
+How can I reduce costs?
+View the cost trend for July
+Gemini can make mistakes. Double-check responses.
+Please contact your network administrator for further assistance.
+Notifications (G then N)
+rollclub-kc
+APIs and services
+IAM and admin
+Billing
+Compute Engine
+Cloud Storage
+BigQuery
+VPC network
+Kubernetes Engine
+Cloud Hub
+Cloud overview
+Solutions
+Marketplace
+Agent Platform
+Security
+Monitoring
+Cloud Run
+Databases
+Cloud SQL
+Google Maps Platform
+Recently visited
+Linked account
+Hide Billing navigation menu (visual change only)
+Overview
+Committed-use discounts (CUDs)
+Overview
+View details on reports
+View details on savings
+Currently disabled.

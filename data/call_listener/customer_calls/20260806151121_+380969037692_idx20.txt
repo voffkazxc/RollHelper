@@ -1,0 +1,15 @@
+decision: empty
+reason: text_empty
+kind: customer
+text: 
+device: [33] SteelSeries Sonar - Gaming (SteelSeries Sonar Virtual Audio Device) [Loopback]
+loopback: True
+backend: pyaudiowpatch
+engine: sherpa-stream-t-one-ctc
+model: sherpa-stream:sherpa-onnx-streaming-t-one-russian-2025-09-08
+language: requested=ru detected=ru prob=
+fallback:  from 
+vad: mode=True reason=start_timeout speech_ms=0 silence_ms=0 peak_rms=7
+stream: first_partial_ms= asr_decode_ms=0
+wav: C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_call.wav
+error: 

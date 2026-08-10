@@ -1,0 +1,72 @@
+{
+  "ok": true,
+  "backend": "pyaudiowpatch",
+  "seconds": 3.0,
+  "best_index": 29,
+  "best_name": "Headset Earphone (Jabra Link 380) [Loopback]",
+  "best_peak_rms": 2160,
+  "raw_best_index": 29,
+  "raw_best_name": "Headset Earphone (Jabra Link 380) [Loopback]",
+  "raw_best_peak_rms": 2160,
+  "selection_rule": "prefer_non_microphone_loopback",
+  "prefer_names": [
+    "Gaming"
+  ],
+  "rows": [
+    {
+      "index": 29,
+      "name": "Headset Earphone (Jabra Link 380) [Loopback]",
+      "rate": 48000,
+      "peak_rms": 2160,
+      "avg_rms": 293,
+      "wav": "C:\\Users\\voffk\\Documents\\РХ_ПалочкиPRO_V6.5\\RollHelper\\data\\call_listener\\scan_loopbacks\\device_29.wav",
+      "error": ""
+    },
+    {
+      "index": 33,
+      "name": "SteelSeries Sonar - Gaming (SteelSeries Sonar Virtual Audio Device) [Loopback]",
+      "rate": 96000,
+      "peak_rms": 7,
+      "avg_rms": 0,
+      "wav": "C:\\Users\\voffk\\Documents\\РХ_ПалочкиPRO_V6.5\\RollHelper\\data\\call_listener\\scan_loopbacks\\device_33.wav",
+      "error": ""
+    },
+    {
+      "index": 28,
+      "name": "SteelSeries Sonar - Chat (SteelSeries Sonar Virtual Audio Device) [Loopback]",
+      "rate": 48000,
+      "peak_rms": 0,
+      "avg_rms": 0,
+      "wav": "C:\\Users\\voffk\\Documents\\РХ_ПалочкиPRO_V6.5\\RollHelper\\data\\call_listener\\scan_loopbacks\\device_28.wav",
+      "error": ""
+    },
+    {
+      "index": 30,
+      "name": "Speakers (High Definition Audio Device) [Loopback]",
+      "rate": 48000,
+      "peak_rms": 0,
+      "avg_rms": 0,
+      "wav": "",
+      "error": ""
+    },
+    {
+      "index": 31,
+      "name": "SteelSeries Sonar - Microphone (SteelSeries Sonar Virtual Audio Device) [Loopback]",
+      "rate": 48000,
+      "peak_rms": 0,
+      "avg_rms": 0,
+      "wav": "C:\\Users\\voffk\\Documents\\РХ_ПалочкиPRO_V6.5\\RollHelper\\data\\call_listener\\scan_loopbacks\\device_31.wav",
+      "error": ""
+    },
+    {
+      "index": 32,
+      "name": "SteelSeries Sonar - Media (SteelSeries Sonar Virtual Audio Device) [Loopback]",
+      "rate": 96000,
+      "peak_rms": 0,
+      "avg_rms": 0,
+      "wav": "C:\\Users\\voffk\\Documents\\РХ_ПалочкиPRO_V6.5\\RollHelper\\data\\call_listener\\scan_loopbacks\\device_32.wav",
+      "error": ""
+    }
+  ],
+  "timestamp": "2026-08-06 15:17:49"
+}

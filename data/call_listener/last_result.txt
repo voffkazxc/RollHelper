@@ -1,0 +1,15 @@
+decision: empty
+reason: text_empty
+kind: test
+text: 
+device: [29] Headset Earphone (Jabra Link 380) [Loopback]
+loopback: True
+backend: pyaudiowpatch
+engine: faster-whisper
+model: tiny
+language: requested=uk detected=uk prob=1.0
+fallback:  from 
+vad: mode=True reason=silence_after_speech speech_ms=1189 silence_ms=788 peak_rms=6764
+stream: first_partial_ms= asr_decode_ms=
+wav: C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_call.wav
+error: 

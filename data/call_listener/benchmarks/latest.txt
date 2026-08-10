@@ -1,0 +1,121 @@
+=== RollHouse local ASR benchmark ===
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260805120751_+380990257465_idx1.wav
+  faster-whisper tiny lang=uk fallback=yes time=661ms
+  decision=positive reason=positive_short:все\s+сподобал,сподобал
+  text=Так, все сподобалось, яку.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260805120925_+380996147268_idx4.wav
+  faster-whisper tiny lang=uk fallback=yes time=1683ms
+  decision=empty reason=text_empty
+  text=
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260805121253_+380997973055_idx6.wav
+  faster-whisper tiny lang=uk fallback=yes time=561ms
+  decision=empty reason=text_empty
+  text=
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260805121623_+380664650375_idx5.wav
+  faster-whisper tiny lang=uk fallback=yes time=2628ms
+  decision=manual reason=unknown
+  text=І я всказі, мать.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260805124731_+380951971409_idx1.wav
+  faster-whisper tiny lang=uk fallback=yes time=463ms
+  decision=positive reason=positive_short:все\s+сподобал,сподобал
+  text=Глак, все сподобалось.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260805124815_+380954575075_idx2.wav
+  faster-whisper tiny lang=uk fallback=yes time=555ms
+  decision=empty reason=text_empty
+  text=
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260805124847_+380956236982_idx3.wav
+  faster-whisper tiny lang=uk fallback=yes time=1496ms
+  decision=positive reason=positive_short:все\s+(хорошо|добре|отлично|чудово|нормально),все\s+.*\b(хорошо|добре|отлично|чудово|нормально)\b
+  text=Претензий, все добре, чудово, нормально.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260805125018_+380966529468_idx6.wav
+  faster-whisper tiny lang=uk fallback=yes time=610ms
+  decision=empty reason=text_empty
+  text=
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260805125820_+380990563899_idx10.wav
+  faster-whisper tiny lang=uk fallback=yes time=1680ms
+  decision=manual reason=unknown
+  text=Так.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260806150215_+380662604578_idx3.wav
+  faster-whisper tiny lang=uk fallback=yes time=517ms
+  decision=empty reason=text_empty
+  text=
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260806150342_+380663729301_idx5.wav
+  faster-whisper tiny lang=uk fallback=yes time=526ms
+  decision=empty reason=text_empty
+  text=
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260806150536_+380667816742_idx9.wav
+  faster-whisper tiny lang=uk fallback=yes time=538ms
+  decision=empty reason=text_empty
+  text=
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260806150606_+380680612988_idx10.wav
+  faster-whisper tiny lang=uk fallback=yes time=529ms
+  decision=empty reason=text_empty
+  text=
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260806150743_+380932666334_idx14.wav
+  faster-whisper tiny lang=uk fallback=yes time=526ms
+  decision=empty reason=text_empty
+  text=
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260806150811_+380932666334_idx14.wav
+  faster-whisper tiny lang=uk fallback=yes time=545ms
+  decision=empty reason=text_empty
+  text=
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260806150849_+380934854814_idx15.wav
+  faster-whisper tiny lang=uk fallback=yes time=545ms
+  decision=empty reason=text_empty
+  text=
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260806151024_+380957612313_idx18.wav
+  faster-whisper tiny lang=uk fallback=yes time=586ms
+  decision=empty reason=text_empty
+  text=
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260806151052_+380961925151_idx19.wav
+  faster-whisper tiny lang=uk fallback=yes time=611ms
+  decision=empty reason=text_empty
+  text=
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260806151121_+380969037692_idx20.wav
+  faster-whisper tiny lang=uk fallback=yes time=526ms
+  decision=empty reason=text_empty
+  text=
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\customer_calls\20260806151254_+380997270478_idx23.wav
+  faster-whisper tiny lang=uk fallback=yes time=547ms
+  decision=empty reason=text_empty
+  text=
+  error=

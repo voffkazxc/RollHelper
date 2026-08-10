@@ -1,0 +1,314 @@
+[
+    {
+        "file": "20260805120751_+380990257465_idx1.wav",
+        "speech_end_ms_auto": 1480,
+        "speech_end_verified": 1480,
+        "reference_text": "Так, все сподобалось. Дякую.",
+        "expected_decision": "positive",
+        "is_verified": true
+    },
+    {
+        "file": "20260805120925_+380996147268_idx4.wav",
+        "speech_end_ms_auto": 420,
+        "speech_end_verified": 420,
+        "reference_text": "Дякую.",
+        "expected_decision": "manual",
+        "is_verified": true
+    },
+    {
+        "file": "20260805121253_+380997973055_idx6.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260805121623_+380664650375_idx5.wav",
+        "speech_end_ms_auto": 580,
+        "speech_end_verified": 580,
+        "reference_text": "Дякую за перегляд!",
+        "expected_decision": "manual",
+        "is_verified": true
+    },
+    {
+        "file": "20260805124731_+380951971409_idx1.wav",
+        "speech_end_ms_auto": 400,
+        "speech_end_verified": 400,
+        "reference_text": "Дякую.",
+        "expected_decision": "manual",
+        "is_verified": true
+    },
+    {
+        "file": "20260805124815_+380954575075_idx2.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260805124847_+380956236982_idx3.wav",
+        "speech_end_ms_auto": 1100,
+        "speech_end_verified": 1100,
+        "reference_text": "Це сподобалось.",
+        "expected_decision": "positive",
+        "is_verified": true
+    },
+    {
+        "file": "20260805125018_+380966529468_idx6.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260805125820_+380990563899_idx10.wav",
+        "speech_end_ms_auto": 360,
+        "speech_end_verified": 360,
+        "reference_text": "Дякую.",
+        "expected_decision": "manual",
+        "is_verified": true
+    },
+    {
+        "file": "20260806150215_+380662604578_idx3.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260806150342_+380663729301_idx5.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260806150536_+380667816742_idx9.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260806150606_+380680612988_idx10.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260806150743_+380932666334_idx14.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260806150811_+380932666334_idx14.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260806150849_+380934854814_idx15.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260806151024_+380957612313_idx18.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260806151052_+380961925151_idx19.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260806151121_+380969037692_idx20.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260806151254_+380997270478_idx23.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260806151716_+380959367796_idx3.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260806151855_+380509724882_idx8.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260806151927_+380954895360_idx9.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260807110358_+380500552282_idx1.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260807110425_+380504031979_idx2.wav",
+        "speech_end_ms_auto": 580,
+        "speech_end_verified": 580,
+        "reference_text": "Дякую за перегляд!",
+        "expected_decision": "manual",
+        "is_verified": true
+    },
+    {
+        "file": "20260807110509_+380633712677_idx3.wav",
+        "speech_end_ms_auto": 1480,
+        "speech_end_verified": 1480,
+        "reference_text": "Після мене вже вставили.",
+        "expected_decision": "manual",
+        "is_verified": true
+    },
+    {
+        "file": "20260807110738_+380667517501_idx7.wav",
+        "speech_end_ms_auto": 880,
+        "speech_end_verified": 880,
+        "reference_text": "Так, добре.",
+        "expected_decision": "manual",
+        "is_verified": true
+    },
+    {
+        "file": "20260807111039_+380967642601_idx15.wav",
+        "speech_end_ms_auto": 440,
+        "speech_end_verified": 440,
+        "reference_text": "Так.",
+        "expected_decision": "manual",
+        "is_verified": true
+    },
+    {
+        "file": "20260807111113_+380969718524_idx16.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260807111205_+380977023345_idx19.wav",
+        "speech_end_ms_auto": 320,
+        "speech_end_verified": 320,
+        "reference_text": "Дякую.",
+        "expected_decision": "manual",
+        "is_verified": true
+    },
+    {
+        "file": "20260807111359_+380991667005_idx23.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260807111628_+380955898394_idx1.wav",
+        "speech_end_ms_auto": 2400,
+        "speech_end_verified": 2400,
+        "reference_text": "Так, все сподобалося, було дуже свіже.",
+        "expected_decision": "positive",
+        "is_verified": true
+    },
+    {
+        "file": "20260807111722_+380954085733_idx3.wav",
+        "speech_end_ms_auto": 1260,
+        "speech_end_verified": 1260,
+        "reference_text": "Так, все сподобалось.",
+        "expected_decision": "positive",
+        "is_verified": true
+    },
+    {
+        "file": "20260807111803_+380995622779_idx4.wav",
+        "speech_end_ms_auto": 1000,
+        "speech_end_verified": 1000,
+        "reference_text": "Так, я кусу.",
+        "expected_decision": "manual",
+        "is_verified": true
+    },
+    {
+        "file": "20260807111836_+380665862680_idx6.wav",
+        "speech_end_ms_auto": 0,
+        "speech_end_verified": 0,
+        "reference_text": "",
+        "expected_decision": "empty",
+        "is_verified": true
+    },
+    {
+        "file": "20260807111912_+380993287838_idx7.wav",
+        "speech_end_ms_auto": 1080,
+        "speech_end_verified": 1080,
+        "reference_text": "Так, так, так.",
+        "expected_decision": "manual",
+        "is_verified": true
+    },
+    {
+        "file": "20260807111939_+380664906244_idx8.wav",
+        "speech_end_ms_auto": 580,
+        "speech_end_verified": 580,
+        "reference_text": "Дякую за перегляд!",
+        "expected_decision": "manual",
+        "is_verified": true
+    },
+    {
+        "file": "20260807112018_+380952120421_idx9.wav",
+        "speech_end_ms_auto": 720,
+        "speech_end_verified": 720,
+        "reference_text": "Це супер.",
+        "expected_decision": "manual",
+        "is_verified": true
+    },
+    {
+        "file": "20260807133635_+380509483834_idx1.wav",
+        "speech_end_ms_auto": 1350,
+        "speech_end_verified": 1350,
+        "reference_text": "Дякую за перегляд!",
+        "expected_decision": "manual",
+        "is_verified": true
+    }
+]

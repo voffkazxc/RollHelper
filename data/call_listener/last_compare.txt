@@ -1,0 +1,19 @@
+=== CALL LISTENER COMPARE ===
+device: [30] Speakers (High Definition Audio Device) [Loopback]
+loopback: True
+wav: C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_call.wav
+
+--- uk / small ---
+detected: uk prob=1.0
+decision: manual reason=unknown
+text: Тому що зазнаємо безперерних ракетних ударів з боку Росії. Виризакуйте власним життям і намагаєтеся на уласні очі побачити що...
+
+--- ru / small ---
+detected: ru prob=1.0
+decision: manual reason=unknown
+text: потому что зазнаемо бесперерных ракетных ударов сбоку Русии. Вы резакуйте властным життям и намагайтесь на властные очи, побачите, что...
+
+--- auto / small ---
+detected: uk prob=0.9968319535255432
+decision: manual reason=unknown
+text: Тому що зазнаємо безперерних ракетних ударів з боку Росії. Виризакуйте власним життям і намагаєтеся на уласні очі побачити що...

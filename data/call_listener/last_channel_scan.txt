@@ -1,0 +1,11 @@
+=== LOOPBACK CHANNEL SCAN ===
+best: [29] peak=2160 Headset Earphone (Jabra Link 380) [Loopback]
+raw_best: [29] peak=2160 Headset Earphone (Jabra Link 380) [Loopback]
+rule: prefer_non_microphone_loopback
+
+[29] peak=2160  avg=293   Headset Earphone (Jabra Link 380) [Loopback] wav=C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\scan_loopbacks\device_29.wav
+[33] peak=7     avg=0     SteelSeries Sonar - Gaming (SteelSeries Sonar Virtual Audio Device) [Loopback] wav=C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\scan_loopbacks\device_33.wav
+[28] peak=0     avg=0     SteelSeries Sonar - Chat (SteelSeries Sonar Virtual Audio Device) [Loopback] wav=C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\scan_loopbacks\device_28.wav
+[30] peak=0     avg=0     Speakers (High Definition Audio Device) [Loopback] wav=
+[31] peak=0     avg=0     SteelSeries Sonar - Microphone (SteelSeries Sonar Virtual Audio Device) [Loopback] wav=C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\scan_loopbacks\device_31.wav
+[32] peak=0     avg=0     SteelSeries Sonar - Media (SteelSeries Sonar Virtual Audio Device) [Loopback] wav=C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\scan_loopbacks\device_32.wav

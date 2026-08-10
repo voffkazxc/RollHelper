@@ -1,0 +1,214 @@
+﻿=== UIA / WinAPI состав ===
+(UIA ничего не вернул)
+
+=== UIA TREE DUMP ===
+treeListItems FOUND
+TREE RECT: l=48 t=432 r=1001 b=916 w=953 h=484
+CHILDREN: 79 (showing up to 180)
+
+[1] ct=50025 class= aid='' name='Панель заголовка' val='' legacyName='' legacyVal='' l=49 t=433 w=951 h=20
+[2] ct=50034 class= aid='' name='Блюдо' val='' legacyName='' legacyVal='' l=68 t=433 w=309 h=20
+[3] ct=50034 class= aid='' name='Количество' val='' legacyName='' legacyVal='' l=377 t=433 w=73 h=20
+[4] ct=50034 class= aid='' name='Комментарий' val='' legacyName='' legacyVal='' l=450 t=433 w=258 h=20
+[5] ct=50034 class= aid='' name='Цена' val='' legacyName='' legacyVal='' l=708 t=433 w=146 h=20
+[6] ct=50034 class= aid='' name='Сумма' val='' legacyName='' legacyVal='' l=854 t=433 w=147 h=20
+[7] ct=50026 class= aid='' name='Панель данных' val='' legacyName='' legacyVal='' l=49 t=453 w=951 h=228
+[8] ct=50024 class= aid='' name='Узел0' val='' legacyName='' legacyVal='' l=49 t=453 w=951 h=19
+[9] ct=50029 class= aid='' name='Блюдо row 0' val='' legacyName='' legacyVal='' l=87 t=453 w=289 h=18
+[10] ct=50029 class= aid='' name='Количество row 0' val='' legacyName='' legacyVal='' l=377 t=453 w=72 h=18
+[11] ct=50029 class= aid='' name='Комментарий row 0' val='' legacyName='' legacyVal='' l=450 t=453 w=257 h=18
+[12] ct=50029 class= aid='' name='Цена row 0' val='' legacyName='' legacyVal='' l=708 t=453 w=145 h=18
+[13] ct=50029 class= aid='' name='Сумма row 0' val='' legacyName='' legacyVal='' l=854 t=453 w=146 h=18
+[14] ct=50024 class= aid='' name='Узел1' val='' legacyName='' legacyVal='' l=49 t=472 w=951 h=19
+[15] ct=50029 class= aid='' name='Блюдо row 1' val='' legacyName='' legacyVal='' l=105 t=472 w=271 h=18
+[16] ct=50029 class= aid='' name='Количество row 1' val='' legacyName='' legacyVal='' l=377 t=472 w=72 h=18
+[17] ct=50029 class= aid='' name='Комментарий row 1' val='' legacyName='' legacyVal='' l=450 t=472 w=257 h=18
+[18] ct=50029 class= aid='' name='Цена row 1' val='' legacyName='' legacyVal='' l=708 t=472 w=145 h=18
+[19] ct=50029 class= aid='' name='Сумма row 1' val='' legacyName='' legacyVal='' l=854 t=472 w=146 h=18
+[20] ct=50024 class= aid='' name='Узел2' val='' legacyName='' legacyVal='' l=49 t=491 w=951 h=19
+[21] ct=50029 class= aid='' name='Блюдо row 2' val='' legacyName='' legacyVal='' l=123 t=491 w=253 h=18
+[22] ct=50029 class= aid='' name='Количество row 2' val='' legacyName='' legacyVal='' l=377 t=491 w=72 h=18
+[23] ct=50029 class= aid='' name='Комментарий row 2' val='' legacyName='' legacyVal='' l=450 t=491 w=257 h=18
+[24] ct=50029 class= aid='' name='Цена row 2' val='' legacyName='' legacyVal='' l=708 t=491 w=145 h=18
+[25] ct=50029 class= aid='' name='Сумма row 2' val='' legacyName='' legacyVal='' l=854 t=491 w=146 h=18
+[26] ct=50024 class= aid='' name='Узел3' val='' legacyName='' legacyVal='' l=49 t=510 w=951 h=19
+[27] ct=50029 class= aid='' name='Блюдо row 3' val='' legacyName='' legacyVal='' l=105 t=510 w=271 h=18
+[28] ct=50029 class= aid='' name='Количество row 3' val='' legacyName='' legacyVal='' l=377 t=510 w=72 h=18
+[29] ct=50029 class= aid='' name='Комментарий row 3' val='' legacyName='' legacyVal='' l=450 t=510 w=257 h=18
+[30] ct=50029 class= aid='' name='Цена row 3' val='' legacyName='' legacyVal='' l=708 t=510 w=145 h=18
+[31] ct=50029 class= aid='' name='Сумма row 3' val='' legacyName='' legacyVal='' l=854 t=510 w=146 h=18
+[32] ct=50024 class= aid='' name='Узел4' val='' legacyName='' legacyVal='' l=49 t=529 w=951 h=19
+[33] ct=50029 class= aid='' name='Блюдо row 4' val='' legacyName='' legacyVal='' l=105 t=529 w=271 h=18
+[34] ct=50029 class= aid='' name='Количество row 4' val='' legacyName='' legacyVal='' l=377 t=529 w=72 h=18
+[35] ct=50029 class= aid='' name='Комментарий row 4' val='' legacyName='' legacyVal='' l=450 t=529 w=257 h=18
+[36] ct=50029 class= aid='' name='Цена row 4' val='' legacyName='' legacyVal='' l=708 t=529 w=145 h=18
+[37] ct=50029 class= aid='' name='Сумма row 4' val='' legacyName='' legacyVal='' l=854 t=529 w=146 h=18
+[38] ct=50024 class= aid='' name='Узел5' val='' legacyName='' legacyVal='' l=49 t=548 w=951 h=19
+[39] ct=50029 class= aid='' name='Блюдо row 5' val='' legacyName='' legacyVal='' l=105 t=548 w=271 h=18
+[40] ct=50029 class= aid='' name='Количество row 5' val='' legacyName='' legacyVal='' l=377 t=548 w=72 h=18
+[41] ct=50029 class= aid='' name='Комментарий row 5' val='' legacyName='' legacyVal='' l=450 t=548 w=257 h=18
+[42] ct=50029 class= aid='' name='Цена row 5' val='' legacyName='' legacyVal='' l=708 t=548 w=145 h=18
+[43] ct=50029 class= aid='' name='Сумма row 5' val='' legacyName='' legacyVal='' l=854 t=548 w=146 h=18
+[44] ct=50024 class= aid='' name='Узел6' val='' legacyName='' legacyVal='' l=49 t=567 w=951 h=19
+[45] ct=50029 class= aid='' name='Блюдо row 6' val='' legacyName='' legacyVal='' l=105 t=567 w=271 h=18
+[46] ct=50029 class= aid='' name='Количество row 6' val='' legacyName='' legacyVal='' l=377 t=567 w=72 h=18
+[47] ct=50029 class= aid='' name='Комментарий row 6' val='' legacyName='' legacyVal='' l=450 t=567 w=257 h=18
+[48] ct=50029 class= aid='' name='Цена row 6' val='' legacyName='' legacyVal='' l=708 t=567 w=145 h=18
+[49] ct=50029 class= aid='' name='Сумма row 6' val='' legacyName='' legacyVal='' l=854 t=567 w=146 h=18
+[50] ct=50024 class= aid='' name='Узел7' val='' legacyName='' legacyVal='' l=49 t=586 w=951 h=19
+[51] ct=50029 class= aid='' name='Блюдо row 7' val='' legacyName='' legacyVal='' l=105 t=586 w=271 h=18
+[52] ct=50029 class= aid='' name='Количество row 7' val='' legacyName='' legacyVal='' l=377 t=586 w=72 h=18
+[53] ct=50029 class= aid='' name='Комментарий row 7' val='' legacyName='' legacyVal='' l=450 t=586 w=257 h=18
+[54] ct=50029 class= aid='' name='Цена row 7' val='' legacyName='' legacyVal='' l=708 t=586 w=145 h=18
+[55] ct=50029 class= aid='' name='Сумма row 7' val='' legacyName='' legacyVal='' l=854 t=586 w=146 h=18
+[56] ct=50024 class= aid='' name='Узел8' val='' legacyName='' legacyVal='' l=49 t=605 w=951 h=19
+[57] ct=50029 class= aid='' name='Блюдо row 8' val='' legacyName='' legacyVal='' l=105 t=605 w=271 h=18
+[58] ct=50029 class= aid='' name='Количество row 8' val='' legacyName='' legacyVal='' l=377 t=605 w=72 h=18
+[59] ct=50029 class= aid='' name='Комментарий row 8' val='' legacyName='' legacyVal='' l=450 t=605 w=257 h=18
+[60] ct=50029 class= aid='' name='Цена row 8' val='' legacyName='' legacyVal='' l=708 t=605 w=145 h=18
+[61] ct=50029 class= aid='' name='Сумма row 8' val='' legacyName='' legacyVal='' l=854 t=605 w=146 h=18
+[62] ct=50024 class= aid='' name='Узел9' val='' legacyName='' legacyVal='' l=49 t=624 w=951 h=19
+[63] ct=50029 class= aid='' name='Блюдо row 9' val='' legacyName='' legacyVal='' l=105 t=624 w=271 h=18
+[64] ct=50029 class= aid='' name='Количество row 9' val='' legacyName='' legacyVal='' l=377 t=624 w=72 h=18
+[65] ct=50029 class= aid='' name='Комментарий row 9' val='' legacyName='' legacyVal='' l=450 t=624 w=257 h=18
+[66] ct=50029 class= aid='' name='Цена row 9' val='' legacyName='' legacyVal='' l=708 t=624 w=145 h=18
+[67] ct=50029 class= aid='' name='Сумма row 9' val='' legacyName='' legacyVal='' l=854 t=624 w=146 h=18
+[68] ct=50024 class= aid='' name='Узел10' val='' legacyName='' legacyVal='' l=49 t=643 w=951 h=19
+[69] ct=50029 class= aid='' name='Блюдо row 10' val='' legacyName='' legacyVal='' l=105 t=643 w=271 h=18
+[70] ct=50029 class= aid='' name='Количество row 10' val='' legacyName='' legacyVal='' l=377 t=643 w=72 h=18
+[71] ct=50029 class= aid='' name='Комментарий row 10' val='' legacyName='' legacyVal='' l=450 t=643 w=257 h=18
+[72] ct=50029 class= aid='' name='Цена row 10' val='' legacyName='' legacyVal='' l=708 t=643 w=145 h=18
+[73] ct=50029 class= aid='' name='Сумма row 10' val='' legacyName='' legacyVal='' l=854 t=643 w=146 h=18
+[74] ct=50024 class= aid='' name='Узел11' val='' legacyName='' legacyVal='' l=49 t=662 w=951 h=19
+[75] ct=50029 class= aid='' name='Блюдо row 11' val='' legacyName='' legacyVal='' l=105 t=662 w=271 h=18
+[76] ct=50029 class= aid='' name='Количество row 11' val='' legacyName='' legacyVal='' l=377 t=662 w=72 h=18
+[77] ct=50029 class= aid='' name='Комментарий row 11' val='' legacyName='' legacyVal='' l=450 t=662 w=257 h=18
+[78] ct=50029 class= aid='' name='Цена row 11' val='' legacyName='' legacyVal='' l=708 t=662 w=145 h=18
+[79] ct=50029 class= aid='' name='Сумма row 11' val='' legacyName='' legacyVal='' l=854 t=662 w=146 h=18
+
+
+=== WINAPI/HWND DUMP ===
+ROOT: hwnd=0x50662 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='Ролл Клаб КЦ - Syrve Office 2025' proc='BackOffice.exe'
+TREE RECT: l=48 t=432 w=953 h=484
+
+=== WindowFromPoint samples ===
+row 0 y=462
+  dish @ 128,462 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  qty @ 398,462 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  comment @ 518,462 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  price @ 768,462 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  sum @ 898,462 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+row 1 y=481
+  dish @ 128,481 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  qty @ 398,481 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  comment @ 518,481 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  price @ 768,481 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  sum @ 898,481 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+row 2 y=500
+  dish @ 128,500 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  qty @ 398,500 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  comment @ 518,500 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  price @ 768,500 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  sum @ 898,500 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+row 3 y=519
+  dish @ 128,519 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  qty @ 398,519 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  comment @ 518,519 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  price @ 768,519 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  sum @ 898,519 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+row 4 y=538
+  dish @ 128,538 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  qty @ 398,538 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  comment @ 518,538 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  price @ 768,538 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  sum @ 898,538 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+row 5 y=557
+  dish @ 128,557 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  qty @ 398,557 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  comment @ 518,557 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  price @ 768,557 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  sum @ 898,557 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+row 6 y=576
+  dish @ 128,576 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  qty @ 398,576 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  comment @ 518,576 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  price @ 768,576 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  sum @ 898,576 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+row 7 y=595
+  dish @ 128,595 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  qty @ 398,595 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  comment @ 518,595 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  price @ 768,595 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  sum @ 898,595 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+row 8 y=614
+  dish @ 128,614 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  qty @ 398,614 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  comment @ 518,614 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  price @ 768,614 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  sum @ 898,614 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+row 9 y=633
+  dish @ 128,633 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  qty @ 398,633 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  comment @ 518,633 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  price @ 768,633 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  sum @ 898,633 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+row 10 y=652
+  dish @ 128,652 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  qty @ 398,652 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  comment @ 518,652 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  price @ 768,652 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  sum @ 898,652 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+row 11 y=671
+  dish @ 128,671 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  qty @ 398,671 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  comment @ 518,671 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  price @ 768,671 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+  sum @ 898,671 -> hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe'
+
+=== Child HWNDs intersecting tree rect ===
+[1] hwnd=0x70510 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe' rect=0,23 1920x1009
+[2] hwnd=0x40526 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe' rect=35,23 1885x979
+[3] hwnd=0x402F4 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe' rect=35,23 1885x979
+[4] hwnd=0x506FA class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='Доставки' proc='BackOffice.exe' rect=36,47 1883x954
+[5] hwnd=0x840746 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='Доставки' proc='BackOffice.exe' rect=36,47 1883x954
+[6] hwnd=0xB04E8 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe' rect=38,80 1879x919
+[7] hwnd=0x1202C8 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe' rect=38,171 1879x828
+[8] hwnd=0x580B70 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='Доставка №747174' proc='BackOffice.exe' rect=36,47 1883x954
+[9] hwnd=0x16063E class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='Доставка №747174' proc='BackOffice.exe' rect=36,47 1883x954
+[10] hwnd=0x207EC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe' rect=38,80 1879x919
+[11] hwnd=0x40962 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe' rect=38,176 1879x772
+[12] hwnd=0x1096E class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe' rect=38,176 1879x772
+[13] hwnd=0x10970 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe' rect=38,176 1879x772
+[14] hwnd=0x10972 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='layoutControl2' proc='BackOffice.exe' rect=38,176 1879x772
+[15] hwnd=0x109EE class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='Заказ' proc='BackOffice.exe' rect=43,385 963x558
+[16] hwnd=0x109F0 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='layoutControl3' proc='BackOffice.exe' rect=45,406 959x535
+[17] hwnd=0x109FC class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe' rect=48,432 953x484
+[18] hwnd=0x109FE class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe' rect=983,453 17x462
+[19] hwnd=0x10A00 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe' rect=49,898 951x17
+[20] hwnd=0x330B58 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='Доставка №747282' proc='BackOffice.exe' rect=36,47 1883x954
+[21] hwnd=0x940C78 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='Доставка №747282' proc='BackOffice.exe' rect=36,47 1883x954
+[22] hwnd=0x10804 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe' rect=38,80 1879x919
+[23] hwnd=0x10806 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe' rect=38,176 1879x772
+[24] hwnd=0x10808 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe' rect=38,176 1879x772
+[25] hwnd=0x1080A class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe' rect=38,176 1879x772
+[26] hwnd=0x1080C class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='layoutControl2' proc='BackOffice.exe' rect=38,176 1879x772
+[27] hwnd=0x10888 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='Заказ' proc='BackOffice.exe' rect=43,385 963x558
+[28] hwnd=0x1088A class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='layoutControl3' proc='BackOffice.exe' rect=45,406 959x535
+[29] hwnd=0x10896 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe' rect=48,432 953x484
+[30] hwnd=0x10898 class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe' rect=983,453 17x462
+[31] hwnd=0x1089A class='WindowsForms10.Window.8.app.0.13e2e7e_r6_ad1' text='' proc='BackOffice.exe' rect=49,898 951x17
+
+
+=== GRID CLIPBOARD COPY ===
+Блюдо	Количество	Комментарий	Цена	Сумма
+	0,000		0,00	0,00
+
+
+=== OCR items ===
+(OCR items пустой — парсер не нашёл массив items)
+
+=== OCR text ===
+(OCR text/raw_text/ocr_text пустой или такого поля нет)
+
+=== RAW OCR RESPONSE ===
+{"ok": true, "items_count": 0, "items": [], "analysis": {"has_chopsticks": false, "has_ginger": false, "has_soy": false, "has_wasabi": false, "chopsticks_status": "⚠️ ВНИМАНИЕ: Палочки НЕ пробиты!"}, "timing": {"grab_ms": 40, "ocr_ms": 168, "total_ms": 209}, "timestamp": "2026-07-30 20:21:32"}

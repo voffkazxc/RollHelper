@@ -1,0 +1,109 @@
+=== RollHouse local ASR benchmark ===
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_call.wav
+  faster-whisper base lang=ru fallback=yes time=2953ms
+  decision=positive reason=positive_short:все\s+(хорошо|добре|отлично|чудово|нормально),все\s+.*\b(хорошо|добре|отлично|чудово|нормально)\b
+  text=Вона все хорошо козіла.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_call.wav
+  faster-whisper base lang=uk fallback=yes time=1483ms
+  decision=positive reason=positive_short:все\s+(хорошо|добре|отлично|чудово|нормально),все\s+.*\b(хорошо|добре|отлично|чудово|нормально)\b
+  text=Вона все хорошо козіла.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_call.wav
+  faster-whisper base lang=auto fallback=yes time=4091ms
+  decision=positive reason=positive_short:все\s+(хорошо|добре|отлично|чудово|нормально),все\s+.*\b(хорошо|добре|отлично|чудово|нормально)\b
+  text=Вона все хорошо козіла.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_customer_call.wav
+  faster-whisper base lang=ru fallback=yes time=3307ms
+  decision=positive reason=positive_short:все\s+(хорошо|добре|отлично|чудово|нормально),все\s+.*\b(хорошо|добре|отлично|чудово|нормально)\b
+  text=Вона все хорошо козіла.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_customer_call.wav
+  faster-whisper base lang=uk fallback=yes time=1234ms
+  decision=positive reason=positive_short:все\s+(хорошо|добре|отлично|чудово|нормально),все\s+.*\b(хорошо|добре|отлично|чудово|нормально)\b
+  text=Вона все хорошо козіла.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\last_customer_call.wav
+  faster-whisper base lang=auto fallback=yes time=4231ms
+  decision=positive reason=positive_short:все\s+(хорошо|добре|отлично|чудово|нормально),все\s+.*\b(хорошо|добре|отлично|чудово|нормально)\b
+  text=Вона все хорошо козіла.
+  error=
+
+C:\Users\voffk\Downloads\2026-08-04_12-23_0990487775_outgoing.mp3
+  faster-whisper base lang=ru fallback=yes time=3369ms
+  decision=manual reason=positive_with_problem_tail:\b(но|але|только|тільки|кроме|крім|окрім)\b
+  text=Доброго дня, Теро Ухал. Доброго вечера. Добрый день. Петки дичьер-сев пододалось вон. Все нормально, кроме Ролла Феодельсия. Рыба Коскане.
+  error=
+
+C:\Users\voffk\Downloads\2026-08-04_12-23_0990487775_outgoing.mp3
+  faster-whisper base lang=uk fallback=yes time=3387ms
+  decision=manual reason=positive_with_problem_tail:\b(но|але|только|тільки|кроме|крім|окрім)\b
+  text=Доброго дня, ця руха. Доброго вечора, позвиваю за новини. Підказючий все, подобовись вам. Все нормально, кроме руха п'яло дельсія. Реба, Коскані.
+  error=
+
+C:\Users\voffk\Downloads\2026-08-04_12-23_0990487775_outgoing.mp3
+  faster-whisper base lang=auto fallback=yes time=3404ms
+  decision=manual reason=positive_with_problem_tail:\b(но|але|только|тільки|кроме|крім|окрім)\b
+  text=Доброго дня, Теро Ухал. Доброго вечера. Добрый день. Петки дичьер-сев пододалось вон. Все нормально, кроме Ролла Феодельсия. Рыба Коскане.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_14000.wav
+  faster-whisper base lang=ru fallback=yes time=4306ms
+  decision=manual reason=unknown
+  text=Ключ, да, было бы как бы.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_14000.wav
+  faster-whisper base lang=uk fallback=yes time=1224ms
+  decision=positive reason=positive_short:дякую
+  text=Вак, че до убилок дякую?
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_14000.wav
+  faster-whisper base lang=auto fallback=yes time=5313ms
+  decision=manual reason=unknown
+  text=Ключ, да, было бы как бы.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_8000.wav
+  faster-whisper base lang=ru fallback=yes time=2628ms
+  decision=positive reason=positive_short:дякую
+  text=Вак, че до вблок дякую?
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_8000.wav
+  faster-whisper base lang=uk fallback=yes time=4165ms
+  decision=manual reason=unknown
+  text=Кріч, довобила біки.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_8000.wav
+  faster-whisper base lang=auto fallback=yes time=4383ms
+  decision=manual reason=unknown
+  text=Ключ, да, было бы как бы.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_3000.wav
+  faster-whisper base lang=ru fallback=yes time=4517ms
+  decision=manual reason=unknown
+  text=Ключ, да, было бы как бы.
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_3000.wav
+  faster-whisper base lang=uk fallback=yes time=4252ms
+  decision=manual reason=unknown
+  text=Вак, чуда було якось?
+  error=
+
+C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\tmp_amp_3000.wav
+  faster-whisper base lang=auto fallback=yes time=4318ms
+  decision=manual reason=unknown
+  text=Ключ, да, было бы как бы.
+  error=

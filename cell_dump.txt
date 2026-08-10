@@ -1,0 +1,9 @@
+﻿ROW DUMP FOR 'Узел0':
+
+Name: 'Узел0'
+ControlType: 50024
+ClassName: ''
+ValuePattern.Value: <N/A>
+LegacyName (10045): <N/A>
+LegacyValue (10047): <N/A>
+LegacyDescription (10044): <N/A>

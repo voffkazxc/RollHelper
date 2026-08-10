@@ -1,0 +1,16 @@
+=== LIVE CALL CHANNEL PROBE ===
+time: 2026-08-05 11:42:19
+seconds: 0.2
+backend: pyaudiowpatch
+selected: [29] peak_rms=9 Headset Earphone (Jabra Link 380) [Loopback]
+rule: fallback_loudest_loopback
+
+Запускай это ВО ВРЕМЯ разговора, когда клиент говорит.
+Нужен канал, где peak/rms/nonzero заметно выше нуля именно на голосе клиента.
+
+[29] peak_rms=9     rms=3     peak=23     nonzero=0.0   % Headset Earphone (Jabra Link 380) [Loopback] wav=C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\live_channel_probe\call_device_29.wav
+[28] peak_rms=0     rms=0     peak=0      nonzero=0.0   % SteelSeries Sonar - Chat (SteelSeries Sonar Virtual Audio Device) [Loopback] wav=
+[30] peak_rms=0     rms=0     peak=0      nonzero=0.0   % Speakers (High Definition Audio Device) [Loopback] wav=C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\live_channel_probe\call_device_30.wav
+[31] peak_rms=0     rms=0     peak=1      nonzero=0.0   % SteelSeries Sonar - Microphone (SteelSeries Sonar Virtual Audio Device) [Loopback] wav=C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\live_channel_probe\call_device_31.wav
+[32] peak_rms=0     rms=0     peak=0      nonzero=0.0   % SteelSeries Sonar - Media (SteelSeries Sonar Virtual Audio Device) [Loopback] wav=C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\live_channel_probe\call_device_32.wav
+[33] peak_rms=0     rms=0     peak=0      nonzero=0.0   % SteelSeries Sonar - Gaming (SteelSeries Sonar Virtual Audio Device) [Loopback] wav=C:\Users\voffk\Documents\РХ_ПалочкиPRO_V6.5\RollHelper\data\call_listener\live_channel_probe\call_device_33.wav

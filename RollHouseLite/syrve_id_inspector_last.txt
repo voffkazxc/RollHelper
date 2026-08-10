@@ -1,0 +1,12 @@
+﻿=== TRY CLICK ACTIONABLE ELEMENT v2 ===
+--- smallest ---
+ControlType=50004 LocalType='поле' Name='карта' AutomationId='267456' Class='WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1' Framework='WinForm' NativeHwnd='267456' Value='карта' Rect=l=144 t=291 w=847 h=42
+Patterns: Legacy, Value
+Dump: Type: 50004 (Edit) Name: "карта" Value: "карта" LocalizedControlType: "поле" AutomationId: "267456" ClassName: "WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1"
+
+--- clicked candidate ---
+ControlType=50004 LocalType='поле' Name='карта' AutomationId='267456' Class='WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1' Framework='WinForm' NativeHwnd='267456' Value='карта' Rect=l=144 t=291 w=847 h=42
+Patterns: Legacy, Value
+Dump: Type: 50004 (Edit) Name: "карта" Value: "карта" LocalizedControlType: "поле" AutomationId: "267456" ClassName: "WindowsForms10.EDIT.app.0.13e2e7e_r6_ad1"
+
+RESULT: act.Click() returned 1
