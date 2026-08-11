@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     private readonly LauncherConfig _config;
     private CancellationTokenSource? _operationCancellation;
     private LauncherRelease? _launcherUpdate;
+    private bool _modulesPanelOpened;
 
     public MainWindow()
     {
@@ -139,6 +140,7 @@ public partial class MainWindow : Window
 
         try
         {
+            var selectedProgramId = (ProgramsGrid.SelectedItem as PackageRow)?.Package.Id;
             var manifestUri = new Uri(_config.ManifestUrl);
             var manifest = await _manifestClient.DownloadManifestAsync(manifestUri, _operationCancellation!.Token);
             _launcherUpdate = _launcherUpdater.IsUpdateAvailable(manifest.Launcher)
@@ -156,11 +158,19 @@ public partial class MainWindow : Window
                 _programs.Add(CreateRow(package));
             }
 
-            ProgramsGrid.SelectedIndex = _programs.Count > 0 ? 0 : -1;
+            ProgramsGrid.SelectedItem = string.IsNullOrWhiteSpace(selectedProgramId)
+                ? null
+                : _programs.FirstOrDefault(row =>
+                    string.Equals(row.Package.Id, selectedProgramId, StringComparison.OrdinalIgnoreCase));
             if (_programs.Count == 0)
             {
                 RefreshModulesForSelectedProgram();
                 SetStatus("Сейчас нет доступных программ");
+            }
+            else if (ProgramsGrid.SelectedItem is null)
+            {
+                RefreshModulesForSelectedProgram();
+                SetStatus("Выберите программу");
             }
 
             LauncherLog.Info("Program and module lists displayed");
@@ -376,6 +386,7 @@ public partial class MainWindow : Window
 
         if (ProgramsGrid.SelectedItem is not PackageRow selectedProgram)
         {
+            SetModulesPanelVisibility(false);
             ModulesHeaderText.Text = "Дополнения";
             ModulesHintText.Text = "Сначала выберите программу слева";
             ModulesEmptyText.Text = "Выберите программу, чтобы увидеть дополнения";
@@ -384,6 +395,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        SetModulesPanelVisibility(true);
         ModulesHeaderText.Text = $"Дополнения для {selectedProgram.DisplayName}";
         ModulesHintText.Text = "Устанавливайте, временно отключайте или удаляйте модули";
 
@@ -399,6 +411,28 @@ public partial class MainWindow : Window
         ModulesEmptyText.Visibility = _modules.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         ModulesGrid.SelectedIndex = _modules.Count > 0 ? 0 : -1;
         UpdateModuleActionButtons();
+    }
+
+    private void SetModulesPanelVisibility(bool visible)
+    {
+        ModulesPanel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        PackagesSplitter.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+
+        if (!visible)
+        {
+            ProgramsColumn.Width = new GridLength(1, GridUnitType.Star);
+            SplitterColumn.Width = new GridLength(0);
+            ModulesColumn.Width = new GridLength(0);
+            return;
+        }
+
+        SplitterColumn.Width = new GridLength(16);
+        if (!_modulesPanelOpened || ModulesColumn.Width.Value == 0)
+        {
+            ProgramsColumn.Width = new GridLength(1, GridUnitType.Star);
+            ModulesColumn.Width = new GridLength(1, GridUnitType.Star);
+            _modulesPanelOpened = true;
+        }
     }
 
     private PackageRow CreateRow(ReleasePackage package) => new(package, GetPackageStatus(package));

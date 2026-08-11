@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "0.1.9"
+    [string]$Version = "0.1.10"
 )
 
 $ErrorActionPreference = "Stop"
@@ -106,6 +106,28 @@ function Invoke-Element {
         throw "Element does not support InvokePattern: $($Element.Current.Name)"
     }
     ([Windows.Automation.InvokePattern]$patternObject).Invoke()
+}
+
+function Select-NamedItem {
+    param(
+        [Windows.Automation.AutomationElement]$Root,
+        [string]$Name
+    )
+
+    $element = Find-ElementByName -Root $Root -Name $Name
+    $walker = [Windows.Automation.TreeWalker]::ControlViewWalker
+    for ($depth = 0; $depth -lt 8 -and $element; $depth++) {
+        $patternObject = $null
+        if ($element.TryGetCurrentPattern(
+            [Windows.Automation.SelectionItemPattern]::Pattern,
+            [ref]$patternObject)) {
+            ([Windows.Automation.SelectionItemPattern]$patternObject).Select()
+            return
+        }
+        $element = $walker.GetParent($element)
+    }
+
+    throw "Selectable row not found for: $Name"
 }
 
 function Read-State {
@@ -218,8 +240,55 @@ public static class ModuleTestNative {
         throw "Launcher window did not appear."
     }
 
+    $transformObject = $null
+    if ($window.TryGetCurrentPattern(
+        [Windows.Automation.TransformPattern]::Pattern,
+        [ref]$transformObject)) {
+        $transformPattern = [Windows.Automation.TransformPattern]$transformObject
+        if ($transformPattern.Current.CanResize) {
+            $transformPattern.Resize(760, 560)
+            Start-Sleep -Milliseconds 300
+        }
+    }
+
+    $headerButtons = @(
+        Find-ButtonByName -Root $window -Name "Проверить обновление лаунчера"
+        Find-ButtonByName -Root $window -Name "Обновить список программ"
+        Find-ButtonByName -Root $window -Name "Открыть лог"
+    )
+    for ($index = 0; $index -lt ($headerButtons.Count - 1); $index++) {
+        $left = $headerButtons[$index].Current.BoundingRectangle
+        $right = $headerButtons[$index + 1].Current.BoundingRectangle
+        $verticalOverlap = $left.Top -lt $right.Bottom -and $right.Top -lt $left.Bottom
+        if ($verticalOverlap -and $left.Right -gt $right.Left) {
+            throw "Header buttons overlap at laptop window width."
+        }
+    }
+
     Find-ElementByName -Root $window -Name "Test Program" | Out-Null
+
+    $moduleNameCondition = New-Object Windows.Automation.PropertyCondition(
+        [Windows.Automation.AutomationElement]::NameProperty,
+        "Test Module")
+    $moduleBeforeSelection = $window.FindFirst(
+        [Windows.Automation.TreeScope]::Descendants,
+        $moduleNameCondition)
+    if ($moduleBeforeSelection) {
+        throw "Modules must stay hidden until the user selects a program."
+    }
+
+    Select-NamedItem -Root $window -Name "Test Program"
     Find-ElementByName -Root $window -Name "Test Module" | Out-Null
+
+    $splitterCondition = New-Object Windows.Automation.PropertyCondition(
+        [Windows.Automation.AutomationElement]::ControlTypeProperty,
+        [Windows.Automation.ControlType]::Thumb)
+    $splitter = $window.FindFirst(
+        [Windows.Automation.TreeScope]::Descendants,
+        $splitterCondition)
+    if (-not $splitter) {
+        throw "Resizable program/module splitter was not exposed after program selection."
+    }
 
     $installModuleButton = Find-ButtonByName -Root $window -Name "Установить"
     if ($installModuleButton.Current.IsEnabled) {
