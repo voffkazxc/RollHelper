@@ -40,6 +40,8 @@ internal sealed class ReleasePackage
     public required string Version { get; init; }
     public string? DisplayName { get; init; }
     public string? Type { get; init; }
+    public string? Extends { get; init; }
+    public List<PackageRequirement> Requires { get; init; } = [];
     public string? Url { get; init; }
     public string? Asset { get; init; }
     public string? Sha256 { get; init; }
@@ -51,13 +53,19 @@ internal sealed class ReleasePackage
     public override string ToString() => DisplayName ?? Id;
 }
 
+internal sealed class PackageRequirement
+{
+    public required string Id { get; init; }
+    public string? MinVersion { get; init; }
+}
+
 internal sealed class PackageManifest
 {
     public int Schema { get; init; } = 1;
     public required string Id { get; init; }
     public required string Version { get; init; }
     public string? DisplayName { get; init; }
-    public required PackageEntrypoint Entrypoint { get; init; }
+    public PackageEntrypoint? Entrypoint { get; init; }
 }
 
 internal sealed class PackageEntrypoint

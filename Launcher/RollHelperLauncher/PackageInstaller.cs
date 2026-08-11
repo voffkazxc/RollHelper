@@ -8,10 +8,12 @@ namespace RollHelperLauncher;
 internal sealed class PackageInstaller
 {
     private readonly ManifestClient _manifestClient;
+    private readonly PackageStateStore _stateStore;
 
-    public PackageInstaller(ManifestClient manifestClient)
+    public PackageInstaller(ManifestClient manifestClient, PackageStateStore stateStore)
     {
         _manifestClient = manifestClient;
+        _stateStore = stateStore;
     }
 
     public bool IsInstalled(ReleasePackage package)
@@ -30,6 +32,77 @@ internal sealed class PackageInstaller
             && Directory.EnumerateFiles(packageDirectory, "package.json", SearchOption.AllDirectories).Any();
     }
 
+    public bool IsEnabled(ReleasePackage package)
+    {
+        return IsInstalled(package) && _stateStore.IsEnabled(package.Id);
+    }
+
+    public IReadOnlyList<string> GetInstalledVersions(string packageId)
+    {
+        var packageDirectory = Path.Combine(
+            LauncherPaths.PackagesDirectory,
+            LauncherPaths.SafePathSegment(packageId));
+
+        if (!Directory.Exists(packageDirectory))
+        {
+            return [];
+        }
+
+        return Directory.EnumerateDirectories(packageDirectory)
+            .Where(directory => File.Exists(Path.Combine(directory, "package.json")))
+            .Select(Path.GetFileName)
+            .Where(version => !string.IsNullOrWhiteSpace(version))
+            .Cast<string>()
+            .ToList();
+    }
+
+    public IReadOnlyList<PackageRequirement> GetMissingRequirements(ReleasePackage package)
+    {
+        var requirements = package.Requires.ToList();
+        if (!string.IsNullOrWhiteSpace(package.Extends)
+            && requirements.All(item => !string.Equals(item.Id, package.Extends, StringComparison.OrdinalIgnoreCase)))
+        {
+            requirements.Add(new PackageRequirement { Id = package.Extends });
+        }
+
+        return requirements
+            .Where(requirement => !IsRequirementSatisfied(requirement))
+            .ToList();
+    }
+
+    public void SetEnabled(ReleasePackage package, bool enabled)
+    {
+        if (!IsInstalled(package))
+        {
+            throw new InvalidOperationException($"Package {package.Id} is not installed.");
+        }
+
+        _stateStore.SetEnabled(package.Id, enabled);
+        LauncherLog.Info($"Package {(enabled ? "enabled" : "disabled")}: {package.Id} {package.Version}");
+    }
+
+    public void Remove(ReleasePackage package)
+    {
+        var safePackageId = LauncherPaths.SafePathSegment(package.Id);
+        var packageDirectory = Path.GetFullPath(Path.Combine(LauncherPaths.PackagesDirectory, safePackageId));
+        var packagesRoot = Path.GetFullPath(LauncherPaths.PackagesDirectory)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+
+        if (!packageDirectory.StartsWith(packagesRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException($"Unsafe package removal path: {packageDirectory}");
+        }
+
+        if (Directory.Exists(packageDirectory))
+        {
+            Directory.Delete(packageDirectory, recursive: true);
+        }
+
+        _stateStore.Remove(package.Id);
+        LauncherLog.Info($"Package removed: {package.Id}");
+    }
+
     public async Task<string> InstallAsync(
         ReleasePackage package,
         IProgress<int>? progress,
@@ -43,6 +116,10 @@ internal sealed class PackageInstaller
         var installDirectory = LauncherPaths.GetPackageVersionDirectory(package.Id, package.Version);
         if (IsInstalled(package))
         {
+            if (_stateStore.Get(package.Id) is null)
+            {
+                _stateStore.MarkInstalled(package.Id, package.Version);
+            }
             LauncherLog.Info($"Package already installed: {package.Id} {package.Version}");
             return installDirectory;
         }
@@ -68,7 +145,10 @@ internal sealed class PackageInstaller
 
             var packageManifest = LoadPackageManifest(stagingDirectory);
             ValidatePackageIdentity(package, packageManifest);
-            ValidateEntrypoint(stagingDirectory, packageManifest.Entrypoint);
+            if (packageManifest.Entrypoint is not null)
+            {
+                ValidateEntrypoint(stagingDirectory, packageManifest.Entrypoint);
+            }
 
             if (Directory.Exists(installDirectory))
             {
@@ -76,6 +156,7 @@ internal sealed class PackageInstaller
             }
 
             Directory.Move(stagingDirectory, installDirectory);
+            _stateStore.MarkInstalled(package.Id, package.Version);
             LauncherLog.Info($"Package installed: {package.Id} {package.Version} -> {installDirectory}");
             return installDirectory;
         }
@@ -96,6 +177,11 @@ internal sealed class PackageInstaller
         var installDirectory = LauncherPaths.GetPackageVersionDirectory(package.Id, package.Version);
         var packageManifest = LoadPackageManifest(installDirectory);
         ValidatePackageIdentity(package, packageManifest);
+
+        if (packageManifest.Entrypoint is null)
+        {
+            throw new InvalidOperationException($"Package {package.Id} has no entrypoint and cannot be launched.");
+        }
 
         var entrypointPath = ResolveInsideDirectory(installDirectory, packageManifest.Entrypoint.File);
         var workingDirectory = string.IsNullOrWhiteSpace(packageManifest.Entrypoint.WorkingDirectory)
@@ -171,6 +257,17 @@ internal sealed class PackageInstaller
                 throw new InvalidDataException($"Package working directory not found: {entrypoint.WorkingDirectory}");
             }
         }
+    }
+
+    private bool IsRequirementSatisfied(PackageRequirement requirement)
+    {
+        var installedVersions = GetInstalledVersions(requirement.Id);
+        if (string.IsNullOrWhiteSpace(requirement.MinVersion))
+        {
+            return installedVersions.Count > 0;
+        }
+
+        return installedVersions.Any(version => PackageVersion.IsAtLeast(version, requirement.MinVersion));
     }
 
     private static async Task VerifySha256Async(string filePath, string expectedHash, CancellationToken cancellationToken)

@@ -104,6 +104,28 @@ internal sealed class ManifestClient : IDisposable
         LauncherPaths.SafePathSegment(package.Id);
         LauncherPaths.SafePathSegment(package.Version);
 
+        var packageType = package.Type?.Trim().ToLowerInvariant();
+        if (packageType == "module")
+        {
+            if (string.IsNullOrWhiteSpace(package.Extends))
+            {
+                throw new InvalidDataException($"Module {package.Id} has no extends package id.");
+            }
+
+            LauncherPaths.SafePathSegment(package.Extends);
+        }
+
+        foreach (var requirement in package.Requires)
+        {
+            LauncherPaths.SafePathSegment(requirement.Id);
+            if (!string.IsNullOrWhiteSpace(requirement.MinVersion)
+                && !PackageVersion.TryParse(requirement.MinVersion, out _))
+            {
+                throw new InvalidDataException(
+                    $"Package {package.Id} has invalid minimum version {requirement.MinVersion} for {requirement.Id}.");
+            }
+        }
+
         if (string.IsNullOrWhiteSpace(package.Url) && string.IsNullOrWhiteSpace(package.Asset))
         {
             throw new InvalidDataException($"Package {package.Id} has neither url nor asset.");

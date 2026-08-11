@@ -2,10 +2,10 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="RollHelper Launcher"
-        Width="860"
-        Height="560"
-        MinWidth="720"
-        MinHeight="460"
+        Width="980"
+        Height="640"
+        MinWidth="820"
+        MinHeight="520"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource WindowBackgroundBrush}">
     <Grid Margin="24">
@@ -55,39 +55,166 @@
             </StackPanel>
         </Grid>
 
-        <Border Grid.Row="2"
-                Background="{StaticResource SurfaceBrush}"
-                BorderBrush="#DDE3EA"
-                BorderThickness="1"
-                CornerRadius="8"
-                Padding="1">
-            <DataGrid x:Name="PackagesGrid"
-                      AutoGenerateColumns="False"
-                      CanUserAddRows="False"
-                      CanUserDeleteRows="False"
-                      CanUserReorderColumns="False"
-                      CanUserResizeRows="False"
-                      HeadersVisibility="Column"
-                      IsReadOnly="True"
-                      SelectionMode="Single"
-                      SelectionUnit="FullRow"
-                      GridLinesVisibility="Horizontal"
-                      BorderThickness="0"
-                      RowHeaderWidth="0"
-                      RowHeight="42"
-                      ColumnHeaderHeight="38"
-                      FontFamily="Segoe UI"
-                      FontSize="14"
-                      SelectionChanged="PackagesGrid_SelectionChanged"
-                      MouseDoubleClick="PackagesGrid_MouseDoubleClick">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="Название" Binding="{Binding DisplayName}" Width="*" />
-                    <DataGridTextColumn Header="Категория" Binding="{Binding Type}" Width="150" />
-                    <DataGridTextColumn Header="Версия" Binding="{Binding Version}" Width="130" />
-                    <DataGridTextColumn Header="Состояние" Binding="{Binding Status}" Width="180" />
-                </DataGrid.Columns>
-            </DataGrid>
-        </Border>
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="11*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="10*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="#DDE3EA"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="16">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="10" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Text="Программы"
+                                   FontSize="18"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Margin="0,3,0,0"
+                                   Text="Выберите программу, чтобы увидеть её дополнения"
+                                   Foreground="{StaticResource SecondaryTextBrush}" />
+                    </StackPanel>
+
+                    <DataGrid x:Name="ProgramsGrid"
+                              Grid.Row="2"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              CanUserReorderColumns="False"
+                              CanUserResizeRows="False"
+                              HeadersVisibility="Column"
+                              IsReadOnly="True"
+                              SelectionMode="Single"
+                              SelectionUnit="FullRow"
+                              GridLinesVisibility="Horizontal"
+                              BorderThickness="0"
+                              RowHeaderWidth="0"
+                              RowHeight="42"
+                              ColumnHeaderHeight="38"
+                              FontFamily="Segoe UI"
+                              FontSize="14"
+                              SelectionChanged="ProgramsGrid_SelectionChanged"
+                              MouseDoubleClick="ProgramsGrid_MouseDoubleClick">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Название" Binding="{Binding DisplayName}" Width="*" />
+                            <DataGridTextColumn Header="Версия" Binding="{Binding Version}" Width="85" />
+                            <DataGridTextColumn Header="Состояние" Binding="{Binding Status}" Width="140" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="2"
+                    Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="#DDE3EA"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="16">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="10" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="12" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel>
+                        <TextBlock x:Name="ModulesHeaderText"
+                                   Text="Дополнения"
+                                   FontSize="18"
+                                   FontWeight="SemiBold" />
+                        <TextBlock x:Name="ModulesHintText"
+                                   Margin="0,3,0,0"
+                                   Text="Сначала выберите программу слева"
+                                   Foreground="{StaticResource SecondaryTextBrush}" />
+                    </StackPanel>
+
+                    <Grid Grid.Row="2">
+                        <DataGrid x:Name="ModulesGrid"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  CanUserReorderColumns="False"
+                                  CanUserResizeRows="False"
+                                  HeadersVisibility="Column"
+                                  IsReadOnly="True"
+                                  SelectionMode="Single"
+                                  SelectionUnit="FullRow"
+                                  GridLinesVisibility="Horizontal"
+                                  BorderThickness="0"
+                                  RowHeaderWidth="0"
+                                  RowHeight="42"
+                                  ColumnHeaderHeight="38"
+                                  FontFamily="Segoe UI"
+                                  FontSize="14"
+                                  SelectionChanged="ModulesGrid_SelectionChanged"
+                                  MouseDoubleClick="ModulesGrid_MouseDoubleClick">
+                            <DataGrid.ContextMenu>
+                                <ContextMenu Opened="ModuleContextMenu_Opened">
+                                    <MenuItem x:Name="ContextInstallModuleItem"
+                                              Header="Установить"
+                                              Click="ContextInstallModuleItem_Click" />
+                                    <MenuItem x:Name="ContextDisableModuleItem"
+                                              Header="Отключить"
+                                              Click="ContextDisableModuleItem_Click" />
+                                    <Separator />
+                                    <MenuItem x:Name="ContextRemoveModuleItem"
+                                              Header="Удалить"
+                                              Click="ContextRemoveModuleItem_Click" />
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Название" Binding="{Binding DisplayName}" Width="*" />
+                                <DataGridTextColumn Header="Версия" Binding="{Binding Version}" Width="80" />
+                                <DataGridTextColumn Header="Состояние" Binding="{Binding Status}" Width="130" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock x:Name="ModulesEmptyText"
+                                   Text="Для этой программы пока нет дополнений"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   Foreground="{StaticResource SecondaryTextBrush}" />
+                    </Grid>
+
+                    <Grid Grid.Row="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="InstallEnableModuleButton"
+                                Content="Установить"
+                                IsEnabled="False"
+                                Click="InstallEnableModuleButton_Click" />
+                        <Button x:Name="DisableModuleButton"
+                                Grid.Column="2"
+                                Content="Отключить"
+                                IsEnabled="False"
+                                Click="DisableModuleButton_Click" />
+                        <Button x:Name="RemoveModuleButton"
+                                Grid.Column="4"
+                                Content="Удалить"
+                                IsEnabled="False"
+                                Click="RemoveModuleButton_Click" />
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
 
         <Grid Grid.Row="4">
             <Grid.ColumnDefinitions>
@@ -98,7 +225,7 @@
 
             <StackPanel VerticalAlignment="Center">
                 <TextBlock x:Name="StatusText"
-                           Text="Выберите программу или дополнение"
+                           Text="Выберите программу"
                            TextTrimming="CharacterEllipsis"
                            Foreground="{StaticResource SecondaryTextBrush}" />
                 <ProgressBar x:Name="DownloadProgress"
@@ -111,7 +238,7 @@
             <Button x:Name="InstallAndRunButton"
                     Grid.Column="2"
                     MinWidth="230"
-                    Content="Выберите компонент"
+                    Content="Выберите программу"
                     IsEnabled="False"
                     Click="InstallAndRunButton_Click" />
         </Grid>

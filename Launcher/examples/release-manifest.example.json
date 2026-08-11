@@ -14,6 +14,21 @@
       "version": "0.1.0",
       "asset": "brand-rollhouse-0.1.0.zip",
       "sha256": "PUT_REAL_SHA256_HERE"
+    },
+    {
+      "id": "rollhouse-calling",
+      "type": "module",
+      "displayName": "Автообзвон",
+      "version": "1.0.0",
+      "extends": "rollhouse",
+      "requires": [
+        {
+          "id": "rollhouse",
+          "minVersion": "0.1.0"
+        }
+      ],
+      "asset": "module-rollhouse-calling-1.0.0.zip",
+      "sha256": "PUT_REAL_SHA256_HERE"
     }
   ]
 }

@@ -2,14 +2,18 @@ namespace RollHelperLauncher;
 
 internal static class LauncherPaths
 {
-    public static string ProgramRoot { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Programs",
-        "RollHelper");
+    public static string ProgramRoot { get; } = ResolveRoot(
+        "ROLLHELPER_PROGRAM_ROOT",
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Programs",
+            "RollHelper"));
 
-    public static string UserRoot { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "RollHelper");
+    public static string UserRoot { get; } = ResolveRoot(
+        "ROLLHELPER_USER_ROOT",
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "RollHelper"));
 
     public static string PackagesDirectory { get; } = Path.Combine(ProgramRoot, "Packages");
     public static string CacheDirectory { get; } = Path.Combine(ProgramRoot, "Cache");
@@ -17,6 +21,7 @@ internal static class LauncherPaths
     public static string LogsDirectory { get; } = Path.Combine(UserRoot, "Logs");
     public static string LogFile { get; } = Path.Combine(LogsDirectory, "launcher.log");
     public static string ConfigFile { get; } = Path.Combine(AppContext.BaseDirectory, "launcher.config.json");
+    public static string PackageStateFile { get; } = Path.Combine(StateDirectory, "packages.json");
 
     public static void EnsureDirectories()
     {
@@ -50,5 +55,11 @@ internal static class LauncherPaths
         }
 
         return value;
+    }
+
+    private static string ResolveRoot(string environmentVariable, string fallback)
+    {
+        var configured = Environment.GetEnvironmentVariable(environmentVariable);
+        return Path.GetFullPath(string.IsNullOrWhiteSpace(configured) ? fallback : configured);
     }
 }

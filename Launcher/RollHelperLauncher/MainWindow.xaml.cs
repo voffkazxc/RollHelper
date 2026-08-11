@@ -1,14 +1,18 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 
 namespace RollHelperLauncher;
 
 public partial class MainWindow : Window
 {
-    private readonly ObservableCollection<PackageRow> _packages = [];
+    private readonly ObservableCollection<PackageRow> _programs = [];
+    private readonly ObservableCollection<PackageRow> _modules = [];
+    private readonly List<ReleasePackage> _manifestPackages = [];
     private readonly ManifestClient _manifestClient = new();
+    private readonly PackageStateStore _packageStateStore = new();
     private readonly PackageInstaller _packageInstaller;
     private readonly LauncherUpdater _launcherUpdater;
     private readonly LauncherConfig _config;
@@ -19,10 +23,11 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        _packageInstaller = new PackageInstaller(_manifestClient);
+        _packageInstaller = new PackageInstaller(_manifestClient, _packageStateStore);
         _launcherUpdater = new LauncherUpdater(_manifestClient);
         _config = LauncherConfig.Load();
-        PackagesGrid.ItemsSource = _packages;
+        ProgramsGrid.ItemsSource = _programs;
+        ModulesGrid.ItemsSource = _modules;
         LauncherVersionText.Text = $"• версия {_launcherUpdater.CurrentVersion}";
 
         Loaded += async (_, _) => await RefreshManifestAsync();
@@ -33,30 +38,59 @@ public partial class MainWindow : Window
         };
     }
 
-    private async void RefreshButton_Click(object sender, RoutedEventArgs e)
-    {
-        await RefreshManifestAsync();
-    }
+    private async void RefreshButton_Click(object sender, RoutedEventArgs e) => await RefreshManifestAsync();
 
-    private async void InstallAndRunButton_Click(object sender, RoutedEventArgs e)
-    {
-        await InstallAndRunSelectedAsync();
-    }
+    private async void InstallAndRunButton_Click(object sender, RoutedEventArgs e) => await InstallAndRunSelectedProgramAsync();
 
-    private async void UpdateLauncherButton_Click(object sender, RoutedEventArgs e)
-    {
-        await UpdateLauncherAsync();
-    }
+    private async void UpdateLauncherButton_Click(object sender, RoutedEventArgs e) => await UpdateLauncherAsync();
 
-    private async void PackagesGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-    {
-        await InstallAndRunSelectedAsync();
-    }
+    private async void ProgramsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e) => await InstallAndRunSelectedProgramAsync();
 
-    private void PackagesGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    private async void ModulesGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e) => await InstallOrEnableSelectedModuleAsync();
+
+    private async void InstallEnableModuleButton_Click(object sender, RoutedEventArgs e) => await InstallOrEnableSelectedModuleAsync();
+
+    private void DisableModuleButton_Click(object sender, RoutedEventArgs e) => DisableSelectedModule();
+
+    private void RemoveModuleButton_Click(object sender, RoutedEventArgs e) => RemoveSelectedModule();
+
+    private async void ContextInstallModuleItem_Click(object sender, RoutedEventArgs e) => await InstallOrEnableSelectedModuleAsync();
+
+    private void ContextDisableModuleItem_Click(object sender, RoutedEventArgs e) => DisableSelectedModule();
+
+    private void ContextRemoveModuleItem_Click(object sender, RoutedEventArgs e) => RemoveSelectedModule();
+
+    private void ProgramsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        UpdateActionButton();
+        RefreshModulesForSelectedProgram();
+        UpdateProgramActionButton();
         UpdateSelectionStatus();
+    }
+
+    private void ModulesGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        UpdateModuleActionButtons();
+        UpdateSelectionStatus();
+    }
+
+    private void ModuleContextMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        if (ModulesGrid.SelectedItem is not PackageRow selectedRow)
+        {
+            ContextInstallModuleItem.IsEnabled = false;
+            ContextDisableModuleItem.IsEnabled = false;
+            ContextRemoveModuleItem.IsEnabled = false;
+            return;
+        }
+
+        var installed = _packageInstaller.IsInstalled(selectedRow.Package);
+        var enabled = _packageInstaller.IsEnabled(selectedRow.Package);
+        var missingRequirements = _packageInstaller.GetMissingRequirements(selectedRow.Package);
+
+        ContextInstallModuleItem.Header = installed && !enabled ? "Включить" : "Установить";
+        ContextInstallModuleItem.IsEnabled = (!installed || !enabled) && missingRequirements.Count == 0;
+        ContextDisableModuleItem.IsEnabled = installed && enabled;
+        ContextRemoveModuleItem.IsEnabled = _packageInstaller.HasInstalledVersion(selectedRow.Package.Id);
     }
 
     private void OpenLogButton_Click(object sender, RoutedEventArgs e)
@@ -78,7 +112,7 @@ public partial class MainWindow : Window
 
     private async Task RefreshManifestAsync()
     {
-        if (!BeginOperation("Загрузка списка пакетов..."))
+        if (!BeginOperation("Загрузка списка программ..."))
         {
             return;
         }
@@ -91,24 +125,25 @@ public partial class MainWindow : Window
                 ? manifest.Launcher
                 : null;
 
-            _packages.Clear();
-            foreach (var package in manifest.Packages.OrderBy(item => item.DisplayName ?? item.Id))
+            _manifestPackages.Clear();
+            _manifestPackages.AddRange(manifest.Packages);
+            _programs.Clear();
+
+            foreach (var package in _manifestPackages
+                         .Where(package => !IsModule(package))
+                         .OrderBy(package => package.DisplayName ?? package.Id))
             {
-                var status = _packageInstaller.IsInstalled(package)
-                    ? "Установлен"
-                    : _packageInstaller.HasInstalledVersion(package.Id)
-                        ? "Доступно обновление"
-                        : "Доступен";
-                _packages.Add(new PackageRow(
-                    package,
-                    status));
+                _programs.Add(CreateRow(package));
             }
 
-            PackagesGrid.SelectedIndex = -1;
-            SetStatus(_packages.Count == 0
-                ? "Сейчас нет доступных программ и дополнений"
-                : "Выберите программу или дополнение");
-            LauncherLog.Info("Package list displayed");
+            ProgramsGrid.SelectedIndex = _programs.Count > 0 ? 0 : -1;
+            if (_programs.Count == 0)
+            {
+                RefreshModulesForSelectedProgram();
+                SetStatus("Сейчас нет доступных программ");
+            }
+
+            LauncherLog.Info("Program and module lists displayed");
         }
         catch (OperationCanceledException)
         {
@@ -117,24 +152,25 @@ public partial class MainWindow : Window
         }
         catch (Exception exception)
         {
-            ShowOperationError("Не удалось загрузить список пакетов", exception);
+            ShowOperationError("Не удалось загрузить список программ", exception);
         }
         finally
         {
             EndOperation();
-            UpdateActionButton();
+            UpdateProgramActionButton();
+            UpdateModuleActionButtons();
         }
     }
 
-    private async Task InstallAndRunSelectedAsync()
+    private async Task InstallAndRunSelectedProgramAsync()
     {
-        if (PackagesGrid.SelectedItem is not PackageRow selectedRow)
+        if (ProgramsGrid.SelectedItem is not PackageRow selectedRow)
         {
             return;
         }
 
         var package = selectedRow.Package;
-        if (!BeginOperation($"Подготовка пакета {selectedRow.DisplayName}..."))
+        if (!BeginOperation($"Подготовка {selectedRow.DisplayName}..."))
         {
             return;
         }
@@ -147,10 +183,8 @@ public partial class MainWindow : Window
 
             SetStatus($"Запуск {selectedRow.DisplayName}...");
             _packageInstaller.Launch(package);
-
-            selectedRow.Status = "Запущен";
-            PackagesGrid.Items.Refresh();
-            SetStatus($"{selectedRow.DisplayName} запущен");
+            selectedRow.Status = "Запущено";
+            SetStatus($"{selectedRow.DisplayName} запущено");
         }
         catch (OperationCanceledException)
         {
@@ -164,7 +198,120 @@ public partial class MainWindow : Window
         finally
         {
             EndOperation();
-            UpdateActionButton();
+            RefreshAllStatuses();
+        }
+    }
+
+    private async Task InstallOrEnableSelectedModuleAsync()
+    {
+        if (ModulesGrid.SelectedItem is not PackageRow selectedRow)
+        {
+            return;
+        }
+
+        var package = selectedRow.Package;
+        var missingRequirements = _packageInstaller.GetMissingRequirements(package);
+        if (missingRequirements.Count > 0)
+        {
+            SetStatus(BuildRequirementMessage(missingRequirements));
+            return;
+        }
+
+        if (_packageInstaller.IsInstalled(package) && !_packageInstaller.IsEnabled(package))
+        {
+            try
+            {
+                _packageInstaller.SetEnabled(package, true);
+                SetStatus($"Дополнение «{selectedRow.DisplayName}» включено");
+                RefreshAllStatuses();
+            }
+            catch (Exception exception)
+            {
+                ShowOperationError($"Не удалось включить {selectedRow.DisplayName}", exception);
+            }
+
+            return;
+        }
+
+        if (!BeginOperation($"Установка дополнения {selectedRow.DisplayName}..."))
+        {
+            return;
+        }
+
+        try
+        {
+            var progress = new Progress<int>(value => DownloadProgress.Value = value);
+            await _packageInstaller.InstallAsync(package, progress, _operationCancellation!.Token);
+            _packageInstaller.SetEnabled(package, true);
+            SetStatus($"Дополнение «{selectedRow.DisplayName}» установлено и включено");
+        }
+        catch (OperationCanceledException)
+        {
+            SetStatus("Установка дополнения отменена");
+            LauncherLog.Warning($"Module installation cancelled: {package.Id}");
+        }
+        catch (Exception exception)
+        {
+            ShowOperationError($"Не удалось установить {selectedRow.DisplayName}", exception);
+        }
+        finally
+        {
+            EndOperation();
+            RefreshAllStatuses();
+        }
+    }
+
+    private void DisableSelectedModule()
+    {
+        if (ModulesGrid.SelectedItem is not PackageRow selectedRow)
+        {
+            return;
+        }
+
+        try
+        {
+            _packageInstaller.SetEnabled(selectedRow.Package, false);
+            SetStatus($"Дополнение «{selectedRow.DisplayName}» отключено");
+            RefreshAllStatuses();
+        }
+        catch (Exception exception)
+        {
+            ShowOperationError($"Не удалось отключить {selectedRow.DisplayName}", exception);
+        }
+    }
+
+    private void RemoveSelectedModule()
+    {
+        if (ModulesGrid.SelectedItem is not PackageRow selectedRow)
+        {
+            LauncherLog.Warning("Remove module requested without a selected module");
+            return;
+        }
+
+        LauncherLog.Info($"Remove module requested: {selectedRow.Package.Id}");
+
+        var answer = MessageBox.Show(
+            this,
+            $"Удалить дополнение «{selectedRow.DisplayName}» со всеми установленными версиями?",
+            "Удаление дополнения",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question,
+            MessageBoxResult.No);
+
+        if (answer != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            _packageInstaller.Remove(selectedRow.Package);
+            SetStatus($"Дополнение «{selectedRow.DisplayName}» удалено");
+            RefreshAllStatuses();
+        }
+        catch (Exception exception)
+        {
+            ShowOperationError($"Не удалось удалить {selectedRow.DisplayName}", exception);
         }
     }
 
@@ -180,10 +327,7 @@ public partial class MainWindow : Window
         {
             var progress = new Progress<int>(value => DownloadProgress.Value = value);
             SetStatus($"Скачивание лаунчера {release.Version}...");
-            await _launcherUpdater.PrepareAndRestartAsync(
-                release,
-                progress,
-                _operationCancellation!.Token);
+            await _launcherUpdater.PrepareAndRestartAsync(release, progress, _operationCancellation!.Token);
 
             SetStatus("Обновление готово. Перезапускаю лаунчер...");
             await Task.Delay(300);
@@ -201,8 +345,89 @@ public partial class MainWindow : Window
         finally
         {
             EndOperation();
-            UpdateActionButton();
+            UpdateProgramActionButton();
+            UpdateModuleActionButtons();
         }
+    }
+
+    private void RefreshModulesForSelectedProgram()
+    {
+        _modules.Clear();
+
+        if (ProgramsGrid.SelectedItem is not PackageRow selectedProgram)
+        {
+            ModulesHeaderText.Text = "Дополнения";
+            ModulesHintText.Text = "Сначала выберите программу слева";
+            ModulesEmptyText.Text = "Выберите программу, чтобы увидеть дополнения";
+            ModulesEmptyText.Visibility = Visibility.Visible;
+            UpdateModuleActionButtons();
+            return;
+        }
+
+        ModulesHeaderText.Text = $"Дополнения для {selectedProgram.DisplayName}";
+        ModulesHintText.Text = "Устанавливайте, временно отключайте или удаляйте модули";
+
+        foreach (var package in _manifestPackages
+                     .Where(package => IsModule(package)
+                         && string.Equals(package.Extends, selectedProgram.Package.Id, StringComparison.OrdinalIgnoreCase))
+                     .OrderBy(package => package.DisplayName ?? package.Id))
+        {
+            _modules.Add(CreateRow(package));
+        }
+
+        ModulesEmptyText.Text = "Для этой программы пока нет дополнений";
+        ModulesEmptyText.Visibility = _modules.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        ModulesGrid.SelectedIndex = _modules.Count > 0 ? 0 : -1;
+        UpdateModuleActionButtons();
+    }
+
+    private PackageRow CreateRow(ReleasePackage package) => new(package, GetPackageStatus(package));
+
+    private string GetPackageStatus(ReleasePackage package)
+    {
+        if (IsModule(package))
+        {
+            if (_packageInstaller.IsInstalled(package))
+            {
+                return _packageInstaller.IsEnabled(package) ? "Включено" : "Отключено";
+            }
+
+            if (_packageInstaller.HasInstalledVersion(package.Id))
+            {
+                return "Доступно обновление";
+            }
+
+            return _packageInstaller.GetMissingRequirements(package).Count > 0
+                ? "Нужна программа"
+                : "Доступно";
+        }
+
+        return _packageInstaller.IsInstalled(package)
+            ? "Установлено"
+            : _packageInstaller.HasInstalledVersion(package.Id)
+                ? "Доступно обновление"
+                : "Доступно";
+    }
+
+    private void RefreshAllStatuses()
+    {
+        foreach (var row in _programs)
+        {
+            row.Status = GetPackageStatus(row.Package);
+        }
+
+        var selectedModuleId = (ModulesGrid.SelectedItem as PackageRow)?.Package.Id;
+        RefreshModulesForSelectedProgram();
+        if (!string.IsNullOrWhiteSpace(selectedModuleId))
+        {
+            ModulesGrid.SelectedItem = _modules.FirstOrDefault(row =>
+                string.Equals(row.Package.Id, selectedModuleId, StringComparison.OrdinalIgnoreCase));
+        }
+
+        ProgramsGrid.Items.Refresh();
+        ModulesGrid.Items.Refresh();
+        UpdateProgramActionButton();
+        UpdateModuleActionButtons();
     }
 
     private bool BeginOperation(string status)
@@ -216,7 +441,11 @@ public partial class MainWindow : Window
         RefreshButton.IsEnabled = false;
         UpdateLauncherButton.IsEnabled = false;
         InstallAndRunButton.IsEnabled = false;
-        PackagesGrid.IsEnabled = false;
+        InstallEnableModuleButton.IsEnabled = false;
+        DisableModuleButton.IsEnabled = false;
+        RemoveModuleButton.IsEnabled = false;
+        ProgramsGrid.IsEnabled = false;
+        ModulesGrid.IsEnabled = false;
         DownloadProgress.Value = 0;
         SetStatus(status);
         return true;
@@ -227,16 +456,17 @@ public partial class MainWindow : Window
         _operationCancellation?.Dispose();
         _operationCancellation = null;
         RefreshButton.IsEnabled = true;
-        PackagesGrid.IsEnabled = true;
+        ProgramsGrid.IsEnabled = true;
+        ModulesGrid.IsEnabled = true;
         DownloadProgress.Value = 0;
         UpdateLauncherButtonState();
     }
 
-    private void UpdateActionButton()
+    private void UpdateProgramActionButton()
     {
-        if (_operationCancellation is not null || PackagesGrid.SelectedItem is not PackageRow selectedRow)
+        if (_operationCancellation is not null || ProgramsGrid.SelectedItem is not PackageRow selectedRow)
         {
-            InstallAndRunButton.Content = "Выберите компонент";
+            InstallAndRunButton.Content = "Выберите программу";
             InstallAndRunButton.IsEnabled = false;
             return;
         }
@@ -249,6 +479,27 @@ public partial class MainWindow : Window
         InstallAndRunButton.IsEnabled = true;
     }
 
+    private void UpdateModuleActionButtons()
+    {
+        if (_operationCancellation is not null || ModulesGrid.SelectedItem is not PackageRow selectedRow)
+        {
+            InstallEnableModuleButton.Content = "Установить";
+            InstallEnableModuleButton.IsEnabled = false;
+            DisableModuleButton.IsEnabled = false;
+            RemoveModuleButton.IsEnabled = false;
+            return;
+        }
+
+        var installed = _packageInstaller.IsInstalled(selectedRow.Package);
+        var enabled = _packageInstaller.IsEnabled(selectedRow.Package);
+        var missingRequirements = _packageInstaller.GetMissingRequirements(selectedRow.Package);
+
+        InstallEnableModuleButton.Content = installed && !enabled ? "Включить" : "Установить";
+        InstallEnableModuleButton.IsEnabled = (!installed || !enabled) && missingRequirements.Count == 0;
+        DisableModuleButton.IsEnabled = installed && enabled;
+        RemoveModuleButton.IsEnabled = _packageInstaller.HasInstalledVersion(selectedRow.Package.Id);
+    }
+
     private void UpdateSelectionStatus()
     {
         if (_operationCancellation is not null)
@@ -256,32 +507,54 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (PackagesGrid.SelectedItem is PackageRow selectedRow)
+        if (ModulesGrid.IsKeyboardFocusWithin && ModulesGrid.SelectedItem is PackageRow selectedModule)
         {
-            SetStatus($"{selectedRow.DisplayName} • версия {selectedRow.Version} • {selectedRow.Status.ToLowerInvariant()}");
+            var missingRequirements = _packageInstaller.GetMissingRequirements(selectedModule.Package);
+            SetStatus(missingRequirements.Count > 0
+                ? BuildRequirementMessage(missingRequirements)
+                : $"{selectedModule.DisplayName} • версия {selectedModule.Version} • {selectedModule.Status.ToLowerInvariant()}");
             return;
         }
 
-        SetStatus(_packages.Count == 0
-            ? "Сейчас нет доступных программ и дополнений"
-            : "Выберите программу или дополнение");
+        if (ProgramsGrid.SelectedItem is PackageRow selectedProgram)
+        {
+            SetStatus($"{selectedProgram.DisplayName} • версия {selectedProgram.Version} • {selectedProgram.Status.ToLowerInvariant()}");
+            return;
+        }
+
+        SetStatus(_programs.Count == 0 ? "Сейчас нет доступных программ" : "Выберите программу");
+    }
+
+    private string BuildRequirementMessage(IReadOnlyList<PackageRequirement> requirements)
+    {
+        var descriptions = requirements.Select(requirement =>
+        {
+            var packageName = _manifestPackages.FirstOrDefault(package =>
+                string.Equals(package.Id, requirement.Id, StringComparison.OrdinalIgnoreCase))?.DisplayName
+                ?? requirement.Id;
+            return string.IsNullOrWhiteSpace(requirement.MinVersion)
+                ? packageName
+                : $"{packageName} {requirement.MinVersion} или новее";
+        });
+
+        return $"Сначала установите: {string.Join(", ", descriptions)}";
     }
 
     private void UpdateLauncherButtonState()
     {
-        UpdateLauncherButton.Visibility = _launcherUpdate is null
-            ? Visibility.Collapsed
-            : Visibility.Visible;
+        UpdateLauncherButton.Visibility = _launcherUpdate is null ? Visibility.Collapsed : Visibility.Visible;
         UpdateLauncherButton.IsEnabled = _operationCancellation is null && _launcherUpdate is not null;
         UpdateLauncherButton.Content = _launcherUpdate is null
             ? "Обновить лаунчер"
             : $"Обновить до {_launcherUpdate.Version}";
     }
 
-    private void SetStatus(string status)
+    private static bool IsModule(ReleasePackage package)
     {
-        StatusText.Text = status;
+        return string.Equals(package.Type, "module", StringComparison.OrdinalIgnoreCase);
     }
+
+    private void SetStatus(string status) => StatusText.Text = status;
 
     private void ShowOperationError(string title, Exception exception)
     {
@@ -305,13 +578,6 @@ public partial class MainWindow : Window
 
         public ReleasePackage Package { get; }
         public string DisplayName => Package.DisplayName ?? Package.Id;
-        public string Type => Package.Type?.ToLowerInvariant() switch
-        {
-            "brand" => "Программа",
-            "module" => "Дополнение",
-            "tool" => "Инструмент",
-            _ => "Компонент"
-        };
         public string Version => Package.Version;
         public string Status { get; set; }
     }
