@@ -137,7 +137,9 @@ $packageDescription = @{
         workingDirectory = "."
     }
 }
-$packageDescription | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $packageRoot "package.json") -Encoding UTF8
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+$packageJson = $packageDescription | ConvertTo-Json -Depth 4
+[IO.File]::WriteAllText((Join-Path $packageRoot "package.json"), $packageJson, $utf8NoBom)
 
 $assetName = "brand-rollhouse-$Version.zip"
 $assetPath = Join-Path $releaseRoot $assetName
@@ -159,7 +161,8 @@ $releaseManifest = @{
     )
 }
 $manifestPath = Join-Path $releaseRoot "release-manifest.json"
-$releaseManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+$manifestJson = $releaseManifest | ConvertTo-Json -Depth 5
+[IO.File]::WriteAllText($manifestPath, $manifestJson, $utf8NoBom)
 
 Remove-Item -LiteralPath $pythonArchive -Force
 
