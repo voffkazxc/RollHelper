@@ -1,6 +1,6 @@
 # Архитектурная декомпозиция RollHelper
 
-Статус документа: карта текущих зависимостей и план безопасного разделения. Рабочий код пока не переносится и не удаляется.
+Статус документа: карта зависимостей и целевой план безопасного разделения. Часть инфраструктуры уже реализована, но целевая структура из раздела 10 ещё не является фактической структурой проекта. Для текущих entrypoint и версий сначала читать `docs/CODEMAP.md`, затем `STATUS.md`.
 
 ## 1. Зачем нужна декомпозиция
 
@@ -34,7 +34,7 @@
 - Использует AutoHotkey v1.1.
 - Подключает `lib/UIA_Interface.ahk`.
 - Рабочая конфигурация бренда: `brands/rollhouse/RkConfig.ini`.
-- Если в `settings.ini` выбран RollClub, запускает `engine_rollclub.ahk` и завершает текущий процесс.
+- Жёстко работает как RollHouse. Переключение бренда удалено из рабочего пульта; RollClub запускается отдельным entrypoint.
 - Запускает или контролирует локальный HTTP-сервер на `127.0.0.1:5000`.
 
 ### RollClub
@@ -55,15 +55,14 @@
 - Требования сервера перечислены в `../server/requirements.txt`: Flask, Flask-Cors и `uiautomation`.
 - База RollHouse находится ещё в одном внешнем расположении: `../data/rollhouse.db`.
 
-Это главный риск будущего дистрибутива: Git-репозиторий RollHelper сам по себе сейчас не содержит весь обязательный runtime.
+В исходной рабочей копии это остаётся внешней зависимостью. Релизный RollHouse ZIP уже собирает сервер, embedded Python и AutoHotkey v1 внутрь пакета через `packaging/build-rollhouse-mvp.ps1`, поэтому на чистом операторском ПК отдельная установка Python и AutoHotkey не требуется.
 
 ## 3. Текущий граф зависимостей
 
 ```mermaid
 flowchart TD
-    Start["Запуск RollHelper"] --> Main["main.ahk"]
-    Main -->|brand=rollhouse| RH["RollHouse внутри main.ahk"]
-    Main -->|brand=rollclub| RC["engine_rollclub.ahk"]
+    StartRH["Запуск RollHouse"] --> RH["main.ahk"]
+    StartRC["Запуск RollClub"] --> RC["engine_rollclub.ahk"]
 
     RH --> UIABase["lib/UIA_Interface.ahk"]
     RC --> IikoUI["lib/IikoUI.ahk"]
@@ -87,7 +86,7 @@ flowchart TD
 
     RH --> Calls["tools/call_listener/*"]
     Calls --> PyAudio["Python + audio/ASR packages + models"]
-    RH --> Report["F5: Syrve + Excel + Telegram"]
+    RH --> Report["F5: подключаемый UIA-отчёт"]
     RH --> Duty["Ctrl+F4: duty mode"]
     RC --> Duty
 ```
@@ -264,11 +263,11 @@ flowchart TD
 
 Модуль не имеет права включаться сам. Повторное нажатие `Ctrl+F4` выключает его немедленно. После открытия заказа модуль возвращается в `Idle` и не запускается снова без оператора.
 
-### `modules/reports.shift`
+### `modules/rollhouse-report-load`
 
-Текущий F5 зависит от Syrve, координат отчёта, Microsoft Excel и Telegram Desktop. Это отдельный рабочий модуль, а не часть обработки заказа.
+Отчёт F5 уже отделён от основного RollHouse в подключаемый пакет. Модуль напрямую находит через UIA таблицу Syrve `gridDeliveries`, копирует её штатной командой таблицы, группирует строки локально и показывает результат в окне с кнопкой копирования.
 
-На первом переносе сохраняются существующие шаги и F5. Меняется только местоположение кода и подключение через registry. Переписывать отчёт одновременно с переносом нельзя.
+Excel, Telegram, Python, сервер, API-ключи и координатная калибровка модулю не нужны. `ModuleRegistry` разрешает F5 только когда пакет `rollhouse-report-load` установлен и включён лаунчером.
 
 ### `modules/calling`
 
@@ -352,7 +351,7 @@ UIA-сканер можно оставить доступным из настр�
   brands\rollhouse\<version>\
   brands\rollclub\<version>\
   modules\duty\<version>\
-  modules\reports.shift\<version>\
+  modules\rollhouse-report-load\<version>\
   modules\calling\<version>\
 ```
 
@@ -420,7 +419,7 @@ RollHelper/
       defaults/
   modules/
     duty/
-    reports.shift/
+    rollhouse-report-load/
     calling/
     ocr/
     crm/
@@ -488,12 +487,12 @@ RollHelper/
 3. Перенести OCR в `modules/ocr` без изменения API.
 4. Снова выполнить smoke-матрицу RollClub.
 
-### Этап 4. Вынести отчёт F5
+### Этап 4. Вынести отчёт F5 — реализовано
 
-1. Перенести код без изменения последовательности действий.
-2. Оставить F5 wrapper в прежнем месте.
-3. Проверить Excel и Telegram на реальном отчёте.
-4. Только после этого улучшать координатные действия.
+1. F5 оставлен тонким wrapper в `main.ahk`.
+2. Реализация вынесена в пакет `rollhouse-report-load`.
+3. Координаты, Excel и Telegram заменены прямым поиском `gridDeliveries` через UIA.
+4. Осталась ручная сверка результата с открытой таблицей доставок Syrve.
 
 ### Этап 5. Вынести автообзвон
 
@@ -541,12 +540,12 @@ RollHelper/
 
 ## 13. Решение на текущий момент
 
-Сейчас нельзя безопасно «просто вырезать F2», `Ctrl+F4`, OCR или F5. Сначала нужно внедрить две небольшие инфраструктурные границы без изменения поведения:
+Уже внедрены две инфраструктурные границы без физического переноса бизнес-логики:
 
-1. единый `OperationCoordinator`;
-2. registry модулей с включением и выключением.
+1. пассивный `OperationCoordinator` в `core/orchestration/OperationCoordinator.ahk`;
+2. `ModuleRegistry` и MVP-профиль в `core/modules/ModuleRegistry.ahk` и `config/mvp_modules.ini`.
 
-После этого первым физически отделяется `modules/diagnostics` вместе с тестовыми хоткеями RollClub. Это минимальный перенос с максимальной пользой: production перестанет зависеть от developer test suite, а OCR останется доступен как отдельный модуль.
+Отключённые возможности всё ещё физически находятся в монолитах. Поэтому нельзя безопасно «просто вырезать F2», `Ctrl+F4`, OCR или F5. Следующий архитектурный шаг — отделять по одному модулю с smoke-проверкой базового заказа. Первым кандидатом остаётся `modules/diagnostics` вместе с тестовыми хоткеями RollClub.
 
 ## 14. Утверждённый состав первого RollHouse MVP
 
@@ -561,7 +560,7 @@ RollHelper/
 
 Не входят в первый MVP и выключены профилем модулей:
 
-- F5 и отчёт через Excel/Telegram;
+- F5 без установленного дополнения `rollhouse-report-load`;
 - F2 и старый автоприём звонка;
 - F6/F7/Ctrl+F6 и весь модуль обзвона;
 - `Ctrl+F4` и дежурство по заказам;

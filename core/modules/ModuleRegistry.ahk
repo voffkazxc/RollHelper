@@ -6,16 +6,18 @@ global ModuleRegistry_Brand := ""
 global ModuleRegistry_Profile := ""
 global ModuleRegistry_ConfigPath := ""
 global ModuleRegistry_Modules := {}
+global ModuleRegistry_ExternalPackages := {}
 
 ModuleRegistry_Init(appDir, brand, profile := "mvp") {
     global ModuleRegistry_AppDir, ModuleRegistry_Brand, ModuleRegistry_Profile
-    global ModuleRegistry_ConfigPath, ModuleRegistry_Modules
+    global ModuleRegistry_ConfigPath, ModuleRegistry_Modules, ModuleRegistry_ExternalPackages
 
     ModuleRegistry_AppDir := appDir
     ModuleRegistry_Brand := brand
     ModuleRegistry_Profile := profile
     ModuleRegistry_ConfigPath := appDir . "\config\" . profile . "_modules.ini"
     ModuleRegistry_Modules := {}
+    ModuleRegistry_ExternalPackages := {}
 
     ModuleRegistry_Load("orders", 1)
     ModuleRegistry_Load("siv", 1)
@@ -27,7 +29,94 @@ ModuleRegistry_Init(appDir, brand, profile := "mvp") {
     ModuleRegistry_Load("web_pult", 0)
     ModuleRegistry_Load("diagnostics", 0)
 
+    ModuleRegistry_RegisterExternal("reports", "rollhouse-report-load")
+
     ModuleRegistry_Log("init", "profile=" . profile . ";brand=" . brand . ";config=" . ModuleRegistry_ConfigPath)
+}
+
+ModuleRegistry_RegisterExternal(moduleId, packageId) {
+    global ModuleRegistry_Modules, ModuleRegistry_ExternalPackages
+
+    EnvGet, _programRoot, ROLLHELPER_PROGRAM_ROOT
+    if (_programRoot = "")
+        _programRoot := A_LocalAppData . "\Programs\RollHelper"
+    _statePath := _programRoot . "\State\packages.json"
+    if !FileExist(_statePath)
+        return 0
+
+    FileRead, _stateJson, %_statePath%
+    if (ErrorLevel || _stateJson = "")
+        return 0
+
+    _quote := Chr(34)
+    if !RegExMatch(_stateJson, "is)" . _quote . "\Q" . packageId . "\E" . _quote . "\s*:\s*\{(.*?)\}", _packageMatch)
+        return 0
+
+    _packageState := _packageMatch1
+    if !RegExMatch(_packageState, "i)" . _quote . "Enabled" . _quote . "\s*:\s*true")
+        return 0
+    if !RegExMatch(_packageState, "i)" . _quote . "Version" . _quote . "\s*:\s*" . _quote . "([^" . _quote . "]+)" . _quote, _versionMatch)
+        return 0
+
+    _version := _versionMatch1
+    _packageDir := _programRoot . "\Packages\" . packageId . "\" . _version
+    _packageManifest := _packageDir . "\package.json"
+    if !FileExist(_packageManifest)
+        return 0
+
+    FileRead, _packageJson, %_packageManifest%
+    if (ErrorLevel || !RegExMatch(_packageJson, "is)" . _quote . "entrypoint" . _quote . "\s*:\s*\{(.*?)\}", _entryMatch))
+        return 0
+    if !RegExMatch(_entryMatch1, "i)" . _quote . "file" . _quote . "\s*:\s*" . _quote . "([^" . _quote . "]+)" . _quote, _fileMatch)
+        return 0
+
+    _entryFile := StrReplace(_fileMatch1, "/", "\")
+    _entryPath := _packageDir . "\" . _entryFile
+    if !FileExist(_entryPath)
+        return 0
+
+    _workingDir := _packageDir
+    if RegExMatch(_entryMatch1, "i)" . _quote . "workingDirectory" . _quote . "\s*:\s*" . _quote . "([^" . _quote . "]+)" . _quote, _workingMatch) {
+        _relativeWorkingDir := StrReplace(_workingMatch1, "/", "\")
+        if (_relativeWorkingDir != "" && _relativeWorkingDir != ".")
+            _workingDir := _packageDir . "\" . _relativeWorkingDir
+    }
+
+    ModuleRegistry_Modules[moduleId] := 1
+    ModuleRegistry_ExternalPackages[moduleId] := {id: packageId, version: _version, entrypoint: _entryPath, workingDir: _workingDir}
+    ModuleRegistry_Log("external_enabled", "module=" . moduleId . ";package=" . packageId . ";version=" . _version)
+    return 1
+}
+
+ModuleRegistry_RunExternal(moduleId) {
+    global ModuleRegistry_ExternalPackages
+
+    if (!IsObject(ModuleRegistry_ExternalPackages) || !ModuleRegistry_ExternalPackages.HasKey(moduleId)) {
+        ModuleRegistry_Log("external_run_missing", "module=" . moduleId)
+        return 0
+    }
+
+    _package := ModuleRegistry_ExternalPackages[moduleId]
+    _entrypoint := _package.entrypoint
+    _workingDir := _package.workingDir
+    if !FileExist(_entrypoint) {
+        ModuleRegistry_Log("external_run_missing_entrypoint", "module=" . moduleId . ";path=" . _entrypoint)
+        return 0
+    }
+
+    SplitPath, _entrypoint, , , _entryExt
+    if (_entryExt = "ahk")
+        Run, "%A_AhkPath%" "%_entrypoint%", %_workingDir%, UseErrorLevel
+    else
+        Run, "%_entrypoint%", %_workingDir%, UseErrorLevel
+
+    if (ErrorLevel) {
+        ModuleRegistry_Log("external_run_error", "module=" . moduleId . ";error=" . ErrorLevel)
+        return 0
+    }
+
+    ModuleRegistry_Log("external_run", "module=" . moduleId . ";package=" . _package.id . ";version=" . _package.version)
+    return 1
 }
 
 ModuleRegistry_Load(moduleId, defaultValue) {

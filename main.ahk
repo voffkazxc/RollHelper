@@ -1055,6 +1055,8 @@ Menu, Tray, Add, ⚙ Налаштування, OpenSettings
 Menu, Tray, Add, 🗺 Оновити карту зон доставки, LoadKmlFile
 Menu, Tray, Add, 📂 Відкрити папку зон, OpenZoneFolder
 Menu, Tray, Add, 🔄 Перезапустити сервер, RestartPythonServer
+if (Module_IsEnabled("reports"))
+    Menu, Tray, Add, 📊 Звіт — навантаження, OpenLoadReport
 if (Module_IsEnabled("web_pult"))
     Menu, Tray, Add, 🌐 Веб-пульт (бета), OpenWebPult
 
@@ -4214,115 +4216,11 @@ LookupCrmBtn:
     GoSub, OpenCrmCard
 return
 
-; --- РОБОТ-БУХГАЛТЕР F5 ---
+; --- МОДУЛЬ «ЗВІТ — НАВАНТАЖЕННЯ» F5 ---
 F5::
-    if (p1X = 0 || tgGroup = "") {
-        MsgBox, 4144, Помилка, Сценарій не налаштовано!`nВідкрий Налаштування (⚙️) і натисни [🎬 Калібрування Звіту].
-        return
-    }
-
-    MouseClickDrag, Left, %p1X%, %p1Y%, %p2X%, %p2Y%, 10
-    Sleep, 800
-    
-    Click, %p3X%, %p3Y%
-    Sleep, 500
-    
-    Click, %p4X%, %p4Y%
-    Sleep, 300
-    
-    Click, %p5X%, %p5Y%
-    Sleep, 300
-    
-    Send, {Esc}
-    Sleep, 500
-    
-    Click, %p6X%, %p6Y%
-    
-    WinWaitActive, ahk_exe EXCEL.EXE,, 10
-    if (ErrorLevel) {
-        MsgBox, 4144, Помилка, Excel не відкрився.
-        return
-    }
-    Sleep, 1500
-    
-    Send, ^{Home}
-    Sleep, 300
-    Send, ^+{End}
-    Sleep, 300
-    
-    Clipboard := ""
-    Send, ^c
-    ClipWait, 3
-    Sleep, 500
-    
-    text := Clipboard
-    totalCount := 0, totalSum := 0, chCount := 0, chSum := 0, berCount := 0, berSum := 0, merCount := 0, merSum := 0, currentCity := ""
-
-    Loop, Parse, text, `n, `r
-    {
-        line := A_LoopField
-
-        if (InStr(line, "Точка:")) {
-            RegExMatch(line, "\(Итого:\s*(\d+)\)", match)
-            if (InStr(line, "Чугуїв")) {
-                currentCity := "Чугуїв"
-                chCount := match1
-            } else if (InStr(line, "Берестин")) {
-                currentCity := "Берестин"
-                berCount := match1
-            } else if (InStr(line, "Мерефа")) {
-                currentCity := "Мерефа"
-                merCount := match1
-            }
-        }
-        else if (currentCity != "" && RegExMatch(line, "Итого:\s*([\d\s]+,\d{2})", match)) {
-            sum := RegExReplace(match1, ",00$", "")
-            sum := RegExReplace(sum, "\s+", " ")    
-            if (currentCity == "Чугуїв")
-                chSum := sum
-            else if (currentCity == "Берестин")
-                berSum := sum
-            else if (currentCity == "Мерефа")
-                merSum := sum
-            currentCity := "" 
-        }
-        else if (InStr(line, "Всего:") && RegExMatch(line, "Всего:\s*(\d+)", match)) {
-            totalCount := match1
-            if RegExMatch(line, "Итого:\s*([\d\s]+,\d{2})", matchSum) {
-                totalSum := RegExReplace(matchSum1, ",00$", "")
-                totalSum := RegExReplace(totalSum, "\s+", " ")
-            }
-        }
-    }
-
-    if (totalCount == 0 && chCount == 0 && merCount == 0 && berCount == 0) {
-        MsgBox, 4112, Помилка Парсингу, Скрипт не знайшов цифри!
-        return
-    }
-
-    report := "Ролл Хаус`n`nВСЬОГО: " . totalCount . " / " . totalSum . "`n`nБерестин: " . berCount . " / " . berSum . "`nМерефа: " . merCount . " / " . merSum . "`nЧугуїв: " . chCount . " / " . chSum
-    Clipboard := report
-
-    WinActivate, ahk_exe Telegram.exe
-    WinWaitActive, ahk_exe Telegram.exe,, 3
-    if (ErrorLevel) {
-        MsgBox, 4144, Увага, Telegram не відкрито!
-        return
-    }
-    
-    Sleep, 300
-    Send, {Esc} 
-    Sleep, 200
-    Send, ^f 
-    Sleep, 300
-    SendInput, %tgGroup%
-    Sleep, 1000 
-    Send, {Enter} 
-    Sleep, 500
-    
-    Send, ^v
-    Sleep, 300
-    Send, {Enter}
+OpenLoadReport:
+    if (!ModuleRegistry_RunExternal("reports"))
+        MsgBox, 48, Звіт — навантаження, Доповнення не встановлено або вимкнено.`nВідкрийте RollHelper Launcher і увімкніть «Звіт — навантаження».
 return
 
 ; --- АВТОПРИНЯТИЕ ЗВОНКА ---

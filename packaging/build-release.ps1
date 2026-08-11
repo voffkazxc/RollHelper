@@ -18,6 +18,10 @@ $manifestPath = Join-Path $releaseRoot "release-manifest.json"
     -Version $Version `
     -OutputDirectory $OutputDirectory
 
+$reportModule = & (Join-Path $PSScriptRoot "build-report-load-module.ps1") `
+    -Version $Version `
+    -OutputDirectory $OutputDirectory
+
 New-Item -ItemType Directory -Force -Path $launcherPublishRoot | Out-Null
 
 dotnet publish $launcherProject `
@@ -41,6 +45,21 @@ Compress-Archive `
 
 $launcherSha256 = (Get-FileHash -LiteralPath $launcherAssetPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+$manifest.packages += [pscustomobject]@{
+    id = $reportModule.Id
+    type = "module"
+    displayName = "Отчёт — нагрузка"
+    version = $reportModule.Version
+    extends = "rollhouse"
+    requires = @(
+        [pscustomobject]@{
+            id = "rollhouse"
+            minVersion = $Version
+        }
+    )
+    asset = $reportModule.AssetName
+    sha256 = $reportModule.Sha256
+}
 $manifest | Add-Member -NotePropertyName launcher -NotePropertyValue ([pscustomobject]@{
     version = $Version
     asset = $launcherAssetName
@@ -58,5 +77,6 @@ Remove-Item -LiteralPath $launcherPublishRoot -Recurse -Force
     Launcher = $launcherAssetPath
     LauncherSha256 = $launcherSha256
     Package = Join-Path $releaseRoot "brand-rollhouse-$Version.zip"
+    ReportModule = $reportModule.AssetPath
     Manifest = $manifestPath
 }
