@@ -1306,6 +1306,26 @@ RhApplyTheme() {
         RhB_StatusSoft := 0xF7F0EA
     }
 }
+
+RhScaledFontSize(size) {
+    dpi := A_ScreenDPI > 0 ? A_ScreenDPI : 96
+    scaledSize := Round(size * 96 / dpi)
+    return scaledSize < 4 ? 4 : scaledSize
+}
+
+RhRollFont(size, style, color) {
+    global RhFontName
+    scaledSize := RhScaledFontSize(size)
+    options := "s" . scaledSize . " " . style . " c" . color
+    Gui, Roll:Font, %options%, %RhFontName%
+}
+
+RhSettingsFont(size, style, color) {
+    global RhFontName
+    scaledSize := RhScaledFontSize(size)
+    options := "s" . scaledSize . " " . style . " c" . color
+    Gui, Settings:Font, %options%, %RhFontName%
+}
 ; --- ГОЛОВНИЙ ІНТЕРФЕЙС ---
 DrawRollclub:
     RhApplyTheme()
@@ -1326,21 +1346,21 @@ DrawRollclub:
     Gui, Roll:Add, Progress, x0 y0 w360 h88 -Theme c%RhC_Header%, 100
     Gui, Roll:Add, Progress, x0 y0 w360 h4 -Theme c%RhC_Neon%, 100
     Gui, Roll:Add, Progress, x16 y16 w46 h46 -Theme c%RhC_BlueSoft%, 100
-    Gui, Roll:Font, s12 bold c%RhC_Neon%, %RhFontName%
+    RhRollFont(12, "bold", RhC_Neon)
     Gui, Roll:Add, Text, x16 y25 w46 h24 Center +BackgroundTrans, RH
-    Gui, Roll:Font, s14 bold c%RhC_Text%, %RhFontName%
+    RhRollFont(14, "bold", RhC_Text)
     Gui, Roll:Add, Text, x72 y14 w170 h24 +BackgroundTrans, АНК PRO V1
-    Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    RhRollFont(8, "norm", RhC_Muted)
     Gui, Roll:Add, Text, x72 y39 w190 h16 +BackgroundTrans, %_brandName% · операторський пульт
-    Gui, Roll:Font, s8 bold cFFFFFF, %RhFontName%
+    RhRollFont(8, "bold", "FFFFFF")
     Gui, Roll:Add, Text, x72 y60 w86 h20 Center +0x200 HwndhOnlinePill, %_serverPill%
-    Gui, Roll:Font, s7 norm c%RhC_Muted%, %RhFontName%
+    RhRollFont(7, "norm", RhC_Muted)
     Gui, Roll:Add, Text, x166 y59 w116 h20 Right +BackgroundTrans vRhClockLbl, %_rhNow% · ~ / F1
     RhRegColor(hOnlinePill, (RH_SERVER_OK ? RhB_Green : RhB_Red), RhB_White)
-    Gui, Roll:Font, s13 bold c%RhC_Neon%, %RhFontName%
+    RhRollFont(13, "bold", RhC_Neon)
     Gui, Roll:Add, Button, x294 y19 w28 h28 HwndhSettingsGear gOpenSettings, ⚙
     RhRegColor(hSettingsGear, RhB_CardFill, RhB_SettingsGear)
-    Gui, Roll:Font, s12 bold c%RhC_Muted%, %RhFontName%
+    RhRollFont(12, "bold", RhC_Muted)
     Gui, Roll:Add, Button, x326 y19 w24 h28 gRollGuiClose, ×
 
     ; ── Аналіз шаблонів (ТОП-6 за частотою використання) ──
@@ -1367,9 +1387,9 @@ DrawRollclub:
     }
 
     ; ── Пошук адреси / зони ──────────────────────────────
-    Gui, Roll:Font, s9 bold c%RhC_Text%, %RhFontName%
+    RhRollFont(9, "bold", RhC_Text)
     Gui, Roll:Add, Text, x26 y104 w200 h18 +BackgroundTrans, 🔎 Адреса / зона
-    Gui, Roll:Font, s10 norm c%RhC_Text%, %RhFontName%
+    RhRollFont(10, "norm", RhC_Text)
     _mapInit := (streetText != "" && !isPickup) ? "Визначаю зону..." : "Зона / точка на карті..."
     Gui, Roll:Add, Edit, x26 y126 w306 h26 vMapSearch, %_mapInit%
 
@@ -1380,62 +1400,62 @@ DrawRollclub:
         _zoneTxt := deliveryCostStr
     else
         _zoneTxt := "Зона не визначена"
-    Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    RhRollFont(8, "norm", RhC_Muted)
     Gui, Roll:Add, Text, x34 y175 w80 h14 Center +BackgroundTrans, статус
     Gui, Roll:Add, Text, x140 y175 w80 h14 Center +BackgroundTrans, сума
     Gui, Roll:Add, Text, x246 y175 w78 h14 Center +BackgroundTrans, разом
-    Gui, Roll:Font, s9 bold c%RhC_SoftText%, %RhFontName%
+    RhRollFont(9, "bold", RhC_SoftText)
     Gui, Roll:Add, Text, x34 y192 w80 h18 Center +BackgroundTrans, %_orderType%
-    Gui, Roll:Font, s10 bold c%RhC_Text%, %RhFontName%
+    RhRollFont(10, "bold", RhC_Text)
     Gui, Roll:Add, Text, x140 y192 w80 h18 Center +BackgroundTrans, %orderSum% грн
-    Gui, Roll:Font, s10 bold c%RhC_Neon%, %RhFontName%
+    RhRollFont(10, "bold", RhC_Neon)
     Gui, Roll:Add, Text, x246 y192 w78 h18 Center +BackgroundTrans vRhTotalLbl, %totalSum% грн
-    Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    RhRollFont(8, "norm", RhC_Muted)
     Gui, Roll:Add, Text, x26 y216 w306 h14 Center +BackgroundTrans, 📍 %_zoneTxt%
 
     ; ── Оплата ───────────────────────────────────────────
     DoAutoCash := noPayChange ? 0 : autoCash
     DoAutoCard := noPayChange ? 0 : autoCard
-    Gui, Roll:Font, s10 bold cFFFFFF, %RhFontName%
-    Gui, Roll:Add, Button, x14 y246 w160 h36 HwndhPayCash gRhTogCash, 💵 Готівка
-    Gui, Roll:Add, Button, x184 y246 w160 h36 HwndhPayCard gRhTogCard, 💳 Картка
+    RhRollFont(10, "bold", "FFFFFF")
+    Gui, Roll:Add, Button, x14 y246 w160 h36 -Wrap HwndhPayCash gRhTogCash, Готівка
+    Gui, Roll:Add, Button, x184 y246 w160 h36 -Wrap HwndhPayCard gRhTogCard, Картка
     RhRegColor(hPayCash, (DoAutoCash ? RhB_Cash : RhB_ButtonOff), (DoAutoCash ? RhB_White : RhB_Text))
     RhRegColor(hPayCard, (DoAutoCard ? RhB_Card : RhB_ButtonOff), (DoAutoCard ? RhB_White : RhB_Text))
 
     ; ── Коментар ─────────────────────────────────────────
-    Gui, Roll:Font, s9 bold c%RhC_Text%, %RhFontName%
+    RhRollFont(9, "bold", RhC_Text)
     Gui, Roll:Add, Text, x26 y302 w94 h18 +BackgroundTrans, 📝 Коментар
-    Gui, Roll:Font, s8 norm c%RhC_Neon%, %RhFontName%
+    RhRollFont(8, "norm", RhC_Neon)
     Gui, Roll:Add, Button, x124 y300 w96 h22 gRhNoChange, Без сдачі
     Gui, Roll:Add, Button, x224 y300 w108 h22 vRhRawBtn gRhToggleRaw, вихідний »
-    Gui, Roll:Font, s9 norm c%RhC_Text%, %RhFontName%
+    RhRollFont(9, "norm", RhC_Text)
     Gui, Roll:Add, Edit, x26 y326 w306 r3 vOrderComment gRhRefreshEnterPreview, %cleanComment%
     Gui, Roll:Add, Edit, x26 y326 w306 r3 vRhRawEdit ReadOnly +Hidden, %rawComment%
 
     ; ── Кухня / адреса ───────────────────────────────────
-    Gui, Roll:Font, s9 bold c%RhC_Text%, %RhFontName%
+    RhRollFont(9, "bold", RhC_Text)
     Gui, Roll:Add, Text, x26 y402 w62 h22 +0x200 +BackgroundTrans, 🍳 Кухня
-    Gui, Roll:Font, s9 norm c%RhC_Text%, %RhFontName%
+    RhRollFont(9, "norm", RhC_Text)
     Gui, Roll:Add, Edit, x92 y402 w240 h22 r1 vClientInfo gRhRefreshEnterPreview, %infoText%
-    Gui, Roll:Font, s9 bold c%RhC_Text%, %RhFontName%
+    RhRollFont(9, "bold", RhC_Text)
     Gui, Roll:Add, Text, x26 y434 w62 h22 +0x200 +BackgroundTrans, 🏠 Адреса
-    Gui, Roll:Font, s9 norm c%RhC_Text%, %RhFontName%
+    RhRollFont(9, "norm", RhC_Text)
     Gui, Roll:Add, Edit, x92 y434 w240 h22 r1 vAddressNote gRhRefreshEnterPreview, %addrNote%
 
     ; ── Інлайн СІВ ───────────────────────────────────────
-    Gui, Roll:Font, s9 bold c%RhC_Text%, %RhFontName%
+    RhRollFont(9, "bold", RhC_Text)
     Gui, Roll:Add, Text, x26 y495 w36 h24 +0x200 +BackgroundTrans, 🥣
-    Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    RhRollFont(8, "norm", RhC_Muted)
     Gui, Roll:Add, Text, x62 y495 w22 h24 +0x200 +BackgroundTrans, Рол
     Gui, Roll:Add, Edit, x86 y496 w34 h22 vVisRolls gRhRefreshEnterPreview Center Number,
     Gui, Roll:Add, Text, x126 y495 w18 h24 +0x200 +BackgroundTrans, Зв
     Gui, Roll:Add, Edit, x146 y496 w34 h22 vVisNorm gRhRefreshEnterPreview Center Number,
     Gui, Roll:Add, Text, x186 y495 w18 h24 +0x200 +BackgroundTrans, Уч
     Gui, Roll:Add, Edit, x206 y496 w34 h22 vVisEdu gRhRefreshEnterPreview Center Number,
-    Gui, Roll:Font, s9 bold cFFFFFF, %RhFontName%
-    Gui, Roll:Add, Button, x250 y494 w82 h26 HwndhSivGo gRhSivGo, Пробити
+    RhRollFont(9, "bold", "FFFFFF")
+    Gui, Roll:Add, Button, x250 y494 w82 h26 -Wrap HwndhSivGo gRhSivGo, Пробити
     RhRegColor(hSivGo, RhB_Siv, RhB_White)
-    Gui, Roll:Font, s8 bold c%RhC_Muted%, %RhFontName%
+    RhRollFont(8, "bold", RhC_Muted)
     Gui, Roll:Add, Text, x26 y524 w306 h18 vRhSivPreview HwndhRhSivPreview +0x200, СІВ: введи Рол/Зв/Уч — покажу соус/імбир/васабі
     RhRegColor(hRhSivPreview, RhB_StatusSoft, RhB_Text)
 
@@ -1443,15 +1463,15 @@ DrawRollclub:
     GiftPepsi := giftPepsiEnabled ? autoPepsi : 0
     GiftBrooklyn := giftBrooklynEnabled ? autoBrooklyn : 0
     GiftBurger := giftBurgerEnabled ? autoBurger : 0
-    Gui, Roll:Font, s9 bold c%RhC_Text%, %RhFontName%
-    Gui, Roll:Add, Text, x14 y548 w86 h30 +0x200, 🎁 Подарунок
-    Gui, Roll:Font, s9 bold cFFFFFF, %RhFontName%
+    RhRollFont(9, "bold", RhC_Text)
+    Gui, Roll:Add, Text, x14 y548 w80 h30 +0x200, 🎁 Подарунок
+    RhRollFont(9, "bold", "FFFFFF")
     _giftPText := (GiftPepsi ? "✓ " : "") . giftPepsiName
-    Gui, Roll:Add, Button, x104 y548 w74 h30 vGiftPBtn HwndhGiftP gRhTogPepsi, %_giftPText%
+    Gui, Roll:Add, Button, x98 y548 w66 h30 -Wrap vGiftPBtn HwndhGiftP gRhTogPepsi, %_giftPText%
     _giftBText := (GiftBrooklyn ? "✓ " : "") . giftBrooklynName
-    Gui, Roll:Add, Button, x184 y548 w74 h30 vGiftBBtn HwndhGiftB gRhTogBrook, %_giftBText%
+    Gui, Roll:Add, Button, x168 y548 w80 h30 -Wrap vGiftBBtn HwndhGiftB gRhTogBrook, %_giftBText%
     _giftUText := (GiftBurger ? "✓ " : "") . giftBurgerName
-    Gui, Roll:Add, Button, x264 y548 w80 h30 vGiftUBtn HwndhGiftU gRhTogBurg, %_giftUText%
+    Gui, Roll:Add, Button, x252 y548 w92 h30 -Wrap vGiftUBtn HwndhGiftU gRhTogBurg, %_giftUText%
     if (!giftPepsiEnabled)
         GuiControl, Roll:Disable, GiftPBtn
     if (!giftBrooklynEnabled)
@@ -1461,7 +1481,7 @@ DrawRollclub:
     RhRegColor(hGiftP, (GiftPepsi ? RhB_Gift : RhB_ButtonOff), (GiftPepsi ? RhB_White : RhB_Text))
     RhRegColor(hGiftB, (GiftBrooklyn ? RhB_Gift : RhB_ButtonOff), (GiftBrooklyn ? RhB_White : RhB_Text))
     RhRegColor(hGiftU, (GiftBurger ? RhB_Gift : RhB_ButtonOff), (GiftBurger ? RhB_White : RhB_Text))
-    Gui, Roll:Font, s8 bold c%RhC_Muted%, %RhFontName%
+    RhRollFont(8, "bold", RhC_Muted)
     Gui, Roll:Add, Text, x14 y582 w330 h16 vRhGiftStatus HwndhRhGiftStatus +0x200, Подарунок: не вибрано
     RhRegColor(hRhGiftStatus, RhB_StatusSoft, RhB_Muted)
 
@@ -1471,24 +1491,24 @@ DrawRollclub:
         _rhP := StrSplit(extractedTime, ":")
         _rhH := _rhP[1], _rhM := _rhP[2]
     }
-    Gui, Roll:Font, s15 bold c%RhC_Neon%, %RhFontName%
+    RhRollFont(15, "bold", RhC_Neon)
     Gui, Roll:Add, Text, x26 y602 w26 h30 +0x200 +BackgroundTrans, ⏱
-    Gui, Roll:Font, s14 bold c%RhC_Text%, %RhFontName%
+    RhRollFont(14, "bold", RhC_Text)
     Gui, Roll:Add, Edit, x58 y602 w36 h28 Center Limit2 Number vReadyH gRhRefreshEnterPreview, %_rhH%
     Gui, Roll:Add, Text, x96 y602 w10 h28 +0x200 Center +BackgroundTrans, :
     Gui, Roll:Add, Edit, x108 y602 w36 h28 Center Limit2 Number vReadyM gRhRefreshEnterPreview, %_rhM%
-    Gui, Roll:Font, s8 bold cFFFFFF, %RhFontName%
-    Gui, Roll:Add, Button, x156 y604 w42 h24 HwndhQuickPickup gCalcPickup, СВ+40
-    Gui, Roll:Add, Button, x202 y604 w40 h24 HwndhQuickDel60 gCalcDelivery, +60
-    Gui, Roll:Add, Button, x246 y604 w40 h24 HwndhQuickDel90 gCalcDelivery90, +90
-    Gui, Roll:Add, Button, x290 y604 w42 h24 HwndhQuickPickup20 gCalcPickup20, СВ+20
+    RhRollFont(8, "bold", "FFFFFF")
+    Gui, Roll:Add, Button, x156 y604 w42 h24 -Wrap HwndhQuickPickup gCalcPickup, СВ+40
+    Gui, Roll:Add, Button, x202 y604 w40 h24 -Wrap HwndhQuickDel60 gCalcDelivery, +60
+    Gui, Roll:Add, Button, x246 y604 w40 h24 -Wrap HwndhQuickDel90 gCalcDelivery90, +90
+    Gui, Roll:Add, Button, x290 y604 w42 h24 -Wrap HwndhQuickPickup20 gCalcPickup20, СВ+20
     RhRegColor(hQuickPickup, RhB_Blue, RhB_White)
     RhRegColor(hQuickDel60, RhB_Teal, RhB_White)
     RhRegColor(hQuickDel90, RhB_Orange, RhB_White)
     RhRegColor(hQuickPickup20, RhB_ButtonOff, RhB_Text)
 
     ; ── Прев'ю Enter-цепочки ─────────────────────────────────
-    Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    RhRollFont(8, "norm", RhC_Muted)
     Gui, Roll:Add, Text, x14 y640 w330 h34 vRhEnterPreview +BackgroundTrans, Enter: готую цепочку...
 
     ; Внесення виконується клавішею Enter / NumpadEnter через hotkey нижче.
@@ -2243,7 +2263,7 @@ OpenSettings:
     Gui, Settings:-DPIScale
     Gui, Settings:+AlwaysOnTop +ToolWindow +OwnDialogs +HwndSettingsHwnd
     Gui, Settings:Color, %RhC_BG%, %RhC_Panel%
-    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    RhSettingsFont(9, "norm", RhC_Text)
     _settingsTabs := "🚀 WinAPI"
     _settingsWinApiTab := 1
     _settingsNextTab := 2
@@ -2271,9 +2291,9 @@ OpenSettings:
 
     ; ── Вкладка 1: WinAPI Сканер ───────────────
     Gui, Settings:Tab, %_settingsWinApiTab%
-    Gui, Settings:Font, s9 bold c%RhC_Text%, %RhFontName%
+    RhSettingsFont(9, "bold", RhC_Text)
     Gui, Settings:Add, Text, x16 y36 w320 Section, Збережені WinAPI елементи (UIA):
-    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    RhSettingsFont(9, "norm", RhC_Text)
     Gui, Settings:Add, ListView, xs y+6 w322 h170 vUiaListView gUiaListClick Grid, Назва (Роль)|Шлях/ID (AutomationId/Name)
     
     ; Заповнюємо ListView з RkConfig.ini
@@ -2283,26 +2303,26 @@ OpenSettings:
     LV_ModifyCol(2, 198)
     GoSub, LoadUiaMapToListView
     
-    Gui, Settings:Font, s9 bold c%RhC_Text%, %RhFontName%
+    RhSettingsFont(9, "bold", RhC_Text)
     Gui, Settings:Add, Button, xs y+8 w156 h32 gLaunchScanner, 🎯 Додати елемент
     Gui, Settings:Add, Button, x+10 yp w156 h32 gDeleteSelectedUiaBinding, 🗑 Видалити вибране
-    Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    RhSettingsFont(8, "norm", RhC_Muted)
     Gui, Settings:Add, Text, xs y+6 w322, Виберіть рядок і натисніть «Видалити». Подвійний клік також працює.
     
     ; ── Опциональна вкладка: Звонки (Aiko) ────────────────
     if (_settingsCallingTab) {
         Gui, Settings:Tab, %_settingsCallingTab%
-        Gui, Settings:Font, s9 bold c%RhC_Text%, %RhFontName%
+        RhSettingsFont(9, "bold", RhC_Text)
         Gui, Settings:Add, Text, x16 y38 w320 Section, Приціли набору в Aiko:
-        Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+        RhSettingsFont(9, "norm", RhC_Text)
         Gui, Settings:Add, Button, xs y+6 w158 h26 gSetAikoInputTarget, Поле номера
         Gui, Settings:Add, Button, x+6 yp w158 h26 gSetAikoCallTarget, Кнопка «Дзвонити»
         Gui, Settings:Add, Button, xs y+5 w158 h26 gSetAikoHangupTarget, Покласти трубку
         Gui, Settings:Add, Button, x+6 yp w158 h26 gSetCallTarget, Автоприйом вхідного
         Gui, Settings:Add, Button, xs y+5 w322 h26 gSetCallEndTarget, Зона «кінець дзвінка» (авто-перехід)
-        Gui, Settings:Font, s9 bold c%RhC_Text%, %RhFontName%
+        RhSettingsFont(9, "bold", RhC_Text)
         Gui, Settings:Add, Text, xs y+12 w320, Клавіші режиму обзвону (F6):
-        Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+        RhSettingsFont(9, "norm", RhC_Text)
         Gui, Settings:Add, Text, xs y+8 w150 h22 +0x200, Наступний дзвінок:
         Gui, Settings:Add, Edit, x+6 yp w150 vNewHkCallNext, %hkCallNext%
         Gui, Settings:Add, Text, xs y+6 w150 h22 +0x200, Покласти трубку:
@@ -2311,7 +2331,7 @@ OpenSettings:
         Gui, Settings:Add, Edit, x+6 yp w150 vNewHkCallPause, %hkCallPause%
         Gui, Settings:Add, Text, xs y+6 w150 h22 +0x200, Прийняти розмову:
         Gui, Settings:Add, Edit, x+6 yp w150 vNewHkAcceptTalk, %hkAcceptTalk%
-        Gui, Settings:Font, s9 norm c%RhC_Muted%, %RhFontName%
+        RhSettingsFont(9, "norm", RhC_Muted)
         Gui, Settings:Add, Text, xs y+10 w316 h1 +0x10
         Gui, Settings:Add, Text, xs y+6 w316, 🧊 Клавіші Soundpad (через | , напр. 1|x):
         Gui, Settings:Add, Edit, xs y+4 w316 h22 vNewSoundpadKeys, %soundpadKeys%
@@ -2332,14 +2352,14 @@ OpenSettings:
 
     ; ── Вкладка: Подарунки ─────────────────────────────────
     Gui, Settings:Tab, %_settingsGiftsTab%
-    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    RhSettingsFont(9, "norm", RhC_Text)
     Gui, Settings:Add, Text, x16 y44 w320 Section, Автоподарунки: поріг суми та PLU-код
-    Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    RhSettingsFont(8, "norm", RhC_Muted)
     Gui, Settings:Add, Text, xs y+10 w22 h18 Center, ✓
     Gui, Settings:Add, Text, x42 yp w102 h18 Center, Назва
     Gui, Settings:Add, Text, x150 yp w76 h18 Center, Від суми
     Gui, Settings:Add, Text, x238 yp w94 h18 Center, PLU-код
-    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    RhSettingsFont(9, "norm", RhC_Text)
     Gui, Settings:Add, Checkbox, xs y+4 w22 h22 vNewGiftPepsiEnabled Checked%giftPepsiEnabled%
     Gui, Settings:Add, Edit, x42 yp w102 h22 vNewGiftPepsiName, %giftPepsiName%
     Gui, Settings:Add, Edit, x150 yp w76 h22 vNewGiftPepsi Center Number, %giftPepsiThreshold%
@@ -2352,17 +2372,17 @@ OpenSettings:
     Gui, Settings:Add, Edit, x42 yp w102 h22 vNewGiftBurgerName, %giftBurgerName%
     Gui, Settings:Add, Edit, x150 yp w76 h22 vNewGiftBurger Center Number, %giftBurgerThreshold%
     Gui, Settings:Add, Edit, x238 yp w94 h22 vNewPluBurger Center Limit10, %pluBurger%
-    Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    RhSettingsFont(8, "norm", RhC_Muted)
     Gui, Settings:Add, Text, xs y+10 w316, PLU вводиться повністю, разом із нулями на початку.
 
     ; ── Вкладка: СІВ / палички ──────────────────────────────
     Gui, Settings:Tab, %_settingsSivTab%
-    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    RhSettingsFont(9, "norm", RhC_Text)
     Gui, Settings:Add, Text, x16 y44 w320 Section, PLU-коди паличок, соусу, імбиру та васабі
-    Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    RhSettingsFont(8, "norm", RhC_Muted)
     Gui, Settings:Add, Text, xs y+10 w190 h18, Позиція
     Gui, Settings:Add, Text, x224 yp w108 h18 Center, PLU-код
-    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    RhSettingsFont(9, "norm", RhC_Text)
     Gui, Settings:Add, Text, xs y+4 w190 h22 +0x200, Звичайні палички
     Gui, Settings:Add, Edit, x224 yp w108 h22 vNewPluSticksNorm Center Limit10, %pluSticksNorm%
     Gui, Settings:Add, Text, xs y+8 w190 h22 +0x200, Навчальні палички
@@ -2373,29 +2393,29 @@ OpenSettings:
     Gui, Settings:Add, Edit, x224 yp w108 h22 vNewPluGinger Center Limit10, %pluGinger%
     Gui, Settings:Add, Text, xs y+8 w190 h22 +0x200, Васабі
     Gui, Settings:Add, Edit, x224 yp w108 h22 vNewPluWasabi Center Limit10, %pluWasabi%
-    Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    RhSettingsFont(8, "norm", RhC_Muted)
     Gui, Settings:Add, Text, xs y+12 w316, Не прибирайте нулі на початку PLU-коду.
 
     ; ── Вкладка: Гарячі клавіші ────────────────────────────
     Gui, Settings:Tab, %_settingsHotkeysTab%
-    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    RhSettingsFont(9, "norm", RhC_Text)
     Gui, Settings:Add, Text, x16 y44 w320 Section, Основні гарячі клавіші:
     _hkMainDisplay := (hkMain = "vkC0") ? "~" : hkMain
     Gui, Settings:Add, Text, xs y+14 w150 h22 +0x200, Відкрити пульт:
     Gui, Settings:Add, Edit, x+6 yp w150 vNewHkMain, %_hkMainDisplay%
     Gui, Settings:Add, Text, xs y+8 w150 h22 +0x200, Швидкий СИВ:
     Gui, Settings:Add, Edit, x+6 yp w150 vNewHkSiv, %hkSiv%
-    Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    RhSettingsFont(8, "norm", RhC_Muted)
     Gui, Settings:Add, Text, xs y+14 w322, Підказка: ~ — клавіша тильди поруч із цифрою 1.
     _themeIdx := (uiTheme = "dark") ? 2 : 1
-    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    RhSettingsFont(9, "norm", RhC_Text)
     Gui, Settings:Add, Text, xs y+12 w150 h22 +0x200, Тема пульта:
     Gui, Settings:Add, DropDownList, x+6 yp w150 vNewUiTheme Choose%_themeIdx%, ☀ Light Premium|🌑 Neon Dark
 
     ; ── Опциональна вкладка: Звіт F5 ───────────────────────
     if (_settingsReportTab) {
         Gui, Settings:Tab, %_settingsReportTab%
-        Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+        RhSettingsFont(9, "norm", RhC_Text)
         Gui, Settings:Add, Text, x16 y44 w320 Section, Автозвіт у Telegram (клавіша F5):
         Gui, Settings:Add, Text, xs y+14 w90 h22 +0x200, Чат / група:
         Gui, Settings:Add, Edit, x+6 yp w216 h22 vNewTgGroup, %tgGroup%
@@ -2404,7 +2424,7 @@ OpenSettings:
 
     ; ── Загальна кнопка збереження (поза вкладками) ───────
     Gui, Settings:Tab
-    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
+    RhSettingsFont(10, "bold", RhC_Text)
     Gui, Settings:Add, Button, x16 y378 w328 h34 gSaveSettings, 💾 Зберегти та перезапустити
     Gui, Settings:Show, w360, Налаштування RollHouse
 return
