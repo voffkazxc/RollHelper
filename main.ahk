@@ -550,6 +550,25 @@ RhUiaFind(role, defaultAid:="") {
         return ""
 }
 
+RhUiaFindByAutomationId(aid) {
+    if (aid = "")
+        return ""
+    root := RhUiaRoot()
+    if (IsObject(root)) {
+        try el := root.FindFirstBy("AutomationId=" . aid)
+        catch e
+            el := ""
+        if (IsObject(el))
+            return el
+    }
+    win := RhUiaWindow()
+    if (!IsObject(win))
+        return ""
+    try return win.FindFirstBy("AutomationId=" . aid)
+    catch e2
+        return ""
+}
+
 RhUiaFindByName(name) {
     root := RhUiaRoot()
     if (!IsObject(root) || name = "")
@@ -752,25 +771,42 @@ RhUiaClickPaymentSumRow() {
 
 RhUiaClickFirstOrderRow() {
     root := RhUiaFind("ТаблицяСтрав", "treeListItems")
+    try rootAid := root.CurrentAutomationId
+    catch e0
+        rootAid := ""
+    if (!IsObject(root) || rootAid != "treeListItems")
+        root := RhUiaFindByAutomationId("treeListItems")
     if (!IsObject(root))
         return 0
+
+    try best := root.FindFirstBy("Name=Блюдо row 1")
+    catch e1
+        best := ""
+    if (IsObject(best)) {
+        IikoRestore()
+        try {
+            best.Click()
+            Sleep, % SpDly(180)
+            return 1
+        } catch e2 {
+        }
+    }
+
     try children := root.FindAllBy("TrueCondition")
-    catch e
+    catch e3
         return 0
     if (!IsObject(children))
         return 0
     best := ""
+    bestRow := 999999
     Loop, % children.MaxIndex() {
         el := children[A_Index]
         try name := el.CurrentName
-        catch e1
+        catch e4
             name := ""
-        try val := el.CurrentValue
-        catch e2
-            val := ""
-        if (InStr(name, "Блюдо row") && val != "") {
+        if (RegExMatch(name, "^Блюдо row (\d+)$", rowMatch) && rowMatch1 > 0 && rowMatch1 < bestRow) {
             best := el
-            break
+            bestRow := rowMatch1
         }
     }
     if (!IsObject(best))
@@ -780,9 +816,55 @@ RhUiaClickFirstOrderRow() {
         best.Click()
         Sleep, % SpDly(180)
         return 1
-    } catch e3 {
+    } catch e5 {
         return 0
     }
+}
+
+RhUiaPasteKitchenComment(text) {
+    if (text = "")
+        return 1
+    root := RhUiaFindByAutomationId("treeListItems")
+    if (!IsObject(root))
+        return 0
+    try el := root.FindFirstBy("Name=Комментарий row 1")
+    catch e
+        el := ""
+    if (!IsObject(el))
+        return 0
+    IikoRestore()
+    try rect := el.CurrentBoundingRectangle
+    catch e2
+        return 0
+    x := Round((rect.l + rect.r) / 2)
+    y := Round((rect.t + rect.b) / 2)
+    if (!x || !y)
+        return 0
+    MouseGetPos, mx, my
+    Click, %x%, %y%, 2
+    Sleep, % SpDly(220)
+    Clipboard := text
+    ClipWait, 1
+    Send, ^a
+    Sleep, 60
+    Send, ^v
+    Sleep, % SpDly(180)
+    Send, {Tab}
+    Sleep, % SpDly(220)
+    MouseMove, %mx%, %my%, 0
+    return 1
+}
+
+RhFocusOrderItems(itX:="", itY:="") {
+    if (RhUiaClickFirstOrderRow())
+        return 1
+    if (IsObject(RhUiaFindByAutomationId("treeListItems")))
+        return 0
+    if (itX = "" || itX = 0 || itX = "ERROR")
+        return 0
+    Click, %itX%, %itY%
+    Sleep, % SpDly(180)
+    return 1
 }
 
 RhApplyPaymentUIA(mode, changeAmount, noChangeFlag) {
@@ -1888,8 +1970,10 @@ RhEnterPreflight:
 
     if (RhOneLine(_pfComment) != "" && !RhTargetReady(commX, commRelX) && !IsObject(RhUiaFind("Коментар", "memoEditDeliveryComment")))
         _pf .= "- Коментар: приціл 1 не налаштований`n"
-    if ((RhOneLine(_pfKitchen) != "" || RhOneLine(_pfCard) != "") && !RhTargetReady(infoX, infoRelX) && !IsObject(RhUiaFind("Кухня", "memoEditCustomerComment")))
+    if (RhOneLine(_pfKitchen) != "" && !RhTargetReady(infoX, infoRelX) && !IsObject(RhUiaFindByName("Комментарий row 1")))
         _pf .= "- Кухня: приціл 3 не налаштований`n"
+    if (RhOneLine(_pfCard) != "" && !IsObject(RhUiaFindByAutomationId("memoEditCustomerComment")))
+        _pf .= "- Карта клієнта: WinAPI-поле не знайдено`n"
     if (RhOneLine(_pfAddress) != "" && !RhTargetReady(addrX, addrRelX) && !IsObject(RhUiaFind("Адреса", "memoEditDeliveryAddressComment")))
         _pf .= "- Адреса: приціл 4 не налаштований`n"
     if (_pfHasTime && !RhTargetReady(timeX, timeRelX) && !IsObject(RhUiaFind("ЧасГотовності", "timeEditDeliveryTime")))
@@ -3350,8 +3434,12 @@ RhPunchPluSeries(jobs, itX, itY) {
         return 0
 
     MouseGetPos, _mx, _my
-    if (!RhUiaClickFirstOrderRow() && itX != 0 && itX != "ERROR")
-        Click, %itX%, %itY%
+    if (!RhFocusOrderItems(itX, itY)) {
+        ToolTip, % "❌ Не вдалося відкрити таблицю страв. Пробиття зупинено."
+        SetTimer, RemoveToolTip, -1800
+        MouseMove, %_mx%, %_my%, 0
+        return 0
+    }
     Sleep, % SpDly(120)
     MouseMove, %_mx%, %_my%, 0
 
@@ -3427,8 +3515,12 @@ PunchByPlu(pluCode, qty, itX, itY) {
     MouseGetPos, _mx, _my
     ; Клік у PLU-таблицю → таблиця отримує клавіатурний фокус.
     ; Спочатку UIA/WinAPI, координати лишаються fallback.
-    if (!RhUiaClickFirstOrderRow() && itX != 0 && itX != "ERROR")
-        Click, %itX%, %itY%
+    if (!RhFocusOrderItems(itX, itY)) {
+        ToolTip, % "❌ Не вдалося відкрити таблицю страв. Пробиття зупинено."
+        SetTimer, RemoveToolTip, -1800
+        MouseMove, %_mx%, %_my%, 0
+        return
+    }
     Sleep, % SpDly(120)
     ; Негайно повертаємо мишу назад
     MouseMove, %_mx%, %_my%, 0
@@ -3715,10 +3807,15 @@ ApplyRollclub:
     if (!RhUiaSetValue("memoEditDeliveryComment", OrderComment))
         IikoPaste(commRelX, commRelY, commX, commY, OrderComment)   ; 1. Коментар
 
-    _rhCustomerInfo := Trim(ClientInfo . ((ClientInfo != "" && ClientCard != "") ? " | " : "") . ClientCard)
-    if (_rhCustomerInfo != "") {
-        if (!RhUiaDoublePaste("memoEditCustomerComment", _rhCustomerInfo))
-            IikoPaste(infoRelX, infoRelY, infoX, infoY, _rhCustomerInfo) ; 3. Кухня/карта
+    _rhKitchenInfo := Trim(ClientInfo)
+    if (_rhKitchenInfo != "") {
+        if (!RhUiaPasteKitchenComment(_rhKitchenInfo))
+            IikoPaste(infoRelX, infoRelY, infoX, infoY, _rhKitchenInfo) ; 3. Кухня
+    }
+
+    if (ClientCard != "") {
+        if (!RhUiaDoublePaste("memoEditCustomerComment", ClientCard))
+            FileAppend, % "[" . A_Now . "] WARN client card field not found`n", %A_ScriptDir%\ahk_debug.log
     }
 
     if (!RhUiaSetValue("memoEditDeliveryAddressComment", AddressNote))
@@ -3766,21 +3863,29 @@ ApplyRollclub:
     ; ── КРОК 1: Подарунок (СПОЧАТКУ — бо ціна зростає після пробиття) ──
     _isGiftPunched := 0
     ; Пробиваємо ТІЛЬКИ якщо задано приціл «7. Табл. страв».
-    if ((GiftPepsi || GiftBurger || GiftBrooklyn) && (itemX != 0 || itemRelX != 0)) {
+    if ((GiftPepsi || GiftBurger || GiftBrooklyn) && ((itemX != 0 || itemRelX != 0) || IsObject(RhUiaFindByAutomationId("treeListItems")))) {
         _isGiftPunched := 1
         if (GiftBurger) {
             GoSub, NewGiftMacro
-            Send, %pluBurger%
-            GoSub, FinishGiftMacro
+            if (_rhGiftMacroReady) {
+                Send, %pluBurger%
+                GoSub, FinishGiftMacro
+            }
         } else if (GiftBrooklyn) {
             GoSub, NewGiftMacro
-            Send, %pluBrooklyn%
-            GoSub, FinishGiftMacro
+            if (_rhGiftMacroReady) {
+                Send, %pluBrooklyn%
+                GoSub, FinishGiftMacro
+            }
         } else if (GiftPepsi) {
             GoSub, NewGiftMacro
-            Send, %pluPepsi%
-            GoSub, FinishGiftMacro
+            if (_rhGiftMacroReady) {
+                Send, %pluPepsi%
+                GoSub, FinishGiftMacro
+            }
         }
+        if (!_rhGiftMacroReady)
+            _isGiftPunched := 0
         ToolTip   ; прибрати підказку подарунка
         ; Пауза — iiko має перерахувати суму замовлення після пробиття подарунка
         Sleep, % Max(600, SpDly(1500))
@@ -3899,8 +4004,13 @@ NewGiftMacro:
     if (iikoWinExe != "" && iikoWinExe != "ERROR")
         WinActivate, ahk_exe %iikoWinExe%
     Sleep, % SpDly(80)
-    if (!RhUiaClickFirstOrderRow())
-        IikoClickRel(itemRelX, itemRelY, itemX, itemY)
+    IikoXY(itemRelX, itemRelY, itemX, itemY, _giftItemX, _giftItemY)
+    _rhGiftMacroReady := RhFocusOrderItems(_giftItemX, _giftItemY)
+    if (!_rhGiftMacroReady) {
+        ToolTip, % "❌ Не вдалося відкрити таблицю страв. Подарунок не пробито."
+        SetTimer, RemoveToolTip, -1800
+        return
+    }
     Sleep, % SpDly(300)
     Send, {PgDn}
     Sleep, % SpDly(300)
