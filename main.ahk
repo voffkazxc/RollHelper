@@ -17,6 +17,10 @@ global APP_DIR := A_ScriptDir
 global BRAND := "rollhouse"
 global BRAND_DIR := APP_DIR . "\brands\rollhouse"
 global UIA_MAP_CONFIG := BRAND_DIR . "\RkConfig.ini"
+global RH_USER_DATA_DIR := A_LocalAppData . "\RollHelper\UserData\rollhouse"
+global RH_ZONE_OVERRIDE_PATH := RH_USER_DATA_DIR . "\zones.kml"
+global RH_ZONE_BACKUP_PATH := RH_USER_DATA_DIR . "\zones.previous.kml"
+global RH_ZONE_PRICES_PATH := RH_USER_DATA_DIR . "\DeliveryPrices.ini"
 global RhEnterBusy := 0
 global RhLastEnterTick := 0
 global RhEnterCooldownMs := 2500
@@ -25,6 +29,7 @@ global RhLocalUIA := ""
 OpCoord_Init("rollhouse", APP_DIR)
 ModuleRegistry_Init(APP_DIR, "rollhouse", "mvp")
 SetWorkingDir, %BRAND_DIR%
+FileCreateDir, %RH_USER_DATA_DIR%
 OnExit, ExitRoutine
 
 ; ══════════════════════════════════════════════════════════════
@@ -938,6 +943,7 @@ global RcZones   := []  ; кеш полігонів з KML [{name, coords:[...]}
 global RcZonesOk := 0   ; 1 = KML вже завантажено
 global RhStaticColors := {}
 global RhStaticBrush  := {}
+RhInitializeZones()
 OnMessage(0x0138, "WM_CTLCOLORSTATIC")
 
 ; --- ЗАХИСТ ВІД КРИВИХ ГАРЯЧИХ КЛАВІШ ---
@@ -964,6 +970,8 @@ TrayTip, RollHouse, ✅ Запущено (режим %speedMode%), 2, 1
 ; --- RollHelper: відкрити ВЕБ-пульт у вікні Edge (бета) ---
 Menu, Tray, Add
 Menu, Tray, Add, ⚙ Налаштування, OpenSettings
+Menu, Tray, Add, 🗺 Оновити карту зон доставки, LoadKmlFile
+Menu, Tray, Add, 📂 Відкрити папку зон, OpenZoneFolder
 Menu, Tray, Add, 🔄 Перезапустити сервер, RestartPythonServer
 if (Module_IsEnabled("web_pult"))
     Menu, Tray, Add, 🌐 Веб-пульт (бета), OpenWebPult
@@ -1734,7 +1742,6 @@ RhNormalizeZoneText(text) {
 }
 
 RhLookupManualZone(value, ByRef zoneName, ByRef zonePrice) {
-    global BRAND_DIR
     zoneName := ""
     zonePrice := 0
     value := Trim(value)
@@ -1748,7 +1755,7 @@ RhLookupManualZone(value, ByRef zoneName, ByRef zonePrice) {
     if (searchValue = "")
         return 0
 
-    pricesFile := BRAND_DIR . "\DeliveryPrices.ini"
+    pricesFile := RhGetZonePricesPath()
     if !FileExist(pricesFile)
         return 0
     FileRead, pricesText, %pricesFile%
@@ -2280,6 +2287,9 @@ OpenSettings:
     _settingsSivTab := _settingsNextTab
     _settingsNextTab += 1
     _settingsTabs .= "|🥢 СІВ"
+    _settingsZonesTab := _settingsNextTab
+    _settingsNextTab += 1
+    _settingsTabs .= "|🗺 Зони"
     _settingsHotkeysTab := _settingsNextTab
     _settingsNextTab += 1
     _settingsTabs .= "|⌨️ Клавіші"
@@ -2395,6 +2405,28 @@ OpenSettings:
     Gui, Settings:Add, Edit, x224 yp w108 h22 vNewPluWasabi Center Limit10, %pluWasabi%
     RhSettingsFont(8, "norm", RhC_Muted)
     Gui, Settings:Add, Text, xs y+12 w316, Не прибирайте нулі на початку PLU-коду.
+
+    ; ── Вкладка: Зони доставки ───────────────────────────────
+    Gui, Settings:Tab, %_settingsZonesTab%
+    _zonePath := RhGetZoneKmlPath()
+    _zoneMode := FileExist(RH_ZONE_OVERRIDE_PATH) ? "Власна карта оператора" : "Стандартна карта пакета"
+    FileGetTime, _zoneUpdatedRaw, %_zonePath%, M
+    if (_zoneUpdatedRaw != "") {
+        FormatTime, _zoneUpdated, %_zoneUpdatedRaw%, dd.MM.yyyy HH:mm
+    } else {
+        _zoneUpdated := "невідомо"
+    }
+    RhZoneStats(_zoneCount, _zonePriced, _zoneCutoffs)
+    RhSettingsFont(9, "bold", RhC_Text)
+    Gui, Settings:Add, Text, x16 y44 w320 Section, Карта зон доставки RollHouse
+    RhSettingsFont(9, "norm", RhC_Text)
+    Gui, Settings:Add, Text, xs y+12 w316 h22 +0x200, % "Джерело: " . _zoneMode
+    Gui, Settings:Add, Text, xs y+4 w316 h22 +0x200, % "Зон: " . _zoneCount . " · з ціною: " . _zonePriced . " · оновлено: " . _zoneUpdated
+    Gui, Settings:Add, Button, xs y+14 w316 h32 gLoadKmlFile, Замінити карту зон (KML)...
+    Gui, Settings:Add, Button, xs y+8 w153 h30 gOpenZoneFolder, Відкрити папку
+    Gui, Settings:Add, Button, x+10 yp w153 h30 gRestorePreviousKml, Повернути попередню
+    RhSettingsFont(8, "norm", RhC_Muted)
+    Gui, Settings:Add, Text, xs y+14 w316 h64, Один KML керує всіма зонами. Назва полігона — назва зони. Перше число в описі — ціна доставки. Після заміни карти перезапуск не потрібен.
 
     ; ── Вкладка: Гарячі клавіші ────────────────────────────
     Gui, Settings:Tab, %_settingsHotkeysTab%
@@ -2888,11 +2920,12 @@ SilentMagicClean:
     deliveryCostStr := ""
     deliveryCostNum := 0
     if (!isPickup) {
-        IfExist, DeliveryPrices.ini
+        zonePricesFile := RhGetZonePricesPath()
+        IfExist, %zonePricesFile%
         {
             oldCaseSense := A_StringCaseSense
             StringCaseSense, Locale
-            FileRead, paramStr, DeliveryPrices.ini
+            FileRead, paramStr, %zonePricesFile%
 
             ; Назви, що ШУКАЮТЬСЯ ТІЛЬКИ В ОСТАННЮ ЧЕРГУ (основні міста)
             mainCitiesRegex := "i)^(Мерефа|Чугуїв|Чугуєв|Берестин)$"
@@ -5085,26 +5118,155 @@ CallHangUp:
 return
 
 ; ═══════════════════════════════════════════════════════════
-; АВТО-ВИЗНАЧЕННЯ ЗОНИ ДОСТАВКИ (RollClub)
-; Щоб оновити карту — просто замініть файл:
-;   brands\rollclub\zones.kml
-; Кеш скинеться при перезапуску скрипта.
+; АВТО-ВИЗНАЧЕННЯ ЗОНИ ДОСТАВКИ
+; Пакет містить стандартну карту brands\rollhouse\zones.kml.
+; Карта оператора зберігається поза версіями програми:
+; %LOCALAPPDATA%\RollHelper\UserData\rollhouse\zones.kml
 ; ═══════════════════════════════════════════════════════════
 
-; ── Таймер: запускається через 450мс після відкриття GUI ──
+RhGetZoneKmlPath() {
+    global RH_ZONE_OVERRIDE_PATH, BRAND_DIR
+    if FileExist(RH_ZONE_OVERRIDE_PATH)
+        return RH_ZONE_OVERRIDE_PATH
+    return BRAND_DIR . "\zones.kml"
+}
+
+RhGetZonePricesPath() {
+    global RH_ZONE_PRICES_PATH, BRAND_DIR
+    if FileExist(RH_ZONE_PRICES_PATH)
+        return RH_ZONE_PRICES_PATH
+    return BRAND_DIR . "\DeliveryPrices.ini"
+}
+
+RhGetZonePricesWritePath() {
+    global RH_USER_DATA_DIR, RH_ZONE_PRICES_PATH
+    FileCreateDir, %RH_USER_DATA_DIR%
+    return RH_ZONE_PRICES_PATH
+}
+
+RhInitializeZones() {
+    global RH_USER_DATA_DIR
+    FileCreateDir, %RH_USER_DATA_DIR%
+    kmlPath := RhGetZoneKmlPath()
+    if FileExist(kmlPath)
+        RcLoadKml(kmlPath)
+}
+
+RhZoneStats(ByRef total, ByRef priced, ByRef cutoffs) {
+    global RcZones
+    total := 0
+    priced := 0
+    cutoffs := 0
+    if (!IsObject(RcZones))
+        return
+    for _, zone in RcZones {
+        total += 1
+        if (zone.price + 0 > 0)
+            priced += 1
+        if (zone.cutoff != "")
+            cutoffs += 1
+    }
+}
+
+OpenZoneFolder:
+    _zonePath := RhGetZoneKmlPath()
+    if FileExist(_zonePath)
+        Run, % "explorer.exe /select,""" . _zonePath . """"
+    else {
+        FileCreateDir, %RH_USER_DATA_DIR%
+        Run, explorer.exe "%RH_USER_DATA_DIR%"
+    }
+return
+
 LoadKmlFile:
-    FileSelectFile, _kmlSel, 3,, Виберіть KML-файл зони, KML (*.kml)
+    _zoneFromSettings := (A_Gui = "Settings")
+    FileSelectFile, _kmlSel, 3,, Виберіть карту зон доставки, KML (*.kml)
     if (_kmlSel = "")
         return
-    _kmlDst := A_ScriptDir . "\brands\" . BRAND . "\zones.kml"
-    FileCopy, %_kmlSel%, %_kmlDst%, 1
+    FileCreateDir, %RH_USER_DATA_DIR%
+    _kmlTemp := RH_USER_DATA_DIR . "\zones.importing.kml"
+    FileDelete, %_kmlTemp%
+    FileCopy, %_kmlSel%, %_kmlTemp%, 1
     if (ErrorLevel) {
-        MsgBox, 48, KML, Не вдалось скопіювати KML-файл.
+        MsgBox, 262192, Зони доставки, Не вдалося скопіювати вибраний KML-файл.
         return
     }
-    RcZonesOk := 0
-    RcZones := []
-    MsgBox, 64, KML, Зону завантажено. Діє з наступного замовлення.
+
+    RcLoadKml(_kmlTemp)
+    RhZoneStats(_zoneCount, _zonePriced, _zoneCutoffs)
+    if (!RcZonesOk || _zoneCount < 1 || _zonePriced < 1) {
+        FileDelete, %_kmlTemp%
+        RhInitializeZones()
+        MsgBox, 262192, Зони доставки, Файл не прийнято.`n`nНе знайдено полігонів зон із ціною. Перевірте, що це KML-карта, а перше число в описі кожної зони є вартістю доставки.
+        return
+    }
+
+    _zoneWithoutPrice := _zoneCount - _zonePriced
+    if (_zoneWithoutPrice > 0) {
+        MsgBox, 262180, Перевірка карти, % "Знайдено зон: " . _zoneCount . "`nЗ ціною: " . _zonePriced . "`nБез ціни: " . _zoneWithoutPrice . "`n`nЗони без ціни не зможуть автоматично встановити вартість доставки. Продовжити?"
+        IfMsgBox, No
+        {
+            FileDelete, %_kmlTemp%
+            RhInitializeZones()
+            return
+        }
+    }
+
+    _currentKml := RhGetZoneKmlPath()
+    if FileExist(_currentKml)
+        FileCopy, %_currentKml%, %RH_ZONE_BACKUP_PATH%, 1
+    FileMove, %_kmlTemp%, %RH_ZONE_OVERRIDE_PATH%, 1
+    if (ErrorLevel) {
+        FileDelete, %_kmlTemp%
+        RhInitializeZones()
+        MsgBox, 262192, Зони доставки, Не вдалося зберегти карту в папці даних RollHelper. Робочу карту не змінено.
+        return
+    }
+
+    RcLoadKml(RH_ZONE_OVERRIDE_PATH)
+    MsgBox, 262208, Зони доставки, % "Карту оновлено.`n`nЗон: " . _zoneCount . "`nЗ ціною: " . _zonePriced . "`n`nНові ціни діятимуть під час наступного зчитування замовлення."
+    if (_zoneFromSettings) {
+        Gui, Settings:Destroy
+        Gosub, OpenSettings
+    }
+return
+
+RestorePreviousKml:
+    _zoneFromSettings := (A_Gui = "Settings")
+    if !FileExist(RH_ZONE_BACKUP_PATH) {
+        MsgBox, 262208, Зони доставки, Попередньої карти ще немає.
+        return
+    }
+
+    RcLoadKml(RH_ZONE_BACKUP_PATH)
+    RhZoneStats(_zoneCount, _zonePriced, _zoneCutoffs)
+    if (!RcZonesOk || _zoneCount < 1 || _zonePriced < 1) {
+        RhInitializeZones()
+        MsgBox, 262192, Зони доставки, Резервна карта пошкоджена або не містить цін. Відновлення скасовано.
+        return
+    }
+
+    _currentKml := RhGetZoneKmlPath()
+    _kmlSwap := RH_USER_DATA_DIR . "\zones.swap.kml"
+    FileDelete, %_kmlSwap%
+    if FileExist(_currentKml)
+        FileCopy, %_currentKml%, %_kmlSwap%, 1
+    FileCopy, %RH_ZONE_BACKUP_PATH%, %RH_ZONE_OVERRIDE_PATH%, 1
+    if (ErrorLevel) {
+        FileDelete, %_kmlSwap%
+        RhInitializeZones()
+        MsgBox, 262192, Зони доставки, Не вдалося відновити попередню карту.
+        return
+    }
+    if FileExist(_kmlSwap)
+        FileCopy, %_kmlSwap%, %RH_ZONE_BACKUP_PATH%, 1
+    FileDelete, %_kmlSwap%
+    RcLoadKml(RH_ZONE_OVERRIDE_PATH)
+    MsgBox, 262208, Зони доставки, % "Попередню карту відновлено.`n`nЗон: " . _zoneCount . "`nЗ ціною: " . _zonePriced . "`nНові ціни діятимуть під час наступного зчитування замовлення."
+    if (_zoneFromSettings) {
+        Gui, Settings:Destroy
+        Gosub, OpenSettings
+    }
 return
 
 RcCheckZone:
@@ -5182,7 +5344,7 @@ RcCheckZone:
     FileAppend, % "[" A_Now "] ZONEDBG GEO-OK addr=[" addr "] lat=" lat " lng=" lng " zonesOk=" RcZonesOk " count=" RcZones.MaxIndex() "`n", %A_ScriptDir%\ahk_debug.log
 
     ; Завантажити KML якщо ще не завантажено (кеш зберігається до перезапуску)
-    kmlPath := A_ScriptDir "\brands\" . BRAND . "\zones.kml"
+    kmlPath := RhGetZoneKmlPath()
     if (!RcZonesOk && FileExist(kmlPath))
         RcLoadKml(kmlPath)
 
@@ -5370,7 +5532,7 @@ RcLoadKml(kmlPath) {
             }
         }
         if (_dp != "") {
-            _dpPath := A_ScriptDir . "\brands\" . BRAND . "\DeliveryPrices.ini"
+            _dpPath := RhGetZonePricesWritePath()
             FileDelete, %_dpPath%
             FileAppend, %_dp%, %_dpPath%, UTF-8
         }
