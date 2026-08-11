@@ -1,0 +1,101 @@
+name: Publish launcher release
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - packaging/launcher-release.json
+      - .github/workflows/publish-launcher-release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build release files
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $request = Get-Content -LiteralPath 'packaging/launcher-release.json' -Raw | ConvertFrom-Json
+          $version = [string]$request.version
+          $packagesRelease = [string]$request.packagesRelease
+          $packagesManifest = Join-Path $env:RUNNER_TEMP 'packages-release-manifest.json'
+          $packagesManifestUrl = "https://github.com/${{ github.repository }}/releases/download/v$packagesRelease/release-manifest.json"
+
+          Invoke-WebRequest -Uri $packagesManifestUrl -OutFile $packagesManifest
+
+          & ./packaging/build-launcher-release.ps1 `
+            -Version $version `
+            -PackagesManifestPath $packagesManifest `
+            -PackageAssetBaseUrl "https://github.com/${{ github.repository }}/releases/download/v$packagesRelease/" `
+            -OutputDirectory (Join-Path $env:RUNNER_TEMP 'RollHelperRelease')
+
+          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RELEASE_DIR=$(Join-Path $env:RUNNER_TEMP "RollHelperRelease/$version")" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = "v$env:RELEASE_VERSION"
+          $repository = '${{ github.repository }}'
+          $releases = @(gh api "repos/$repository/releases?per_page=100" | ConvertFrom-Json)
+
+          foreach ($draft in @($releases | Where-Object { $_.draft -and $_.tag_name -eq $tag })) {
+            gh api --method DELETE "repos/$repository/releases/$($draft.id)"
+          }
+
+          $notesPath = Join-Path $env:RUNNER_TEMP 'launcher-release-notes.md'
+          @"
+          Исправлено обновление списка программ после самообновления лаунчера.
+
+          Лаунчер перечитывает `launcher.config.json` при каждом обновлении списка и сразу видит программы и дополнения из актуального манифеста.
+          "@ | Set-Content -LiteralPath $notesPath -Encoding utf8
+
+          $launcherAsset = Join-Path $env:RELEASE_DIR "RollHelperLauncher-win-x64-$env:RELEASE_VERSION.zip"
+          $manifestAsset = Join-Path $env:RELEASE_DIR 'release-manifest.json'
+          $published = $releases | Where-Object { -not $_.draft -and $_.tag_name -eq $tag } | Select-Object -First 1
+
+          if ($published) {
+            gh release upload $tag $launcherAsset $manifestAsset --clobber --repo $repository
+            gh release edit $tag --title "RollHelper $env:RELEASE_VERSION" --notes-file $notesPath --latest --repo $repository
+          }
+          else {
+            gh release create $tag $launcherAsset $manifestAsset `
+              --target master `
+              --title "RollHelper $env:RELEASE_VERSION" `
+              --notes-file $notesPath `
+              --latest `
+              --repo $repository
+          }
+
+      - name: Verify published files
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $urls = @(
+            'https://github.com/${{ github.repository }}/releases/latest/download/release-manifest.json',
+            "https://github.com/${{ github.repository }}/releases/download/v$env:RELEASE_VERSION/RollHelperLauncher-win-x64-$env:RELEASE_VERSION.zip"
+          )
+
+          foreach ($url in $urls) {
+            $response = Invoke-WebRequest -Uri $url -Method Head
+            if ($response.StatusCode -ne 200) {
+              throw "Published file is unavailable: $url"
+            }
+          }
