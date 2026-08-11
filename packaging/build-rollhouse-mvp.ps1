@@ -38,6 +38,14 @@ Copy-Item -LiteralPath (Join-Path $repoRoot "config") -Destination $rollHelperRo
 Copy-Item -LiteralPath (Join-Path $repoRoot "core") -Destination $rollHelperRoot -Recurse
 Copy-Item -LiteralPath (Join-Path $repoRoot "lib") -Destination $rollHelperRoot -Recurse
 
+# AutoHotkey v1 determines source encoding before FileEncoding is applied.
+# Every standalone and included AHK source therefore needs a UTF-8 BOM.
+$utf8Bom = New-Object System.Text.UTF8Encoding($true)
+Get-ChildItem -LiteralPath $rollHelperRoot -Recurse -Filter "*.ahk" | ForEach-Object {
+    $sourceText = [IO.File]::ReadAllText($_.FullName, [Text.Encoding]::UTF8)
+    [IO.File]::WriteAllText($_.FullName, $sourceText, $utf8Bom)
+}
+
 foreach ($fileName in @("DeliveryPrices.ini", "RkTemplates.txt", "zones.kml")) {
     Copy-Item -LiteralPath (Join-Path $repoRoot "brands\rollhouse\$fileName") -Destination (Join-Path $rollHelperRoot "brands\rollhouse\$fileName")
 }
