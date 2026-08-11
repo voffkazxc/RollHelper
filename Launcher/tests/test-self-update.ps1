@@ -1,7 +1,7 @@
 param(
-    [string]$ReleaseRoot = (Join-Path $env:TEMP "RollHelperRelease\0.1.12"),
-    [string]$OldVersion = "0.1.11",
-    [string]$NewVersion = "0.1.12"
+    [string]$ReleaseRoot = (Join-Path $env:TEMP "RollHelperRelease\0.1.13"),
+    [string]$OldVersion = "0.1.12",
+    [string]$NewVersion = "0.1.13"
 )
 
 $ErrorActionPreference = "Stop"

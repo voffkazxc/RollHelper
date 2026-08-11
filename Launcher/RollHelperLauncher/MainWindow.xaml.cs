@@ -76,7 +76,7 @@ public partial class MainWindow : Window
     private void ProgramsGrid_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         if (e.OriginalSource is not DependencyObject source
-            || ItemsControl.ContainerFromElement(ProgramsGrid, source) is DataGridRow
+            || FindVisualParent<DataGridRow>(source) is not null
             || FindVisualParent<DataGridColumnHeader>(source) is not null
             || FindVisualParent<ScrollBar>(source) is not null)
         {

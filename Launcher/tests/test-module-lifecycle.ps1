@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "0.1.12"
+    [string]$Version = "0.1.13"
 )
 
 $ErrorActionPreference = "Stop"
@@ -304,6 +304,32 @@ public static class ModuleTestNative {
         throw "Saved panel ratio was not restored. Expected about 0.64, actual $restoredPanelRatio"
     }
 
+    $programHeaderCondition = New-Object Windows.Automation.PropertyCondition(
+        [Windows.Automation.AutomationElement]::ControlTypeProperty,
+        [Windows.Automation.ControlType]::HeaderItem)
+    $programHeaders = $programsGridForRatio.FindAll(
+        [Windows.Automation.TreeScope]::Descendants,
+        $programHeaderCondition)
+    $originalCellCursor = New-Object ModuleTestNative+POINT
+    [ModuleTestNative]::GetCursorPos([ref]$originalCellCursor) | Out-Null
+    for ($headerIndex = 0; $headerIndex -lt $programHeaders.Count; $headerIndex++) {
+        $headerBounds = $programHeaders.Item($headerIndex).Current.BoundingRectangle
+        $programGridBounds = $programsGridForRatio.Current.BoundingRectangle
+        [ModuleTestNative]::SetForegroundWindow([IntPtr]$window.Current.NativeWindowHandle) | Out-Null
+        [ModuleTestNative]::SetCursorPos(
+            [int]($headerBounds.Left + ($headerBounds.Width / 2)),
+            [int]($programGridBounds.Top + $headerBounds.Height + 21)) | Out-Null
+        [ModuleTestNative]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
+        [ModuleTestNative]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
+        Start-Sleep -Milliseconds 150
+        if (-not $window.FindFirst(
+            [Windows.Automation.TreeScope]::Descendants,
+            $moduleNameCondition)) {
+            throw "Clicking program column $($programHeaders.Item($headerIndex).Current.Name) closed the module panel."
+        }
+    }
+    [ModuleTestNative]::SetCursorPos($originalCellCursor.X, $originalCellCursor.Y) | Out-Null
+
     $programGrid = Find-ElementByName -Root $window -Name "Список программ"
     $gridBounds = $programGrid.Current.BoundingRectangle
     $originalGridCursor = New-Object ModuleTestNative+POINT
@@ -453,6 +479,7 @@ public static class ModuleTestNative {
         ModuleRemoved = $true
         UiStateRestored = $true
         UiStateSaved = $true
+        ProgramColumnsKeepSelection = $true
     }
 }
 finally {
