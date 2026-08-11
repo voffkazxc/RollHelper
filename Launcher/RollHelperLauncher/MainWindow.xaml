@@ -95,6 +95,7 @@
 
                     <DataGrid x:Name="ProgramsGrid"
                               Grid.Row="2"
+                              AutomationProperties.Name="Список программ"
                               AutoGenerateColumns="False"
                               CanUserAddRows="False"
                               CanUserDeleteRows="False"
@@ -113,6 +114,7 @@
                               FontFamily="Segoe UI"
                               FontSize="13"
                               SelectionChanged="ProgramsGrid_SelectionChanged"
+                              MouseLeftButtonUp="ProgramsGrid_MouseLeftButtonUp"
                               MouseDoubleClick="ProgramsGrid_MouseDoubleClick">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Название" Binding="{Binding DisplayName}" Width="1.2*" MinWidth="110" />
@@ -153,16 +155,33 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <StackPanel>
-                        <TextBlock x:Name="ModulesHeaderText"
-                                   Text="Дополнения"
-                                   FontSize="18"
-                                   FontWeight="SemiBold" />
-                        <TextBlock x:Name="ModulesHintText"
-                                   Margin="0,3,0,0"
-                                   Text="Сначала выберите программу слева"
-                                   Foreground="{StaticResource SecondaryTextBrush}" />
-                    </StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Name="ModulesHeaderText"
+                                       Text="Дополнения"
+                                       FontSize="18"
+                                       FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="ModulesHintText"
+                                       Margin="0,3,0,0"
+                                       Text="Сначала выберите программу слева"
+                                       TextTrimming="CharacterEllipsis"
+                                       Foreground="{StaticResource SecondaryTextBrush}" />
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                                Margin="10,0,0,0"
+                                Padding="10,5"
+                                MinHeight="30"
+                                FontSize="12"
+                                VerticalAlignment="Top"
+                                Content="Скрыть"
+                                ToolTip="Снять выбор программы и закрыть дополнения"
+                                Click="HideModulesButton_Click" />
+                    </Grid>
 
                     <Grid Grid.Row="2">
                         <DataGrid x:Name="ModulesGrid"

@@ -8,7 +8,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>RollHelperLauncher</AssemblyName>
     <RootNamespace>RollHelperLauncher</RootNamespace>
-    <Version>0.1.10</Version>
+    <Version>0.1.11</Version>
   </PropertyGroup>
 
 </Project>

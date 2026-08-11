@@ -2,7 +2,9 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace RollHelperLauncher;
 
@@ -67,6 +69,21 @@ public partial class MainWindow : Window
 
     private async void ProgramsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e) => await InstallAndRunSelectedProgramAsync();
 
+    private void ProgramsGrid_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is not DependencyObject source
+            || ItemsControl.ContainerFromElement(ProgramsGrid, source) is DataGridRow
+            || FindVisualParent<DataGridColumnHeader>(source) is not null
+            || FindVisualParent<ScrollBar>(source) is not null)
+        {
+            return;
+        }
+
+        ClearProgramSelection();
+    }
+
+    private void HideModulesButton_Click(object sender, RoutedEventArgs e) => ClearProgramSelection();
+
     private async void ModulesGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e) => await InstallOrEnableSelectedModuleAsync();
 
     private async void InstallEnableModuleButton_Click(object sender, RoutedEventArgs e) => await InstallOrEnableSelectedModuleAsync();
@@ -86,6 +103,34 @@ public partial class MainWindow : Window
         RefreshModulesForSelectedProgram();
         UpdateProgramActionButton();
         UpdateSelectionStatus();
+    }
+
+    private void ClearProgramSelection()
+    {
+        ProgramsGrid.UnselectAll();
+        ProgramsGrid.SelectedItem = null;
+        ProgramsGrid.CurrentItem = null;
+        RefreshModulesForSelectedProgram();
+        UpdateProgramActionButton();
+        UpdateSelectionStatus();
+    }
+
+    private static T? FindVisualParent<T>(DependencyObject? child) where T : DependencyObject
+    {
+        var current = child;
+        while (current is not null)
+        {
+            if (current is T match)
+            {
+                return match;
+            }
+
+            current = current is Visual
+                ? VisualTreeHelper.GetParent(current)
+                : LogicalTreeHelper.GetParent(current);
+        }
+
+        return null;
     }
 
     private void ModulesGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)

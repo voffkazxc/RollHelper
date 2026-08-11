@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "0.1.10"
+    [string]$Version = "0.1.11"
 )
 
 $ErrorActionPreference = "Stop"
@@ -275,6 +275,39 @@ public static class ModuleTestNative {
         $moduleNameCondition)
     if ($moduleBeforeSelection) {
         throw "Modules must stay hidden until the user selects a program."
+    }
+
+    Select-NamedItem -Root $window -Name "Test Program"
+    Find-ElementByName -Root $window -Name "Test Module" | Out-Null
+
+    $programGrid = Find-ElementByName -Root $window -Name "Список программ"
+    $gridBounds = $programGrid.Current.BoundingRectangle
+    $originalGridCursor = New-Object ModuleTestNative+POINT
+    [ModuleTestNative]::GetCursorPos([ref]$originalGridCursor) | Out-Null
+    [ModuleTestNative]::SetForegroundWindow([IntPtr]$window.Current.NativeWindowHandle) | Out-Null
+    [ModuleTestNative]::SetCursorPos(
+        [int]($gridBounds.Left + ($gridBounds.Width / 2)),
+        [int]($gridBounds.Bottom - 18)) | Out-Null
+    [ModuleTestNative]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
+    [ModuleTestNative]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
+    [ModuleTestNative]::SetCursorPos($originalGridCursor.X, $originalGridCursor.Y) | Out-Null
+    Start-Sleep -Milliseconds 300
+    $moduleAfterEmptyClick = $window.FindFirst(
+        [Windows.Automation.TreeScope]::Descendants,
+        $moduleNameCondition)
+    if ($moduleAfterEmptyClick) {
+        throw "Clicking empty program-list space did not clear the selection."
+    }
+
+    Select-NamedItem -Root $window -Name "Test Program"
+    Find-ElementByName -Root $window -Name "Test Module" | Out-Null
+    Invoke-Element (Find-ButtonByName -Root $window -Name "Скрыть")
+    Start-Sleep -Milliseconds 200
+    $moduleAfterHide = $window.FindFirst(
+        [Windows.Automation.TreeScope]::Descendants,
+        $moduleNameCondition)
+    if ($moduleAfterHide) {
+        throw "Hide button did not close the module panel."
     }
 
     Select-NamedItem -Root $window -Name "Test Program"
