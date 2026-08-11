@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "id": "rollhouse",
+  "displayName": "Roll House",
+  "version": "0.1.0",
+  "entrypoint": {
+    "file": "start_rollhouse.bat",
+    "workingDirectory": "."
+  }
+}

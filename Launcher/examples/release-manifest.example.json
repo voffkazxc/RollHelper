@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "release": "0.1.0",
+  "packages": [
+    {
+      "id": "rollhouse",
+      "type": "brand",
+      "displayName": "Roll House",
+      "version": "0.1.0",
+      "asset": "brand-rollhouse-0.1.0.zip",
+      "sha256": "PUT_REAL_SHA256_HERE"
+    }
+  ]
+}

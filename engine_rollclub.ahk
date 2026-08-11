@@ -4,7 +4,9 @@
 SetWorkingDir %A_ScriptDir%\brands\rollclub   ; дані Roll Club (конфіг, промо, кухні, img)
 FileEncoding, UTF-8
 #Include %A_ScriptDir%\lib\IikoUI.ahk
+#Include %A_ScriptDir%\core\orchestration\OperationCoordinator.ahk
 
+OpCoord_Init("rollclub", A_ScriptDir)
 RhKillDuplicateInstances()
 
 ; Налаштування координат
@@ -313,6 +315,7 @@ return
 ; ГОЛОВНИЙ ТРИГЕР
 ; ========================================================
 TriggerMain:
+    OpCoord_Event("ReadingOrder", "trigger", "TriggerMain", "inDutyTake=" . _inDutyTake . ";dutyOn=" . dutyOn)
     GoSub, KcStopDuty          ; ручна робота → дежурство стоп
     ; При дежурстві (_inDutyTake=1) НЕ тоглимо видимість, а ЗАВЖДИ робимо повний перечит нового заказу.
     ; Ручна тільда — як раніше: тогл показати/сховати.
@@ -415,6 +418,7 @@ RcRemoveTip:
 return
 
 TriggerSiv:
+    OpCoord_Event("PunchingSiv", "trigger", "TriggerSiv", "dutyOn=" . dutyOn)
     GoSub, KcStopDuty
     GoSub, AddSivVisual
 return
@@ -2110,6 +2114,7 @@ KcStopDuty:
 return
 
 KcDutyToggle:
+    OpCoord_Event("DutyScanning", "toggle", "KcDutyToggle", "was_dutyOn=" . dutyOn . ";punchBusy=" . rhPunchBusy . ";inDutyTake=" . _inDutyTake)
     ; Ctrl+F4: дежурство — сам ловить перший вільний годний заказ, бере і зупиняється з гучним сигналом
     FileAppend, % "[" . A_Now . "] Ctrl+F4-TOGGLE (was dutyOn=" . dutyOn . ")`n", %A_ScriptDir%\parse_debug.log
     if (rhPunchBusy || _inDutyTake)
@@ -3186,6 +3191,7 @@ return
     ; СИВ — ПРОБИТТЯ
 ; ========================================================
 SivVisApply:
+    _opSivToken := OpCoord_Begin("PunchingSiv", "SivVisApply", "source=F1")
     rhPunchBusy := 1
     dutyOn := 0
     kcForce := 0
@@ -3241,6 +3247,7 @@ SivVisApply:
     Gui, Roll:Show
     GoSub, RhRepaintRollPult
     rhPunchBusy := 0
+    OpCoord_End(_opSivToken, "ok", "rolls=" . VisRolls . ";norm=" . VisNorm . ";edu=" . VisEdu)
 return
 
 ; --------------------------------------------------------
@@ -3264,6 +3271,7 @@ return
 ; ФІНАЛЬНЕ ВНЕСЕННЯ
 ; ========================================================
 ApplyRollclub:
+    _opEnterToken := OpCoord_Begin("EditingOrder", "ApplyRollclub", "inDutyTake=" . _inDutyTake)
     rhPunchBusy := 1
     dutyOn := 0
     kcForce := 0
@@ -3494,10 +3502,12 @@ ApplyRollclub:
     MouseMove, %originalMouseX%, %originalMouseY%, 0
     rhPunchBusy := 0
     FileAppend, % "[" . A_Now . "] APPLY_LOCK off`n", %A_ScriptDir%\parse_debug.log
+    OpCoord_End(_opEnterToken, "ok", "apply_complete")
 return
 
 ; ── ФІНІШ: Подтвердить → Зберегти на точку (Ctrl+Enter). Окремо, безпечно. ──
 FinishOrder:
+    _opFinishToken := OpCoord_Begin("FinishingOrder", "FinishOrder", "hotkey=Ctrl+Enter")
     GoSub, KcStopDuty          ; ручний фініш (Ctrl+Enter) → дежурство стоп
     FileAppend, % "[" . A_Now . "] FINISH via IikoUI Driver`n", %A_ScriptDir%\ahk_debug.log
     
@@ -3512,6 +3522,7 @@ FinishOrder:
     kcPaused := 0
     ToolTip, Confirmed + saved (IikoUI Driver).
     SetTimer, RemoveFinishTip, -2000
+    OpCoord_End(_opFinishToken, "ok", "finish_complete")
 return
 
 RemoveFinishTip:

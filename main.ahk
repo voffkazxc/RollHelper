@@ -5,22 +5,15 @@ CoordMode, Mouse, Screen
 CoordMode, Pixel, Screen
 FileEncoding, UTF-8
 #Include %A_ScriptDir%\lib\UIA_Interface.ahk
+#Include %A_ScriptDir%\core\orchestration\OperationCoordinator.ahk
+#Include %A_ScriptDir%\core\modules\ModuleRegistry.ahk
 
 ; ══════════════════════════════════════════════════════════════
-;  RollHelper — ВИБІР БРЕНДУ (Roll House / Roll Club)
-;  Активний бренд зберігається у settings.ini (секція App, ключ Brand).
-;  Дані бренду лежать у brands\<brand>\ — туди ж переводимо робочу папку,
-;  тож усі відносні файли (RkConfig.ini, RkTemplates.txt, img\, DeliveryPrices.ini)
-;  читаються саме з папки активного бренду. Сервер — спільний (APP_DIR\server).
+;  RollHelper — брендовый пакет RollHouse
+;  RollClub запускается своим entrypoint engine_rollclub.ahk.
+;  Выбор бренда выполняет лаунчер, а не рабочий пульт.
 ; ══════════════════════════════════════════════════════════════
 global APP_DIR := A_ScriptDir
-IniRead, BrandActive, %APP_DIR%\settings.ini, App, Brand, rollhouse
-; Лаунчер: якщо збережений бренд — Roll Club, відразу запускаємо його движок і виходимо.
-; (main.ahk — це движок Roll House; Roll Club має власний engine_rollclub.ahk)
-if (BrandActive = "rollclub") {
-    Run, "%A_AhkPath%" "%APP_DIR%\engine_rollclub.ahk"
-    ExitApp
-}
 global BRAND := "rollhouse"
 global BRAND_DIR := APP_DIR . "\brands\rollhouse"
 global UIA_MAP_CONFIG := BRAND_DIR . "\RkConfig.ini"
@@ -29,6 +22,8 @@ global RhLastEnterTick := 0
 global RhEnterCooldownMs := 2500
 global RhFinishBusy := 0
 global RhLocalUIA := ""
+OpCoord_Init("rollhouse", APP_DIR)
+ModuleRegistry_Init(APP_DIR, "rollhouse", "mvp")
 SetWorkingDir, %BRAND_DIR%
 OnExit, ExitRoutine
 
@@ -848,6 +843,15 @@ IniRead, pluBurger, RkConfig.ini, PLU, Burger, 0000
 IniRead, giftPepsiThreshold, RkConfig.ini, Gifts, PepsiThreshold, 699
 IniRead, giftBrooklynThreshold, RkConfig.ini, Gifts, BrooklynThreshold, 899
 IniRead, giftBurgerThreshold, RkConfig.ini, Gifts, BurgerThreshold, 1299
+IniRead, giftPepsiEnabled, RkConfig.ini, Gifts, PepsiEnabled, 1
+IniRead, giftBrooklynEnabled, RkConfig.ini, Gifts, BrooklynEnabled, 1
+IniRead, giftBurgerEnabled, RkConfig.ini, Gifts, BurgerEnabled, 1
+IniRead, giftPepsiName, RkConfig.ini, Gifts, PepsiName, Пепсі
+IniRead, giftBrooklynName, RkConfig.ini, Gifts, BrooklynName, Бруклін
+IniRead, giftBurgerName, RkConfig.ini, Gifts, BurgerName, Крабсбургер
+giftPepsiEnabled := giftPepsiEnabled ? 1 : 0
+giftBrooklynEnabled := giftBrooklynEnabled ? 1 : 0
+giftBurgerEnabled := giftBurgerEnabled ? 1 : 0
 
 ; --- PLU СИВ (палички, соус, імбир, васабі) ---
 IniRead, pluSticksNorm, RkConfig.ini, PLU_SIV, SticksNorm, 00430
@@ -906,12 +910,18 @@ if (ErrorLevel) {
     Hotkey, %hkSiv%, TriggerSiv, On
 }
 
+; MVP: базовая обработка + СІВ. Остальные модули остаются в коде,
+; но не регистрируют хоткеи, таймеры и фоновые процессы.
+ModuleRegistry_ApplyRollHouseMvpPolicy()
+
 TrayTip, RollHouse, ✅ Запущено (режим %speedMode%), 2, 1
 
 ; --- RollHelper: відкрити ВЕБ-пульт у вікні Edge (бета) ---
 Menu, Tray, Add
+Menu, Tray, Add, ⚙ Налаштування, OpenSettings
 Menu, Tray, Add, 🔄 Перезапустити сервер, RestartPythonServer
-Menu, Tray, Add, 🌐 Веб-пульт (бета), OpenWebPult
+if (Module_IsEnabled("web_pult"))
+    Menu, Tray, Add, 🌐 Веб-пульт (бета), OpenWebPult
 
 ; --- Запуск Python-сервера (читає поля iiko «по іменах», надійніше за прицели) ---
 ; Сервер спільний для брендів; беремо вже робочий поряд: APP_DIR\..\server.
@@ -1013,6 +1023,7 @@ return
 
 ; --- ГОЛОВНИЙ ТРИГЕР ПАРСИНГУ ---
 TriggerMain:
+    OpCoord_Event("ReadingOrder", "trigger", "TriggerMain", "rollExists=" . rollExists . ";rollVisible=" . rollVisible . ";dutyOn=" . dutyOn)
     ; --- ЗАХИСТ ДЕЖУРСТВА: будь-яка ручна дія оператора → зупиняємо авто-режим ---
     dutyOn := 0
     kcStop := 1
@@ -1140,6 +1151,7 @@ RemoveToolTip:
 return
 
 TriggerSiv:
+    OpCoord_Event("PunchingSiv", "trigger", "TriggerSiv", "dutyOn=" . dutyOn)
 
     ; --- ЗАХИСТ ДЕЖУРСТВА (F1/SIV) ---
 
@@ -1253,7 +1265,7 @@ RhApplyTheme() {
 DrawRollclub:
     RhApplyTheme()
     RhStaticColors := {}
-    _brandName := (BRAND = "rollclub") ? "Roll Club" : "Roll House"
+    _brandName := "Roll House"
     _orderType := isPickup ? "Самовивіз" : "Доставка"
     _serverPill := RH_SERVER_OK ? "● ONLINE" : "● OFFLINE"
     _userLabel := A_UserName
@@ -1308,16 +1320,12 @@ DrawRollclub:
         top%A_Index% := arr[2]
     }
 
-    ; ── Пошук / бренд ────────────────────────────────────
+    ; ── Пошук адреси / зони ──────────────────────────────
     Gui, Roll:Font, s9 bold c%RhC_Text%, %RhFontName%
-    Gui, Roll:Add, Text, x26 y104 w110 h18 +BackgroundTrans, 🔎 Адреса / зона
-    Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
-    Gui, Roll:Add, Text, x242 y104 w88 h18 Right +BackgroundTrans, бренд
+    Gui, Roll:Add, Text, x26 y104 w200 h18 +BackgroundTrans, 🔎 Адреса / зона
     Gui, Roll:Font, s10 norm c%RhC_Text%, %RhFontName%
     _mapInit := (streetText != "" && !isPickup) ? "Визначаю зону..." : "Зона / точка на карті..."
-    Gui, Roll:Add, Edit, x26 y126 w190 h26 vMapSearch, %_mapInit%
-    _brandIdx := (BRAND = "rollclub") ? 2 : 1
-    Gui, Roll:Add, DropDownList, x224 y126 w108 vBrandSel gBrandChange AltSubmit Choose%_brandIdx%, Roll House|Roll Club
+    Gui, Roll:Add, Edit, x26 y126 w306 h26 vMapSearch, %_mapInit%
 
     ; ── Карта замовлення: зона / сума / тип ──────────────
     if (isPickup)
@@ -1327,82 +1335,88 @@ DrawRollclub:
     else
         _zoneTxt := "Зона не визначена"
     Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
-    Gui, Roll:Add, Text, x34 y199 w80 h14 Center +BackgroundTrans, статус
-    Gui, Roll:Add, Text, x140 y199 w80 h14 Center +BackgroundTrans, сума
-    Gui, Roll:Add, Text, x246 y199 w78 h14 Center +BackgroundTrans, разом
+    Gui, Roll:Add, Text, x34 y175 w80 h14 Center +BackgroundTrans, статус
+    Gui, Roll:Add, Text, x140 y175 w80 h14 Center +BackgroundTrans, сума
+    Gui, Roll:Add, Text, x246 y175 w78 h14 Center +BackgroundTrans, разом
     Gui, Roll:Font, s9 bold c%RhC_SoftText%, %RhFontName%
-    Gui, Roll:Add, Text, x34 y216 w80 h18 Center +BackgroundTrans, %_orderType%
+    Gui, Roll:Add, Text, x34 y192 w80 h18 Center +BackgroundTrans, %_orderType%
     Gui, Roll:Font, s10 bold c%RhC_Text%, %RhFontName%
-    Gui, Roll:Add, Text, x140 y216 w80 h18 Center +BackgroundTrans, %orderSum% грн
+    Gui, Roll:Add, Text, x140 y192 w80 h18 Center +BackgroundTrans, %orderSum% грн
     Gui, Roll:Font, s10 bold c%RhC_Neon%, %RhFontName%
-    Gui, Roll:Add, Text, x246 y216 w78 h18 Center +BackgroundTrans vRhTotalLbl, %totalSum% грн
+    Gui, Roll:Add, Text, x246 y192 w78 h18 Center +BackgroundTrans vRhTotalLbl, %totalSum% грн
     Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
-    Gui, Roll:Add, Text, x26 y240 w306 h14 Center +BackgroundTrans, 📍 %_zoneTxt%
+    Gui, Roll:Add, Text, x26 y216 w306 h14 Center +BackgroundTrans, 📍 %_zoneTxt%
 
     ; ── Оплата ───────────────────────────────────────────
     DoAutoCash := noPayChange ? 0 : autoCash
     DoAutoCard := noPayChange ? 0 : autoCard
     Gui, Roll:Font, s10 bold cFFFFFF, %RhFontName%
-    Gui, Roll:Add, Button, x14 y270 w160 h36 HwndhPayCash gRhTogCash, 💵 Готівка
-    Gui, Roll:Add, Button, x184 y270 w160 h36 HwndhPayCard gRhTogCard, 💳 Картка
+    Gui, Roll:Add, Button, x14 y246 w160 h36 HwndhPayCash gRhTogCash, 💵 Готівка
+    Gui, Roll:Add, Button, x184 y246 w160 h36 HwndhPayCard gRhTogCard, 💳 Картка
     RhRegColor(hPayCash, (DoAutoCash ? RhB_Cash : RhB_ButtonOff), (DoAutoCash ? RhB_White : RhB_Text))
     RhRegColor(hPayCard, (DoAutoCard ? RhB_Card : RhB_ButtonOff), (DoAutoCard ? RhB_White : RhB_Text))
 
     ; ── Коментар ─────────────────────────────────────────
     Gui, Roll:Font, s9 bold c%RhC_Text%, %RhFontName%
-    Gui, Roll:Add, Text, x26 y326 w94 h18 +BackgroundTrans, 📝 Коментар
+    Gui, Roll:Add, Text, x26 y302 w94 h18 +BackgroundTrans, 📝 Коментар
     Gui, Roll:Font, s8 norm c%RhC_Neon%, %RhFontName%
-    Gui, Roll:Add, Button, x124 y324 w96 h22 gRhNoChange, Без сдачі
-    Gui, Roll:Add, Button, x224 y324 w108 h22 vRhRawBtn gRhToggleRaw, вихідний »
+    Gui, Roll:Add, Button, x124 y300 w96 h22 gRhNoChange, Без сдачі
+    Gui, Roll:Add, Button, x224 y300 w108 h22 vRhRawBtn gRhToggleRaw, вихідний »
     Gui, Roll:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Roll:Add, Edit, x26 y350 w306 r3 vOrderComment gRhRefreshEnterPreview, %cleanComment%
-    Gui, Roll:Add, Edit, x26 y350 w306 r3 vRhRawEdit ReadOnly +Hidden, %rawComment%
+    Gui, Roll:Add, Edit, x26 y326 w306 r3 vOrderComment gRhRefreshEnterPreview, %cleanComment%
+    Gui, Roll:Add, Edit, x26 y326 w306 r3 vRhRawEdit ReadOnly +Hidden, %rawComment%
 
     ; ── Кухня / адреса ───────────────────────────────────
     Gui, Roll:Font, s9 bold c%RhC_Text%, %RhFontName%
-    Gui, Roll:Add, Text, x26 y426 w62 h22 +0x200 +BackgroundTrans, 🍳 Кухня
+    Gui, Roll:Add, Text, x26 y402 w62 h22 +0x200 +BackgroundTrans, 🍳 Кухня
     Gui, Roll:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Roll:Add, Edit, x92 y426 w240 h22 r1 vClientInfo gRhRefreshEnterPreview, %infoText%
+    Gui, Roll:Add, Edit, x92 y402 w240 h22 r1 vClientInfo gRhRefreshEnterPreview, %infoText%
     Gui, Roll:Font, s9 bold c%RhC_Text%, %RhFontName%
-    Gui, Roll:Add, Text, x26 y458 w62 h22 +0x200 +BackgroundTrans, 🏠 Адреса
+    Gui, Roll:Add, Text, x26 y434 w62 h22 +0x200 +BackgroundTrans, 🏠 Адреса
     Gui, Roll:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Roll:Add, Edit, x92 y458 w240 h22 r1 vAddressNote gRhRefreshEnterPreview, %addrNote%
+    Gui, Roll:Add, Edit, x92 y434 w240 h22 r1 vAddressNote gRhRefreshEnterPreview, %addrNote%
 
     ; ── Інлайн СІВ ───────────────────────────────────────
     Gui, Roll:Font, s9 bold c%RhC_Text%, %RhFontName%
-    Gui, Roll:Add, Text, x26 y519 w36 h24 +0x200 +BackgroundTrans, 🥣
+    Gui, Roll:Add, Text, x26 y495 w36 h24 +0x200 +BackgroundTrans, 🥣
     Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
-    Gui, Roll:Add, Text, x62 y519 w22 h24 +0x200 +BackgroundTrans, Рол
-    Gui, Roll:Add, Edit, x86 y520 w34 h22 vVisRolls gRhRefreshEnterPreview Center Number,
-    Gui, Roll:Add, Text, x126 y519 w18 h24 +0x200 +BackgroundTrans, Зв
-    Gui, Roll:Add, Edit, x146 y520 w34 h22 vVisNorm gRhRefreshEnterPreview Center Number,
-    Gui, Roll:Add, Text, x186 y519 w18 h24 +0x200 +BackgroundTrans, Уч
-    Gui, Roll:Add, Edit, x206 y520 w34 h22 vVisEdu gRhRefreshEnterPreview Center Number,
+    Gui, Roll:Add, Text, x62 y495 w22 h24 +0x200 +BackgroundTrans, Рол
+    Gui, Roll:Add, Edit, x86 y496 w34 h22 vVisRolls gRhRefreshEnterPreview Center Number,
+    Gui, Roll:Add, Text, x126 y495 w18 h24 +0x200 +BackgroundTrans, Зв
+    Gui, Roll:Add, Edit, x146 y496 w34 h22 vVisNorm gRhRefreshEnterPreview Center Number,
+    Gui, Roll:Add, Text, x186 y495 w18 h24 +0x200 +BackgroundTrans, Уч
+    Gui, Roll:Add, Edit, x206 y496 w34 h22 vVisEdu gRhRefreshEnterPreview Center Number,
     Gui, Roll:Font, s9 bold cFFFFFF, %RhFontName%
-    Gui, Roll:Add, Button, x250 y518 w82 h26 HwndhSivGo gRhSivGo, Пробити
+    Gui, Roll:Add, Button, x250 y494 w82 h26 HwndhSivGo gRhSivGo, Пробити
     RhRegColor(hSivGo, RhB_Siv, RhB_White)
     Gui, Roll:Font, s8 bold c%RhC_Muted%, %RhFontName%
-    Gui, Roll:Add, Text, x26 y548 w306 h18 vRhSivPreview HwndhRhSivPreview +0x200, СІВ: введи Рол/Зв/Уч — покажу соус/імбир/васабі
+    Gui, Roll:Add, Text, x26 y524 w306 h18 vRhSivPreview HwndhRhSivPreview +0x200, СІВ: введи Рол/Зв/Уч — покажу соус/імбир/васабі
     RhRegColor(hRhSivPreview, RhB_StatusSoft, RhB_Text)
 
     ; ── Подарунки ────────────────────────────────────────
-    GiftPepsi := autoPepsi
-    GiftBrooklyn := autoBrooklyn
-    GiftBurger := autoBurger
+    GiftPepsi := giftPepsiEnabled ? autoPepsi : 0
+    GiftBrooklyn := giftBrooklynEnabled ? autoBrooklyn : 0
+    GiftBurger := giftBurgerEnabled ? autoBurger : 0
     Gui, Roll:Font, s9 bold c%RhC_Text%, %RhFontName%
-    Gui, Roll:Add, Text, x14 y572 w86 h30 +0x200, 🎁 Подарунок
+    Gui, Roll:Add, Text, x14 y548 w86 h30 +0x200, 🎁 Подарунок
     Gui, Roll:Font, s9 bold cFFFFFF, %RhFontName%
-    _giftPText := GiftPepsi ? "✓ Пепсі" : "Пепсі"
-    Gui, Roll:Add, Button, x104 y572 w74 h30 vGiftPBtn HwndhGiftP gRhTogPepsi, %_giftPText%
-    _giftBText := GiftBrooklyn ? "✓ Бруклін" : "Бруклін"
-    Gui, Roll:Add, Button, x184 y572 w74 h30 vGiftBBtn HwndhGiftB gRhTogBrook, %_giftBText%
-    _giftUText := GiftBurger ? "✓ Бургер" : "Бургер"
-    Gui, Roll:Add, Button, x264 y572 w80 h30 vGiftUBtn HwndhGiftU gRhTogBurg, %_giftUText%
+    _giftPText := (GiftPepsi ? "✓ " : "") . giftPepsiName
+    Gui, Roll:Add, Button, x104 y548 w74 h30 vGiftPBtn HwndhGiftP gRhTogPepsi, %_giftPText%
+    _giftBText := (GiftBrooklyn ? "✓ " : "") . giftBrooklynName
+    Gui, Roll:Add, Button, x184 y548 w74 h30 vGiftBBtn HwndhGiftB gRhTogBrook, %_giftBText%
+    _giftUText := (GiftBurger ? "✓ " : "") . giftBurgerName
+    Gui, Roll:Add, Button, x264 y548 w80 h30 vGiftUBtn HwndhGiftU gRhTogBurg, %_giftUText%
+    if (!giftPepsiEnabled)
+        GuiControl, Roll:Disable, GiftPBtn
+    if (!giftBrooklynEnabled)
+        GuiControl, Roll:Disable, GiftBBtn
+    if (!giftBurgerEnabled)
+        GuiControl, Roll:Disable, GiftUBtn
     RhRegColor(hGiftP, (GiftPepsi ? RhB_Gift : RhB_ButtonOff), (GiftPepsi ? RhB_White : RhB_Text))
     RhRegColor(hGiftB, (GiftBrooklyn ? RhB_Gift : RhB_ButtonOff), (GiftBrooklyn ? RhB_White : RhB_Text))
     RhRegColor(hGiftU, (GiftBurger ? RhB_Gift : RhB_ButtonOff), (GiftBurger ? RhB_White : RhB_Text))
     Gui, Roll:Font, s8 bold c%RhC_Muted%, %RhFontName%
-    Gui, Roll:Add, Text, x14 y606 w330 h16 vRhGiftStatus HwndhRhGiftStatus +0x200, Подарунок: не вибрано
+    Gui, Roll:Add, Text, x14 y582 w330 h16 vRhGiftStatus HwndhRhGiftStatus +0x200, Подарунок: не вибрано
     RhRegColor(hRhGiftStatus, RhB_StatusSoft, RhB_Muted)
 
     ; ── Час готовності ───────────────────────────────────
@@ -1412,16 +1426,16 @@ DrawRollclub:
         _rhH := _rhP[1], _rhM := _rhP[2]
     }
     Gui, Roll:Font, s15 bold c%RhC_Neon%, %RhFontName%
-    Gui, Roll:Add, Text, x26 y626 w26 h30 +0x200 +BackgroundTrans, ⏱
+    Gui, Roll:Add, Text, x26 y602 w26 h30 +0x200 +BackgroundTrans, ⏱
     Gui, Roll:Font, s14 bold c%RhC_Text%, %RhFontName%
-    Gui, Roll:Add, Edit, x58 y626 w36 h28 Center Limit2 Number vReadyH gRhRefreshEnterPreview, %_rhH%
-    Gui, Roll:Add, Text, x96 y626 w10 h28 +0x200 Center +BackgroundTrans, :
-    Gui, Roll:Add, Edit, x108 y626 w36 h28 Center Limit2 Number vReadyM gRhRefreshEnterPreview, %_rhM%
+    Gui, Roll:Add, Edit, x58 y602 w36 h28 Center Limit2 Number vReadyH gRhRefreshEnterPreview, %_rhH%
+    Gui, Roll:Add, Text, x96 y602 w10 h28 +0x200 Center +BackgroundTrans, :
+    Gui, Roll:Add, Edit, x108 y602 w36 h28 Center Limit2 Number vReadyM gRhRefreshEnterPreview, %_rhM%
     Gui, Roll:Font, s8 bold cFFFFFF, %RhFontName%
-    Gui, Roll:Add, Button, x156 y628 w42 h24 HwndhQuickPickup gCalcPickup, СВ+40
-    Gui, Roll:Add, Button, x202 y628 w40 h24 HwndhQuickDel60 gCalcDelivery, +60
-    Gui, Roll:Add, Button, x246 y628 w40 h24 HwndhQuickDel90 gCalcDelivery90, +90
-    Gui, Roll:Add, Button, x290 y628 w42 h24 HwndhQuickPickup20 gCalcPickup20, СВ+20
+    Gui, Roll:Add, Button, x156 y604 w42 h24 HwndhQuickPickup gCalcPickup, СВ+40
+    Gui, Roll:Add, Button, x202 y604 w40 h24 HwndhQuickDel60 gCalcDelivery, +60
+    Gui, Roll:Add, Button, x246 y604 w40 h24 HwndhQuickDel90 gCalcDelivery90, +90
+    Gui, Roll:Add, Button, x290 y604 w42 h24 HwndhQuickPickup20 gCalcPickup20, СВ+20
     RhRegColor(hQuickPickup, RhB_Blue, RhB_White)
     RhRegColor(hQuickDel60, RhB_Teal, RhB_White)
     RhRegColor(hQuickDel90, RhB_Orange, RhB_White)
@@ -1429,7 +1443,7 @@ DrawRollclub:
 
     ; ── Прев'ю Enter-цепочки ─────────────────────────────────
     Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
-    Gui, Roll:Add, Text, x14 y664 w330 h34 vRhEnterPreview +BackgroundTrans, Enter: готую цепочку...
+    Gui, Roll:Add, Text, x14 y640 w330 h34 vRhEnterPreview +BackgroundTrans, Enter: готую цепочку...
 
     ; Внесення виконується клавішею Enter / NumpadEnter через hotkey нижче.
 
@@ -1524,16 +1538,16 @@ RhBuildSivPreview() {
 }
 
 RhBuildGiftStatus() {
-    global GiftPepsi, GiftBrooklyn, GiftBurger
+    global GiftPepsi, GiftBrooklyn, GiftBurger, giftPepsiName, giftBrooklynName, giftBurgerName
     _count := (GiftPepsi ? 1 : 0) + (GiftBrooklyn ? 1 : 0) + (GiftBurger ? 1 : 0)
     if (_count = 0)
         return "Подарунок: не вибрано"
     if (GiftBurger)
-        _name := "Бургер"
+        _name := giftBurgerName
     else if (GiftBrooklyn)
-        _name := "Бруклін"
+        _name := giftBrooklynName
     else
-        _name := "Пепсі"
+        _name := giftPepsiName
     _txt := "✓ Подарунок: " . _name
     if (_count > 1)
         _txt .= " (обрано кілька, пробьється " . _name . ")"
@@ -1541,7 +1555,7 @@ RhBuildGiftStatus() {
 }
 
 RhBuildEnterPreview() {
-    global DoAutoCash, DoAutoCard, GiftPepsi, GiftBrooklyn, GiftBurger, isPickup, itemX, itemRelX
+    global DoAutoCash, DoAutoCard, GiftPepsi, GiftBrooklyn, GiftBurger, giftPepsiName, giftBrooklynName, giftBurgerName, isPickup, itemX, itemRelX
     GuiControlGet, _pRolls, Roll:, VisRolls
     GuiControlGet, _pNorm, Roll:, VisNorm
     GuiControlGet, _pEdu, Roll:, VisEdu
@@ -1586,11 +1600,11 @@ RhBuildEnterPreview() {
     }
     _gifts := ""
     if (GiftPepsi)
-        _gifts .= (_gifts = "" ? "Пепсі" : "/Пепсі")
+        _gifts .= (_gifts = "" ? giftPepsiName : "/" . giftPepsiName)
     if (GiftBrooklyn)
-        _gifts .= (_gifts = "" ? "Бруклін" : "/Бруклін")
+        _gifts .= (_gifts = "" ? giftBrooklynName : "/" . giftBrooklynName)
     if (GiftBurger)
-        _gifts .= (_gifts = "" ? "Бургер" : "/Бургер")
+        _gifts .= (_gifts = "" ? giftBurgerName : "/" . giftBurgerName)
     if (_gifts != "") {
         _txt .= _sep . "подарок " . _gifts
         _sep := " → "
@@ -1924,6 +1938,8 @@ RhPayPaint:
     GoSub, RhRefreshEnterPreview
 return
 RhTogPepsi:
+    if (!giftPepsiEnabled)
+        return
     GiftPepsi := !GiftPepsi
     if (GiftPepsi) {
         GiftBrooklyn := 0
@@ -1932,6 +1948,8 @@ RhTogPepsi:
     GoSub, RhGiftPaint
 return
 RhTogBrook:
+    if (!giftBrooklynEnabled)
+        return
     GiftBrooklyn := !GiftBrooklyn
     if (GiftBrooklyn) {
         GiftPepsi := 0
@@ -1940,6 +1958,8 @@ RhTogBrook:
     GoSub, RhGiftPaint
 return
 RhTogBurg:
+    if (!giftBurgerEnabled)
+        return
     GiftBurger := !GiftBurger
     if (GiftBurger) {
         GiftPepsi := 0
@@ -1948,9 +1968,9 @@ RhTogBurg:
     GoSub, RhGiftPaint
 return
 RhGiftPaint:
-    GuiControl, Roll:, GiftPBtn, % (GiftPepsi ? "✓ Пепсі" : "Пепсі")
-    GuiControl, Roll:, GiftBBtn, % (GiftBrooklyn ? "✓ Бруклін" : "Бруклін")
-    GuiControl, Roll:, GiftUBtn, % (GiftBurger ? "✓ Бургер" : "Бургер")
+    GuiControl, Roll:, GiftPBtn, % (GiftPepsi ? "✓ " : "") . giftPepsiName
+    GuiControl, Roll:, GiftBBtn, % (GiftBrooklyn ? "✓ " : "") . giftBrooklynName
+    GuiControl, Roll:, GiftUBtn, % (GiftBurger ? "✓ " : "") . giftBurgerName
     RhRegColor(hGiftP, (GiftPepsi ? RhB_Gift : RhB_ButtonOff), (GiftPepsi ? RhB_White : RhB_Text))
     RhRegColor(hGiftB, (GiftBrooklyn ? RhB_Gift : RhB_ButtonOff), (GiftBrooklyn ? RhB_White : RhB_Text))
     RhRegColor(hGiftU, (GiftBurger ? RhB_Gift : RhB_ButtonOff), (GiftBurger ? RhB_White : RhB_Text))
@@ -1989,14 +2009,17 @@ return
 RhPunchSivValues(rolls, norm, edu) {
     global itemX, itemY, itemRelX, itemRelY, iikoWinExe, rollExists, rollVisible
     global pluSticksNorm, pluSticksEdu, pluSoy, pluGinger, pluWasabi
+    _opSivToken := OpCoord_Begin("PunchingSiv", "RhPunchSivValues", "rolls=" . rolls . ";norm=" . norm . ";edu=" . edu)
     if (rolls = "")
         rolls := 0
     if (norm = "")
         norm := 0
     if (edu = "")
         edu := 0
-    if (rolls = 0 && norm = 0 && edu = 0)
+    if (rolls = 0 && norm = 0 && edu = 0) {
+        OpCoord_End(_opSivToken, "skip", "empty_values")
         return 1
+    }
 
     soyQty := Floor((rolls + 1) / 2)
     gwQty  := Floor((rolls + 3) / 4)
@@ -2011,6 +2034,7 @@ RhPunchSivValues(rolls, norm, edu) {
     }
     if ((itemX = 0 || itemX = "ERROR") && !IsObject(RhUiaFind("ТаблицяСтрав", "treeListItems"))) {
         MsgBox, 48, Помилка, Не задано приціл "Табл. Страв"! (Налаштування -> 7)
+        OpCoord_End(_opSivToken, "error", "items_control_not_found")
         return 0
     }
 
@@ -2050,6 +2074,7 @@ RhPunchSivValues(rolls, norm, edu) {
         Gui, Roll:Show
         rollVisible := 1
     }
+    OpCoord_End(_opSivToken, _sivOk ? "ok" : "error", "jobs=" . _pluJobs.Length())
     return 1
 }
 
@@ -2114,25 +2139,6 @@ RhShiftControls(hwndParent, minY, delta) {
     DllCall("InvalidateRect", "Ptr", hwndParent, "Ptr", 0, "Int", 1)
 }
 
-; ── Перемикання бренду: зберігаємо вибір і перезапускаємо ──
-BrandChange:
-    GuiControlGet, _bs, Roll:, BrandSel
-    if (_bs = 2 || _bs = "Roll Club" || InStr(_bs, "Club"))
-        _nb := "rollclub"
-    else
-        _nb := "rollhouse"
-    if (_nb = "rollhouse") {
-        GuiControl, Roll:Choose, BrandSel, 1
-        return
-    }
-    IniWrite, rollclub, %APP_DIR%\settings.ini, App, Brand
-    SaveRollPos()
-    Run, "%A_AhkPath%" "%APP_DIR%\engine_rollclub.ahk"
-    ExitApp
-return
-
-
-
 ; ── Взаємовиключні чекбокси Готівка / Картка ──────────────────
 OnCashToggle:
     GuiControl, Roll:, DoAutoCard, 0
@@ -2190,10 +2196,33 @@ OpenSettings:
     Gui, Settings:+AlwaysOnTop +ToolWindow +OwnDialogs +HwndSettingsHwnd
     Gui, Settings:Color, %RhC_BG%, %RhC_Panel%
     Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Tab3, x6 y6 w348 h364 vSettTab, 🚀 WinAPI|📞 Звонки|🎁 Подарунки|⌨️ Клавіші|🤖 Звіт F5
+    _settingsTabs := "🚀 WinAPI"
+    _settingsWinApiTab := 1
+    _settingsNextTab := 2
+    _settingsCallingTab := 0
+    _settingsReportTab := 0
+    if (Module_IsEnabled("calling")) {
+        _settingsCallingTab := _settingsNextTab
+        _settingsNextTab += 1
+        _settingsTabs .= "|📞 Звонки"
+    }
+    _settingsGiftsTab := _settingsNextTab
+    _settingsNextTab += 1
+    _settingsTabs .= "|🎁 Подарунки"
+    _settingsSivTab := _settingsNextTab
+    _settingsNextTab += 1
+    _settingsTabs .= "|🥢 СІВ"
+    _settingsHotkeysTab := _settingsNextTab
+    _settingsNextTab += 1
+    _settingsTabs .= "|⌨️ Клавіші"
+    if (Module_IsEnabled("reports")) {
+        _settingsReportTab := _settingsNextTab
+        _settingsTabs .= "|🤖 Звіт F5"
+    }
+    Gui, Settings:Add, Tab3, x6 y6 w348 h364 vSettTab, %_settingsTabs%
 
     ; ── Вкладка 1: WinAPI Сканер ───────────────
-    Gui, Settings:Tab, 1
+    Gui, Settings:Tab, %_settingsWinApiTab%
     Gui, Settings:Font, s9 bold c%RhC_Text%, %RhFontName%
     Gui, Settings:Add, Text, x16 y36 w320 Section, Збережені WinAPI елементи (UIA):
     Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
@@ -2212,114 +2241,190 @@ OpenSettings:
     Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
     Gui, Settings:Add, Text, xs y+6 w322, Виберіть рядок і натисніть «Видалити». Подвійний клік також працює.
     
-    ; ── Вкладка 2: Звонки (Aiko) ──────────────────────────
-    Gui, Settings:Tab, 2
-    Gui, Settings:Font, s9 bold c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, x16 y38 w320 Section, Приціли набору в Aiko:
-    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Button, xs y+6 w158 h26 gSetAikoInputTarget, Поле номера
-    Gui, Settings:Add, Button, x+6 yp w158 h26 gSetAikoCallTarget, Кнопка «Дзвонити»
-    Gui, Settings:Add, Button, xs y+5 w158 h26 gSetAikoHangupTarget, Покласти трубку
-    Gui, Settings:Add, Button, x+6 yp w158 h26 gSetCallTarget, Автоприйом вхідного
-    Gui, Settings:Add, Button, xs y+5 w322 h26 gSetCallEndTarget, Зона «кінець дзвінка» (авто-перехід)
-    Gui, Settings:Font, s9 bold c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, xs y+12 w320, Клавіші режиму обзвону (F6):
-    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, xs y+8 w150 h22 +0x200, Наступний дзвінок:
-    Gui, Settings:Add, Edit, x+6 yp w150 vNewHkCallNext, %hkCallNext%
-    Gui, Settings:Add, Text, xs y+6 w150 h22 +0x200, Покласти трубку:
-    Gui, Settings:Add, Edit, x+6 yp w150 vNewHkCallHangup, %hkCallHangup%
-    Gui, Settings:Add, Text, xs y+6 w150 h22 +0x200, Пауза:
-    Gui, Settings:Add, Edit, x+6 yp w150 vNewHkCallPause, %hkCallPause%
-    Gui, Settings:Add, Text, xs y+6 w150 h22 +0x200, Прийняти розмову:
-    Gui, Settings:Add, Edit, x+6 yp w150 vNewHkAcceptTalk, %hkAcceptTalk%
-    Gui, Settings:Font, s9 norm c%RhC_Muted%, %RhFontName%
-    Gui, Settings:Add, Text, xs y+10 w316 h1 +0x10  ; лінія-роздільник
-    Gui, Settings:Add, Text, xs y+6 w316, 🧊 Клавіші Soundpad (через | , напр. 1|x):
-    Gui, Settings:Add, Edit, xs y+4 w316 h22 vNewSoundpadKeys, %soundpadKeys%
-    Gui, Settings:Add, Text, xs y+2 w316 c%RhC_Muted%, Під час заморозки (F7) ці клавіші блокуються від Soundpad
-    Gui, Settings:Add, Text, xs y+10 w316 h1 +0x10  ; лінія-роздільник
-    Gui, Settings:Add, Checkbox, xs y+8 w316 h22 vNewCallListenEnabled Checked%callListenEnabled%, Автослух після привітання
-    _callEngineIdx := (callListenEngine = "sherpa_stream") ? 3 : ((callListenEngine = "sherpa") ? 2 : 1)
-    Gui, Settings:Add, Text, xs y+6 w150 h22 +0x200, Движок слуху:
-    Gui, Settings:Add, DropDownList, x+6 yp w150 vNewCallListenEngine Choose%_callEngineIdx%, Whisper|Sherpa|Sherpa Stream
-    Gui, Settings:Add, Checkbox, xs y+6 w316 h22 vNewCallListenAdvisorOnly Checked%callListenAdvisorOnly%, Радник без натискання X
-    Gui, Settings:Add, Text, xs y+6 w150 h22 +0x200, Затримка після «1», мс:
-    Gui, Settings:Add, Edit, x+6 yp w150 h22 Number vNewCallGreetingDelayMs, %callGreetingDelayMs%
-    Gui, Settings:Add, Text, xs y+6 w150 h22 +0x200, Аудіо-пристрій (0=авто):
-    Gui, Settings:Add, Edit, x+6 yp w150 h22 Number vNewCallListenDevice, %callListenDevice%
-    Gui, Settings:Add, Text, xs y+6 w150 h22 +0x200, Поріг слуху RMS:
-    Gui, Settings:Add, Edit, x+6 yp w150 h22 Number vNewCallListenRmsThreshold, %callListenRmsThreshold%
+    ; ── Опциональна вкладка: Звонки (Aiko) ────────────────
+    if (_settingsCallingTab) {
+        Gui, Settings:Tab, %_settingsCallingTab%
+        Gui, Settings:Font, s9 bold c%RhC_Text%, %RhFontName%
+        Gui, Settings:Add, Text, x16 y38 w320 Section, Приціли набору в Aiko:
+        Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+        Gui, Settings:Add, Button, xs y+6 w158 h26 gSetAikoInputTarget, Поле номера
+        Gui, Settings:Add, Button, x+6 yp w158 h26 gSetAikoCallTarget, Кнопка «Дзвонити»
+        Gui, Settings:Add, Button, xs y+5 w158 h26 gSetAikoHangupTarget, Покласти трубку
+        Gui, Settings:Add, Button, x+6 yp w158 h26 gSetCallTarget, Автоприйом вхідного
+        Gui, Settings:Add, Button, xs y+5 w322 h26 gSetCallEndTarget, Зона «кінець дзвінка» (авто-перехід)
+        Gui, Settings:Font, s9 bold c%RhC_Text%, %RhFontName%
+        Gui, Settings:Add, Text, xs y+12 w320, Клавіші режиму обзвону (F6):
+        Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+        Gui, Settings:Add, Text, xs y+8 w150 h22 +0x200, Наступний дзвінок:
+        Gui, Settings:Add, Edit, x+6 yp w150 vNewHkCallNext, %hkCallNext%
+        Gui, Settings:Add, Text, xs y+6 w150 h22 +0x200, Покласти трубку:
+        Gui, Settings:Add, Edit, x+6 yp w150 vNewHkCallHangup, %hkCallHangup%
+        Gui, Settings:Add, Text, xs y+6 w150 h22 +0x200, Пауза:
+        Gui, Settings:Add, Edit, x+6 yp w150 vNewHkCallPause, %hkCallPause%
+        Gui, Settings:Add, Text, xs y+6 w150 h22 +0x200, Прийняти розмову:
+        Gui, Settings:Add, Edit, x+6 yp w150 vNewHkAcceptTalk, %hkAcceptTalk%
+        Gui, Settings:Font, s9 norm c%RhC_Muted%, %RhFontName%
+        Gui, Settings:Add, Text, xs y+10 w316 h1 +0x10
+        Gui, Settings:Add, Text, xs y+6 w316, 🧊 Клавіші Soundpad (через | , напр. 1|x):
+        Gui, Settings:Add, Edit, xs y+4 w316 h22 vNewSoundpadKeys, %soundpadKeys%
+        Gui, Settings:Add, Text, xs y+2 w316 c%RhC_Muted%, Під час заморозки (F7) ці клавіші блокуються від Soundpad
+        Gui, Settings:Add, Text, xs y+10 w316 h1 +0x10
+        Gui, Settings:Add, Checkbox, xs y+8 w316 h22 vNewCallListenEnabled Checked%callListenEnabled%, Автослух після привітання
+        _callEngineIdx := (callListenEngine = "sherpa_stream") ? 3 : ((callListenEngine = "sherpa") ? 2 : 1)
+        Gui, Settings:Add, Text, xs y+6 w150 h22 +0x200, Движок слуху:
+        Gui, Settings:Add, DropDownList, x+6 yp w150 vNewCallListenEngine Choose%_callEngineIdx%, Whisper|Sherpa|Sherpa Stream
+        Gui, Settings:Add, Checkbox, xs y+6 w316 h22 vNewCallListenAdvisorOnly Checked%callListenAdvisorOnly%, Радник без натискання X
+        Gui, Settings:Add, Text, xs y+6 w150 h22 +0x200, Затримка після «1», мс:
+        Gui, Settings:Add, Edit, x+6 yp w150 h22 Number vNewCallGreetingDelayMs, %callGreetingDelayMs%
+        Gui, Settings:Add, Text, xs y+6 w150 h22 +0x200, Аудіо-пристрій (0=авто):
+        Gui, Settings:Add, Edit, x+6 yp w150 h22 Number vNewCallListenDevice, %callListenDevice%
+        Gui, Settings:Add, Text, xs y+6 w150 h22 +0x200, Поріг слуху RMS:
+        Gui, Settings:Add, Edit, x+6 yp w150 h22 Number vNewCallListenRmsThreshold, %callListenRmsThreshold%
+    }
 
-    ; ── Вкладка 3: Подарунки ──────────────────────────────
-    Gui, Settings:Tab, 3
+    ; ── Вкладка: Подарунки ─────────────────────────────────
+    Gui, Settings:Tab, %_settingsGiftsTab%
     Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, x16 y44 w320 Section, Поріг суми замовлення для автоподарунка (грн):
-    Gui, Settings:Add, Text, xs y+14 w150 h22 +0x200, 🥤 Пепсі від:
-    Gui, Settings:Add, Edit, x+6 yp w100 h22 vNewGiftPepsi Center Number, %giftPepsiThreshold%
-    Gui, Settings:Add, Text, xs y+8 w150 h22 +0x200, 🍦 Бруклін від:
-    Gui, Settings:Add, Edit, x+6 yp w100 h22 vNewGiftBrooklyn Center Number, %giftBrooklynThreshold%
-    Gui, Settings:Add, Text, xs y+8 w150 h22 +0x200, 🍔 Крабсбургер від:
-    Gui, Settings:Add, Edit, x+6 yp w100 h22 vNewGiftBurger Center Number, %giftBurgerThreshold%
+    Gui, Settings:Add, Text, x16 y44 w320 Section, Автоподарунки: поріг суми та PLU-код
+    Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    Gui, Settings:Add, Text, xs y+10 w22 h18 Center, ✓
+    Gui, Settings:Add, Text, x42 yp w102 h18 Center, Назва
+    Gui, Settings:Add, Text, x150 yp w76 h18 Center, Від суми
+    Gui, Settings:Add, Text, x238 yp w94 h18 Center, PLU-код
+    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Checkbox, xs y+4 w22 h22 vNewGiftPepsiEnabled Checked%giftPepsiEnabled%
+    Gui, Settings:Add, Edit, x42 yp w102 h22 vNewGiftPepsiName, %giftPepsiName%
+    Gui, Settings:Add, Edit, x150 yp w76 h22 vNewGiftPepsi Center Number, %giftPepsiThreshold%
+    Gui, Settings:Add, Edit, x238 yp w94 h22 vNewPluPepsi Center Limit10, %pluPepsi%
+    Gui, Settings:Add, Checkbox, xs y+8 w22 h22 vNewGiftBrooklynEnabled Checked%giftBrooklynEnabled%
+    Gui, Settings:Add, Edit, x42 yp w102 h22 vNewGiftBrooklynName, %giftBrooklynName%
+    Gui, Settings:Add, Edit, x150 yp w76 h22 vNewGiftBrooklyn Center Number, %giftBrooklynThreshold%
+    Gui, Settings:Add, Edit, x238 yp w94 h22 vNewPluBrooklyn Center Limit10, %pluBrooklyn%
+    Gui, Settings:Add, Checkbox, xs y+8 w22 h22 vNewGiftBurgerEnabled Checked%giftBurgerEnabled%
+    Gui, Settings:Add, Edit, x42 yp w102 h22 vNewGiftBurgerName, %giftBurgerName%
+    Gui, Settings:Add, Edit, x150 yp w76 h22 vNewGiftBurger Center Number, %giftBurgerThreshold%
+    Gui, Settings:Add, Edit, x238 yp w94 h22 vNewPluBurger Center Limit10, %pluBurger%
+    Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    Gui, Settings:Add, Text, xs y+10 w316, PLU вводиться повністю, разом із нулями на початку.
 
-    ; ── Вкладка 4: Гарячі клавіші ─────────────────────────
-    Gui, Settings:Tab, 4
+    ; ── Вкладка: СІВ / палички ──────────────────────────────
+    Gui, Settings:Tab, %_settingsSivTab%
+    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Text, x16 y44 w320 Section, PLU-коди паличок, соусу, імбиру та васабі
+    Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    Gui, Settings:Add, Text, xs y+10 w190 h18, Позиція
+    Gui, Settings:Add, Text, x224 yp w108 h18 Center, PLU-код
+    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Text, xs y+4 w190 h22 +0x200, Звичайні палички
+    Gui, Settings:Add, Edit, x224 yp w108 h22 vNewPluSticksNorm Center Limit10, %pluSticksNorm%
+    Gui, Settings:Add, Text, xs y+8 w190 h22 +0x200, Навчальні палички
+    Gui, Settings:Add, Edit, x224 yp w108 h22 vNewPluSticksEdu Center Limit10, %pluSticksEdu%
+    Gui, Settings:Add, Text, xs y+8 w190 h22 +0x200, Соєвий соус
+    Gui, Settings:Add, Edit, x224 yp w108 h22 vNewPluSoy Center Limit10, %pluSoy%
+    Gui, Settings:Add, Text, xs y+8 w190 h22 +0x200, Імбир
+    Gui, Settings:Add, Edit, x224 yp w108 h22 vNewPluGinger Center Limit10, %pluGinger%
+    Gui, Settings:Add, Text, xs y+8 w190 h22 +0x200, Васабі
+    Gui, Settings:Add, Edit, x224 yp w108 h22 vNewPluWasabi Center Limit10, %pluWasabi%
+    Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    Gui, Settings:Add, Text, xs y+12 w316, Не прибирайте нулі на початку PLU-коду.
+
+    ; ── Вкладка: Гарячі клавіші ────────────────────────────
+    Gui, Settings:Tab, %_settingsHotkeysTab%
     Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
     Gui, Settings:Add, Text, x16 y44 w320 Section, Основні гарячі клавіші:
-    Gui, Settings:Add, Text, xs y+14 w150 h22 +0x200, Головне меню (відкрити):
-    Gui, Settings:Add, Edit, x+6 yp w150 vNewHkMain, %hkMain%
+    _hkMainDisplay := (hkMain = "vkC0") ? "~" : hkMain
+    Gui, Settings:Add, Text, xs y+14 w150 h22 +0x200, Відкрити пульт:
+    Gui, Settings:Add, Edit, x+6 yp w150 vNewHkMain, %_hkMainDisplay%
     Gui, Settings:Add, Text, xs y+8 w150 h22 +0x200, Швидкий СИВ:
     Gui, Settings:Add, Edit, x+6 yp w150 vNewHkSiv, %hkSiv%
     Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
-    Gui, Settings:Add, Text, xs y+14 w322, Підказка: за замовчуванням головне меню — клавіша ~ (тильда).
+    Gui, Settings:Add, Text, xs y+14 w322, Підказка: ~ — клавіша тильди поруч із цифрою 1.
     _themeIdx := (uiTheme = "dark") ? 2 : 1
     Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
     Gui, Settings:Add, Text, xs y+12 w150 h22 +0x200, Тема пульта:
     Gui, Settings:Add, DropDownList, x+6 yp w150 vNewUiTheme Choose%_themeIdx%, ☀ Light Premium|🌑 Neon Dark
 
-    ; ── Вкладка 5: Звіт F5 ────────────────────────────────
-    Gui, Settings:Tab, 5
-    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, x16 y44 w320 Section, Автозвіт у Telegram (клавіша F5):
-    Gui, Settings:Add, Text, xs y+14 w90 h22 +0x200, Чат / група:
-    Gui, Settings:Add, Edit, x+6 yp w216 h22 vNewTgGroup, %tgGroup%
-    Gui, Settings:Add, Button, xs y+14 w322 h30 gSetupAutopilot, 🎬 Калібрування звіту (записати кліки)
+    ; ── Опциональна вкладка: Звіт F5 ───────────────────────
+    if (_settingsReportTab) {
+        Gui, Settings:Tab, %_settingsReportTab%
+        Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+        Gui, Settings:Add, Text, x16 y44 w320 Section, Автозвіт у Telegram (клавіша F5):
+        Gui, Settings:Add, Text, xs y+14 w90 h22 +0x200, Чат / група:
+        Gui, Settings:Add, Edit, x+6 yp w216 h22 vNewTgGroup, %tgGroup%
+        Gui, Settings:Add, Button, xs y+14 w322 h30 gSetupAutopilot, 🎬 Калібрування звіту (записати кліки)
+    }
 
     ; ── Загальна кнопка збереження (поза вкладками) ───────
     Gui, Settings:Tab
     Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
     Gui, Settings:Add, Button, x16 y378 w328 h34 gSaveSettings, 💾 Зберегти та перезапустити
-    Gui, Settings:Show, w360, Налаштування PRO
+    Gui, Settings:Show, w360, Налаштування RollHouse
 return
 
 SaveSettings:
     Gui, Settings:Submit
+    if (NewHkMain = "~")
+        NewHkMain := "vkC0"
+    NewGiftPepsiName := Trim(NewGiftPepsiName)
+    NewGiftBrooklynName := Trim(NewGiftBrooklynName)
+    NewGiftBurgerName := Trim(NewGiftBurgerName)
+    if (NewGiftPepsiName = "")
+        NewGiftPepsiName := giftPepsiName
+    if (NewGiftBrooklynName = "")
+        NewGiftBrooklynName := giftBrooklynName
+    if (NewGiftBurgerName = "")
+        NewGiftBurgerName := giftBurgerName
     IniWrite, %NewGiftPepsi%, RkConfig.ini, Gifts, PepsiThreshold
     IniWrite, %NewGiftBrooklyn%, RkConfig.ini, Gifts, BrooklynThreshold
     IniWrite, %NewGiftBurger%, RkConfig.ini, Gifts, BurgerThreshold
-    IniWrite, %NewTgGroup%, RkConfig.ini, Autopilot, TgGroup
+    IniWrite, %NewGiftPepsiEnabled%, RkConfig.ini, Gifts, PepsiEnabled
+    IniWrite, %NewGiftBrooklynEnabled%, RkConfig.ini, Gifts, BrooklynEnabled
+    IniWrite, %NewGiftBurgerEnabled%, RkConfig.ini, Gifts, BurgerEnabled
+    IniWrite, %NewGiftPepsiName%, RkConfig.ini, Gifts, PepsiName
+    IniWrite, %NewGiftBrooklynName%, RkConfig.ini, Gifts, BrooklynName
+    IniWrite, %NewGiftBurgerName%, RkConfig.ini, Gifts, BurgerName
+    if (NewPluPepsi != "")
+        IniWrite, %NewPluPepsi%, RkConfig.ini, PLU, Pepsi
+    if (NewPluBrooklyn != "")
+        IniWrite, %NewPluBrooklyn%, RkConfig.ini, PLU, Brooklyn
+    if (NewPluBurger != "")
+        IniWrite, %NewPluBurger%, RkConfig.ini, PLU, Burger
+    if (NewPluSticksNorm != "")
+        IniWrite, %NewPluSticksNorm%, RkConfig.ini, PLU_SIV, SticksNorm
+    if (NewPluSticksEdu != "")
+        IniWrite, %NewPluSticksEdu%, RkConfig.ini, PLU_SIV, SticksEdu
+    if (NewPluSoy != "")
+        IniWrite, %NewPluSoy%, RkConfig.ini, PLU_SIV, Soy
+    if (NewPluGinger != "")
+        IniWrite, %NewPluGinger%, RkConfig.ini, PLU_SIV, Ginger
+    if (NewPluWasabi != "")
+        IniWrite, %NewPluWasabi%, RkConfig.ini, PLU_SIV, Wasabi
+    if (Module_IsEnabled("reports"))
+        IniWrite, %NewTgGroup%, RkConfig.ini, Autopilot, TgGroup
     IniWrite, %NewHkMain%, RkConfig.ini, Hotkeys, Main
     IniWrite, %NewHkSiv%, RkConfig.ini, Hotkeys, Siv
-    if (NewHkCallNext != "")
-        IniWrite, %NewHkCallNext%, RkConfig.ini, Hotkeys, CallNext
-    if (NewHkCallHangup != "")
-        IniWrite, %NewHkCallHangup%, RkConfig.ini, Hotkeys, CallHangup
-    if (NewHkCallPause != "")
-        IniWrite, %NewHkCallPause%, RkConfig.ini, Hotkeys, CallPause
-    if (NewHkAcceptTalk != "")
-        IniWrite, %NewHkAcceptTalk%, RkConfig.ini, Hotkeys, AcceptTalk
-    if (NewSoundpadKeys != "")
-        IniWrite, %NewSoundpadKeys%, RkConfig.ini, Hotkeys, SoundpadKeys
-    IniWrite, %NewCallListenEnabled%, RkConfig.ini, CallListen, AutoEnabled
-    _callEngineSave := InStr(NewCallListenEngine, "Stream") ? "sherpa_stream" : (InStr(NewCallListenEngine, "Sherpa") ? "sherpa" : "whisper")
-    IniWrite, %_callEngineSave%, RkConfig.ini, CallListen, Engine
-    IniWrite, %NewCallListenAdvisorOnly%, RkConfig.ini, CallListen, AdvisorOnly
-    if (NewCallGreetingDelayMs != "")
-        IniWrite, %NewCallGreetingDelayMs%, RkConfig.ini, CallListen, GreetingDelayMs
-    if (NewCallListenDevice != "")
-        IniWrite, %NewCallListenDevice%, RkConfig.ini, CallListen, Device
-    if (NewCallListenRmsThreshold != "")
-        IniWrite, %NewCallListenRmsThreshold%, RkConfig.ini, CallListen, RmsThreshold
+    if (Module_IsEnabled("calling")) {
+        if (NewHkCallNext != "")
+            IniWrite, %NewHkCallNext%, RkConfig.ini, Hotkeys, CallNext
+        if (NewHkCallHangup != "")
+            IniWrite, %NewHkCallHangup%, RkConfig.ini, Hotkeys, CallHangup
+        if (NewHkCallPause != "")
+            IniWrite, %NewHkCallPause%, RkConfig.ini, Hotkeys, CallPause
+        if (NewHkAcceptTalk != "")
+            IniWrite, %NewHkAcceptTalk%, RkConfig.ini, Hotkeys, AcceptTalk
+        if (NewSoundpadKeys != "")
+            IniWrite, %NewSoundpadKeys%, RkConfig.ini, Hotkeys, SoundpadKeys
+        IniWrite, %NewCallListenEnabled%, RkConfig.ini, CallListen, AutoEnabled
+        _callEngineSave := InStr(NewCallListenEngine, "Stream") ? "sherpa_stream" : (InStr(NewCallListenEngine, "Sherpa") ? "sherpa" : "whisper")
+        IniWrite, %_callEngineSave%, RkConfig.ini, CallListen, Engine
+        IniWrite, %NewCallListenAdvisorOnly%, RkConfig.ini, CallListen, AdvisorOnly
+        if (NewCallGreetingDelayMs != "")
+            IniWrite, %NewCallGreetingDelayMs%, RkConfig.ini, CallListen, GreetingDelayMs
+        if (NewCallListenDevice != "")
+            IniWrite, %NewCallListenDevice%, RkConfig.ini, CallListen, Device
+        if (NewCallListenRmsThreshold != "")
+            IniWrite, %NewCallListenRmsThreshold%, RkConfig.ini, CallListen, RmsThreshold
+    }
     if (NewCashSearch != "")
         IniWrite, %NewCashSearch%, RkConfig.ini, Payment, CashSearch
     if (NewCardSearch != "")
@@ -2414,6 +2519,7 @@ RhFinishOrder:
         SetTimer, RemoveToolTip, -900
         return
     }
+    _opFinishToken := OpCoord_Begin("FinishingOrder", "RhFinishOrder", "hotkey=Ctrl+Enter")
     RhFinishBusy := 1
     _finishStart := A_TickCount
     FileAppend, % "[" . A_Now . "] RH_FINISH start Ctrl+Enter`n", %A_ScriptDir%\ahk_debug.log
@@ -2446,6 +2552,7 @@ RhFinishOrder:
     FileAppend, % "[" . A_Now . "] RH_FINISH done ok=" . _finishOk . " total_ms=" . (A_TickCount - _finishStart) . "`n", %A_ScriptDir%\ahk_debug.log
     SetTimer, RemoveToolTip, -1200
     RhFinishBusy := 0
+    OpCoord_End(_opFinishToken, _finishOk ? "ok" : "error", "total_ms=" . (A_TickCount - _finishStart))
 return
 
 RollEnter:
@@ -2455,6 +2562,7 @@ RollEnter:
         SetTimer, RemoveToolTip, -1200
         return
     }
+    _opEnterToken := OpCoord_Begin("EditingOrder", "RollEnter", "hotkey=Enter")
     RhEnterBusy := 1
     RhLastEnterTick := A_TickCount
     RhApplyManualZoneOverride()
@@ -2463,6 +2571,7 @@ RollEnter:
     GoSub, RhEnterPreflight
     if (!RhPreflightOk) {
         RhEnterBusy := 0
+        OpCoord_End(_opEnterToken, "blocked", "preflight_failed")
         return
     }
 
@@ -2480,6 +2589,7 @@ RollEnter:
     if (_hasSivInput)
         RhPunchSivValues(_enterRolls, _enterNorm, _enterEdu)
     RhEnterBusy := 0
+    OpCoord_End(_opEnterToken, "ok", "has_siv=" . _hasSivInput)
 return
 
 #IfWinActive СИВ (Модуль)
@@ -2668,11 +2778,11 @@ SilentMagicClean:
     noPayChange := bonusWriteoff ? 1 : 0
     FileAppend, % "[" A_Now "] BONUSDBG noPayChange=" noPayChange " txt=[" SubStr(text,1,160) "]`n", %A_ScriptDir%\ahk_debug.log
     if (orderSum > 0 && !hasBonuses) {
-        if (orderSum >= giftBurgerThreshold && !autoBurger)
+        if (giftBurgerEnabled && orderSum >= giftBurgerThreshold && !autoBurger)
             autoBurger := 1
-        else if (orderSum >= giftBrooklynThreshold && !autoBrooklyn && !autoBurger)
+        else if (giftBrooklynEnabled && orderSum >= giftBrooklynThreshold && !autoBrooklyn && !autoBurger)
             autoBrooklyn := 1
-        else if (orderSum >= giftPepsiThreshold && !autoPepsi && !autoBrooklyn && !autoBurger)
+        else if (giftPepsiEnabled && orderSum >= giftPepsiThreshold && !autoPepsi && !autoBrooklyn && !autoBurger)
             autoPepsi := 1
     }
 
@@ -3777,7 +3887,7 @@ RollMaybeHide:
         return
     if WinActive("RollHouse MEGA 3.0 (PLU) ahk_class AutoHotkeyGUI")
         return
-    if (WinActive("СИВ (Модуль)") || WinActive("Налаштування PRO") || WinActive("Вихідний текст"))
+    if (WinActive("СИВ (Модуль)") || WinActive("Налаштування RollHouse") || WinActive("Вихідний текст"))
         return
     SaveRollPos()
     Gui, Roll:Hide
@@ -5298,6 +5408,7 @@ IniRead, rowY,   RkConfig.ini, Targets, RowY,   0
 ^F4::GoSub, KcDutyToggle
 
 KcDutyToggle:
+    OpCoord_Event("DutyScanning", "toggle", "KcDutyToggle", "was_dutyOn=" . dutyOn . ";punchBusy=" . rhPunchBusy . ";inDutyTake=" . _inDutyTake)
     ; Ctrl+F4: дежурство — сам ловить перший вільний годний заказ, бере і зупиняється з гучним сигналом
     FileAppend, % "[" . A_Now . "] Ctrl+F4-TOGGLE (was dutyOn=" . dutyOn . ")`n", %A_ScriptDir%\parse_debug.log
     if (rhPunchBusy || _inDutyTake)
