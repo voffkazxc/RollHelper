@@ -212,11 +212,12 @@ internal sealed class PackageInstaller
         }
 
         var root = Path.GetFullPath(rootDirectory)
-            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-            + Path.DirectorySeparatorChar;
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var rootPrefix = root + Path.DirectorySeparatorChar;
         var resolved = Path.GetFullPath(Path.Combine(root, relativePath));
 
-        if (!resolved.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(resolved, root, StringComparison.OrdinalIgnoreCase)
+            && !resolved.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidDataException($"Package path escapes installation directory: {relativePath}");
         }
