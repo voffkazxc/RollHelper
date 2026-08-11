@@ -15,12 +15,14 @@ public partial class MainWindow : Window
     private readonly List<ReleasePackage> _manifestPackages = [];
     private readonly ManifestClient _manifestClient = new();
     private readonly PackageStateStore _packageStateStore = new();
+    private readonly LauncherUiSettingsStore _uiSettingsStore = new();
     private readonly PackageInstaller _packageInstaller;
     private readonly LauncherUpdater _launcherUpdater;
     private readonly LauncherConfig _config;
     private CancellationTokenSource? _operationCancellation;
     private LauncherRelease? _launcherUpdate;
     private bool _modulesPanelOpened;
+    private double _programsPanelRatio = 0.52;
 
     public MainWindow()
     {
@@ -32,10 +34,12 @@ public partial class MainWindow : Window
         ProgramsGrid.ItemsSource = _programs;
         ModulesGrid.ItemsSource = _modules;
         LauncherVersionText.Text = $"• версия {_launcherUpdater.CurrentVersion}";
+        ApplyUiSettings(_uiSettingsStore.Load());
 
         Loaded += async (_, _) => await RefreshManifestAsync();
         Closed += (_, _) =>
         {
+            SaveUiSettings();
             _operationCancellation?.Cancel();
             _manifestClient.Dispose();
         };
@@ -83,6 +87,17 @@ public partial class MainWindow : Window
     }
 
     private void HideModulesButton_Click(object sender, RoutedEventArgs e) => ClearProgramSelection();
+
+    private void PackagesSplitter_DragCompleted(object sender, DragCompletedEventArgs e) => CapturePanelRatio();
+
+    private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape && ModulesPanel.Visibility == Visibility.Visible)
+        {
+            ClearProgramSelection();
+            e.Handled = true;
+        }
+    }
 
     private async void ModulesGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e) => await InstallOrEnableSelectedModuleAsync();
 
@@ -460,6 +475,11 @@ public partial class MainWindow : Window
 
     private void SetModulesPanelVisibility(bool visible)
     {
+        if (!visible && ModulesPanel.Visibility == Visibility.Visible)
+        {
+            CapturePanelRatio();
+        }
+
         ModulesPanel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         PackagesSplitter.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
 
@@ -474,9 +494,54 @@ public partial class MainWindow : Window
         SplitterColumn.Width = new GridLength(16);
         if (!_modulesPanelOpened || ModulesColumn.Width.Value == 0)
         {
-            ProgramsColumn.Width = new GridLength(1, GridUnitType.Star);
-            ModulesColumn.Width = new GridLength(1, GridUnitType.Star);
+            ProgramsColumn.Width = new GridLength(_programsPanelRatio, GridUnitType.Star);
+            ModulesColumn.Width = new GridLength(1 - _programsPanelRatio, GridUnitType.Star);
             _modulesPanelOpened = true;
+        }
+    }
+
+    private void CapturePanelRatio()
+    {
+        var panelWidth = ProgramsColumn.ActualWidth + ModulesColumn.ActualWidth;
+        if (panelWidth > 0 && ModulesColumn.ActualWidth > 0)
+        {
+            _programsPanelRatio = Math.Clamp(ProgramsColumn.ActualWidth / panelWidth, 0.25, 0.75);
+        }
+    }
+
+    private void ApplyUiSettings(LauncherUiSettings settings)
+    {
+        var maximumWidth = Math.Max(MinWidth, SystemParameters.WorkArea.Width - 40);
+        var maximumHeight = Math.Max(MinHeight, SystemParameters.WorkArea.Height - 40);
+        Width = Math.Clamp(settings.WindowWidth, MinWidth, maximumWidth);
+        Height = Math.Clamp(settings.WindowHeight, MinHeight, maximumHeight);
+        _programsPanelRatio = Math.Clamp(settings.ProgramsPanelRatio, 0.25, 0.75);
+        ApplyColumnWidths(ProgramsGrid, settings.ProgramColumnWidths);
+        ApplyColumnWidths(ModulesGrid, settings.ModuleColumnWidths);
+    }
+
+    private void SaveUiSettings()
+    {
+        CapturePanelRatio();
+        var bounds = WindowState == WindowState.Normal ? new Rect(Left, Top, ActualWidth, ActualHeight) : RestoreBounds;
+        _uiSettingsStore.Save(new LauncherUiSettings
+        {
+            WindowWidth = bounds.Width,
+            WindowHeight = bounds.Height,
+            ProgramsPanelRatio = _programsPanelRatio,
+            ProgramColumnWidths = ProgramsGrid.Columns.Select(column => column.ActualWidth).ToList(),
+            ModuleColumnWidths = ModulesGrid.Columns.Select(column => column.ActualWidth).ToList()
+        });
+    }
+
+    private static void ApplyColumnWidths(DataGrid grid, IReadOnlyList<double> widths)
+    {
+        for (var index = 0; index < grid.Columns.Count && index < widths.Count; index++)
+        {
+            if (double.IsFinite(widths[index]) && widths[index] >= 48)
+            {
+                grid.Columns[index].Width = new DataGridLength(widths[index]);
+            }
         }
     }
 

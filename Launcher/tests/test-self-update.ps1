@@ -1,7 +1,7 @@
 param(
-    [string]$ReleaseRoot = (Join-Path $env:TEMP "RollHelperRelease\0.1.11"),
-    [string]$OldVersion = "0.1.10",
-    [string]$NewVersion = "0.1.11"
+    [string]$ReleaseRoot = (Join-Path $env:TEMP "RollHelperRelease\0.1.12"),
+    [string]$OldVersion = "0.1.11",
+    [string]$NewVersion = "0.1.12"
 )
 
 $ErrorActionPreference = "Stop"
@@ -10,7 +10,11 @@ $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $project = Join-Path $repoRoot "Launcher\RollHelperLauncher\RollHelperLauncher.csproj"
 $testRoot = Join-Path $env:TEMP ("RollHelperSelfUpdateTest-" + [guid]::NewGuid().ToString("N"))
 $installRoot = Join-Path $testRoot "launcher"
+$programRoot = Join-Path $testRoot "program-data"
+$userRoot = Join-Path $testRoot "user-data"
 $server = $null
+$originalProgramRoot = $env:ROLLHELPER_PROGRAM_ROOT
+$originalUserRoot = $env:ROLLHELPER_USER_ROOT
 
 New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
 
@@ -34,6 +38,21 @@ $port = $listener.LocalEndpoint.Port
 $listener.Stop()
 
 try {
+    $env:ROLLHELPER_PROGRAM_ROOT = $programRoot
+    $env:ROLLHELPER_USER_ROOT = $userRoot
+    $uiStateDirectory = Join-Path $programRoot "State"
+    New-Item -ItemType Directory -Force -Path $uiStateDirectory | Out-Null
+    $uiStatePath = Join-Path $uiStateDirectory "launcher-ui.json"
+    $uiStateBefore = @{
+        schema = 1
+        windowWidth = 840
+        windowHeight = 570
+        programsPanelRatio = 0.67
+        programColumnWidths = @(190, 72, 140)
+        moduleColumnWidths = @(180, 70, 130)
+    } | ConvertTo-Json
+    [IO.File]::WriteAllText($uiStatePath, $uiStateBefore, (New-Object Text.UTF8Encoding($false)))
+
     $server = Start-Process python `
         -ArgumentList "-m", "http.server", $port, "--bind", "127.0.0.1", "--directory", $ReleaseRoot `
         -WindowStyle Hidden `
@@ -88,20 +107,28 @@ try {
 
     $versionAfter = (Get-Item -LiteralPath $executable).VersionInfo.ProductVersion
     $updated = $versionAfter -like "$NewVersion*"
+    $uiStatePreserved = Test-Path -LiteralPath $uiStatePath
 
     [pscustomobject]@{
         TestRoot = $testRoot
         VersionBefore = $versionBefore
         VersionAfter = $versionAfter
         Updated = $updated
+        UiStatePreserved = $uiStatePreserved
         UpdaterLog = Join-Path $env:LOCALAPPDATA "RollHelper\Logs\updater.log"
     }
 
     if (-not $updated) {
         throw "Self-update did not replace the launcher."
     }
+    if (-not $uiStatePreserved) {
+        throw "Self-update removed the launcher UI state."
+    }
 }
 finally {
+    $env:ROLLHELPER_PROGRAM_ROOT = $originalProgramRoot
+    $env:ROLLHELPER_USER_ROOT = $originalUserRoot
+
     if ($server -and -not $server.HasExited) {
         Stop-Process -Id $server.Id -Force
     }

@@ -22,6 +22,7 @@ internal static class LauncherPaths
     public static string LogFile { get; } = Path.Combine(LogsDirectory, "launcher.log");
     public static string ConfigFile { get; } = Path.Combine(AppContext.BaseDirectory, "launcher.config.json");
     public static string PackageStateFile { get; } = Path.Combine(StateDirectory, "packages.json");
+    public static string LauncherUiStateFile { get; } = Path.Combine(StateDirectory, "launcher-ui.json");
 
     public static void EnsureDirectories()
     {

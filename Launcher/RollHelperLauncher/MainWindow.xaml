@@ -7,6 +7,7 @@
         MinWidth="720"
         MinHeight="520"
         WindowStartupLocation="CenterScreen"
+        PreviewKeyDown="MainWindow_PreviewKeyDown"
         Background="{StaticResource WindowBackgroundBrush}">
     <Grid Margin="24">
         <Grid.RowDefinitions>
@@ -135,7 +136,9 @@
                           ResizeBehavior="PreviousAndNext"
                           Background="#DDE3EA"
                           Cursor="SizeWE"
+                          ToolTip="Перетащите, чтобы изменить ширину панелей"
                           Visibility="Collapsed"
+                          DragCompleted="PackagesSplitter_DragCompleted"
                           ShowsPreview="True" />
 
             <Border x:Name="ModulesPanel"
@@ -185,6 +188,7 @@
 
                     <Grid Grid.Row="2">
                         <DataGrid x:Name="ModulesGrid"
+                                  AutomationProperties.Name="Список дополнений"
                                   AutoGenerateColumns="False"
                                   CanUserAddRows="False"
                                   CanUserDeleteRows="False"

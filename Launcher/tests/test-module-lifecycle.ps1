@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "0.1.11"
+    [string]$Version = "0.1.12"
 )
 
 $ErrorActionPreference = "Stop"
@@ -206,6 +206,21 @@ try {
 
     $env:ROLLHELPER_PROGRAM_ROOT = $programRoot
     $env:ROLLHELPER_USER_ROOT = $userRoot
+    $uiStateDirectory = Join-Path $programRoot "State"
+    New-Item -ItemType Directory -Force -Path $uiStateDirectory | Out-Null
+    $uiStatePath = Join-Path $uiStateDirectory "launcher-ui.json"
+    $initialUiState = [ordered]@{
+        schema = 1
+        windowWidth = 820
+        windowHeight = 560
+        programsPanelRatio = 0.64
+        programColumnWidths = @(180, 70, 130)
+        moduleColumnWidths = @(170, 65, 125)
+    }
+    [IO.File]::WriteAllText(
+        $uiStatePath,
+        ($initialUiState | ConvertTo-Json -Depth 4),
+        $utf8NoBom)
     $launcherProcess = Start-Process `
         -FilePath (Join-Path $launcherRoot "RollHelperLauncher.exe") `
         -WorkingDirectory $launcherRoot `
@@ -279,6 +294,15 @@ public static class ModuleTestNative {
 
     Select-NamedItem -Root $window -Name "Test Program"
     Find-ElementByName -Root $window -Name "Test Module" | Out-Null
+
+    $programsGridForRatio = Find-ElementByName -Root $window -Name "Список программ"
+    $modulesGridForRatio = Find-ElementByName -Root $window -Name "Список дополнений"
+    $programsWidth = $programsGridForRatio.Current.BoundingRectangle.Width
+    $modulesWidth = $modulesGridForRatio.Current.BoundingRectangle.Width
+    $restoredPanelRatio = $programsWidth / ($programsWidth + $modulesWidth)
+    if ([Math]::Abs($restoredPanelRatio - 0.64) -gt 0.12) {
+        throw "Saved panel ratio was not restored. Expected about 0.64, actual $restoredPanelRatio"
+    }
 
     $programGrid = Find-ElementByName -Root $window -Name "Список программ"
     $gridBounds = $programGrid.Current.BoundingRectangle
@@ -396,6 +420,29 @@ public static class ModuleTestNative {
         throw "Module state still exists after removal."
     }
 
+    $windowPatternObject = $null
+    if (-not $window.TryGetCurrentPattern(
+        [Windows.Automation.WindowPattern]::Pattern,
+        [ref]$windowPatternObject)) {
+        throw "Launcher window does not support WindowPattern."
+    }
+    ([Windows.Automation.WindowPattern]$windowPatternObject).Close()
+    if (-not $launcherProcess.WaitForExit(5000)) {
+        throw "Launcher did not close after the persistence check."
+    }
+    $launcherProcess = $null
+
+    if (-not (Test-Path -LiteralPath $uiStatePath)) {
+        throw "Launcher UI state file was not saved."
+    }
+    $savedUiState = Get-Content -LiteralPath $uiStatePath -Raw | ConvertFrom-Json
+    if ([Math]::Abs([double]$savedUiState.programsPanelRatio - 0.64) -gt 0.08) {
+        throw "Saved panel ratio changed unexpectedly: $($savedUiState.programsPanelRatio)"
+    }
+    if ($savedUiState.programColumnWidths.Count -ne 3 -or $savedUiState.moduleColumnWidths.Count -ne 3) {
+        throw "Launcher table column widths were not saved."
+    }
+
     [pscustomobject]@{
         Passed = $true
         TestRoot = $testRoot
@@ -404,6 +451,8 @@ public static class ModuleTestNative {
         ModuleDisabled = $true
         ModuleEnabledAgain = $true
         ModuleRemoved = $true
+        UiStateRestored = $true
+        UiStateSaved = $true
     }
 }
 finally {
