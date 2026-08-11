@@ -47,6 +47,7 @@ public partial class MainWindow : Window
     private void PackagesGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
         UpdateActionButton();
+        UpdateSelectionStatus();
     }
 
     private void OpenLogButton_Click(object sender, RoutedEventArgs e)
@@ -91,7 +92,10 @@ public partial class MainWindow : Window
                     status));
             }
 
-            SetStatus($"Релиз {manifest.Release ?? "без номера"}. Пакетов: {manifest.Packages.Count}");
+            PackagesGrid.SelectedIndex = -1;
+            SetStatus(_packages.Count == 0
+                ? "Сейчас нет доступных программ и дополнений"
+                : "Выберите программу или дополнение");
             LauncherLog.Info("Package list displayed");
         }
         catch (OperationCanceledException)
@@ -106,6 +110,7 @@ public partial class MainWindow : Window
         finally
         {
             EndOperation();
+            UpdateActionButton();
         }
     }
 
@@ -180,7 +185,7 @@ public partial class MainWindow : Window
     {
         if (_operationCancellation is not null || PackagesGrid.SelectedItem is not PackageRow selectedRow)
         {
-            InstallAndRunButton.Content = "Установить и запустить";
+            InstallAndRunButton.Content = "Выберите компонент";
             InstallAndRunButton.IsEnabled = false;
             return;
         }
@@ -191,6 +196,24 @@ public partial class MainWindow : Window
                 ? "Обновить и запустить"
                 : "Установить и запустить";
         InstallAndRunButton.IsEnabled = true;
+    }
+
+    private void UpdateSelectionStatus()
+    {
+        if (_operationCancellation is not null)
+        {
+            return;
+        }
+
+        if (PackagesGrid.SelectedItem is PackageRow selectedRow)
+        {
+            SetStatus($"{selectedRow.DisplayName} • версия {selectedRow.Version} • {selectedRow.Status.ToLowerInvariant()}");
+            return;
+        }
+
+        SetStatus(_packages.Count == 0
+            ? "Сейчас нет доступных программ и дополнений"
+            : "Выберите программу или дополнение");
     }
 
     private void SetStatus(string status)
@@ -220,7 +243,13 @@ public partial class MainWindow : Window
 
         public ReleasePackage Package { get; }
         public string DisplayName => Package.DisplayName ?? Package.Id;
-        public string Type => Package.Type ?? "package";
+        public string Type => Package.Type?.ToLowerInvariant() switch
+        {
+            "brand" => "Программа",
+            "module" => "Дополнение",
+            "tool" => "Инструмент",
+            _ => "Компонент"
+        };
         public string Version => Package.Version;
         public string Status { get; set; }
     }

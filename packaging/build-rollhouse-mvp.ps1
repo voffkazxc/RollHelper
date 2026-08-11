@@ -138,7 +138,7 @@ $startScript | Set-Content -LiteralPath (Join-Path $packageRoot "start_rollhouse
 $packageDescription = @{
     schema = 1
     id = "rollhouse"
-    displayName = "RollHouse MVP"
+    displayName = "RollHouse"
     version = $Version
     entrypoint = @{
         file = "start_rollhouse.bat"
@@ -161,7 +161,7 @@ $releaseManifest = @{
         @{
             id = "rollhouse"
             type = "brand"
-            displayName = "RollHouse MVP"
+            displayName = "RollHouse"
             version = $Version
             asset = $assetName
             sha256 = $sha256

@@ -27,7 +27,7 @@
                 <TextBlock Text="RollHelper Launcher"
                            FontSize="28"
                            FontWeight="SemiBold" />
-                <TextBlock Text="Пакеты из release-manifest.json"
+                <TextBlock Text="Программы и дополнения RollHelper"
                            Margin="0,5,0,0"
                            FontSize="14"
                            Foreground="{StaticResource SecondaryTextBrush}" />
@@ -71,8 +71,8 @@
                       SelectionChanged="PackagesGrid_SelectionChanged"
                       MouseDoubleClick="PackagesGrid_MouseDoubleClick">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Пакет" Binding="{Binding DisplayName}" Width="*" />
-                    <DataGridTextColumn Header="Тип" Binding="{Binding Type}" Width="150" />
+                    <DataGridTextColumn Header="Название" Binding="{Binding DisplayName}" Width="*" />
+                    <DataGridTextColumn Header="Категория" Binding="{Binding Type}" Width="150" />
                     <DataGridTextColumn Header="Версия" Binding="{Binding Version}" Width="130" />
                     <DataGridTextColumn Header="Состояние" Binding="{Binding Status}" Width="180" />
                 </DataGrid.Columns>
@@ -88,7 +88,7 @@
 
             <StackPanel VerticalAlignment="Center">
                 <TextBlock x:Name="StatusText"
-                           Text="Готово"
+                           Text="Выберите программу или дополнение"
                            TextTrimming="CharacterEllipsis"
                            Foreground="{StaticResource SecondaryTextBrush}" />
                 <ProgressBar x:Name="DownloadProgress"
@@ -101,7 +101,7 @@
             <Button x:Name="InstallAndRunButton"
                     Grid.Column="2"
                     MinWidth="230"
-                    Content="Установить и запустить"
+                    Content="Выберите компонент"
                     IsEnabled="False"
                     Click="InstallAndRunButton_Click" />
         </Grid>
