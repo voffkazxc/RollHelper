@@ -27,15 +27,25 @@
                 <TextBlock Text="RollHelper Launcher"
                            FontSize="28"
                            FontWeight="SemiBold" />
-                <TextBlock Text="Программы и дополнения RollHelper"
-                           Margin="0,5,0,0"
-                           FontSize="14"
-                           Foreground="{StaticResource SecondaryTextBrush}" />
+                <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
+                    <TextBlock Text="Программы и дополнения RollHelper"
+                               FontSize="14"
+                               Foreground="{StaticResource SecondaryTextBrush}" />
+                    <TextBlock x:Name="LauncherVersionText"
+                               Margin="8,0,0,0"
+                               FontSize="14"
+                               Foreground="{StaticResource SecondaryTextBrush}" />
+                </StackPanel>
             </StackPanel>
 
             <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
                         VerticalAlignment="Center">
+                <Button x:Name="UpdateLauncherButton"
+                        Content="Обновить лаунчер"
+                        Margin="0,0,10,0"
+                        Visibility="Collapsed"
+                        Click="UpdateLauncherButton_Click" />
                 <Button x:Name="RefreshButton"
                         Content="Обновить список"
                         Margin="0,0,10,0"

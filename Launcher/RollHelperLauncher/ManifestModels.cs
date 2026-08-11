@@ -19,7 +19,19 @@ internal sealed class ReleaseManifest
 {
     public int Schema { get; init; } = 1;
     public string? Release { get; init; }
+    public LauncherRelease? Launcher { get; init; }
     public List<ReleasePackage> Packages { get; init; } = [];
+}
+
+internal sealed class LauncherRelease
+{
+    public required string Version { get; init; }
+    public string? Url { get; init; }
+    public string? Asset { get; init; }
+    public required string Sha256 { get; init; }
+
+    [JsonIgnore]
+    public Uri? DownloadUri { get; set; }
 }
 
 internal sealed class ReleasePackage

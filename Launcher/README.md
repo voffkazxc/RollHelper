@@ -12,6 +12,7 @@
 6. Читает `package.json` из корня ZIP.
 7. Запускает описанный в пакете `entrypoint`.
 8. Записывает все действия и ошибки в `launcher.log`.
+9. Проверяет наличие новой версии самого лаунчера и обновляет её одной кнопкой.
 
 ## Где хранятся файлы
 
@@ -41,6 +42,14 @@ dotnet build .\RollHelperLauncher\RollHelperLauncher.csproj -c Release
 ```powershell
 dotnet publish .\RollHelperLauncher\RollHelperLauncher.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
 ```
+
+Полный релиз RollHouse вместе с самообновляемым лаунчером собирается из корня репозитория:
+
+```powershell
+.\packaging\build-release.ps1 -Version 0.1.7
+```
+
+Поле `launcher` в `release-manifest.json` содержит версию, имя ZIP и SHA-256. Если версия новее установленной, в шапке появляется кнопка «Обновить до …». После нажатия архив проверяется, лаунчер закрывается, заменяет свои файлы и запускается снова. Пользовательские пакеты, настройки и логи находятся вне папки лаунчера и не перезаписываются.
 
 ## Границы MVP
 

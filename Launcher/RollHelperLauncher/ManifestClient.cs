@@ -40,6 +40,15 @@ internal sealed class ManifestClient : IDisposable
             package.DownloadUri = ResolvePackageUri(manifestUri, package);
         }
 
+        if (manifest.Launcher is not null)
+        {
+            ValidateLauncher(manifest.Launcher);
+            manifest.Launcher.DownloadUri = ResolveAssetUri(
+                manifestUri,
+                manifest.Launcher.Url,
+                manifest.Launcher.Asset);
+        }
+
         LauncherLog.Info($"Manifest loaded. Release={manifest.Release ?? "unknown"}, packages={manifest.Packages.Count}");
         return manifest;
     }
@@ -101,9 +110,29 @@ internal sealed class ManifestClient : IDisposable
         }
     }
 
+    private static void ValidateLauncher(LauncherRelease launcher)
+    {
+        LauncherPaths.SafePathSegment(launcher.Version);
+
+        if (string.IsNullOrWhiteSpace(launcher.Url) && string.IsNullOrWhiteSpace(launcher.Asset))
+        {
+            throw new InvalidDataException("Launcher update has neither url nor asset.");
+        }
+
+        if (string.IsNullOrWhiteSpace(launcher.Sha256))
+        {
+            throw new InvalidDataException("Launcher update has no SHA-256 checksum.");
+        }
+    }
+
     private static Uri ResolvePackageUri(Uri manifestUri, ReleasePackage package)
     {
-        var location = !string.IsNullOrWhiteSpace(package.Url) ? package.Url : package.Asset;
+        return ResolveAssetUri(manifestUri, package.Url, package.Asset);
+    }
+
+    private static Uri ResolveAssetUri(Uri manifestUri, string? url, string? asset)
+    {
+        var location = !string.IsNullOrWhiteSpace(url) ? url : asset;
         if (Uri.TryCreate(location, UriKind.Absolute, out var absoluteUri))
         {
             return absoluteUri;

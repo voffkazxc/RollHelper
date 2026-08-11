@@ -10,16 +10,20 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<PackageRow> _packages = [];
     private readonly ManifestClient _manifestClient = new();
     private readonly PackageInstaller _packageInstaller;
+    private readonly LauncherUpdater _launcherUpdater;
     private readonly LauncherConfig _config;
     private CancellationTokenSource? _operationCancellation;
+    private LauncherRelease? _launcherUpdate;
 
     public MainWindow()
     {
         InitializeComponent();
 
         _packageInstaller = new PackageInstaller(_manifestClient);
+        _launcherUpdater = new LauncherUpdater(_manifestClient);
         _config = LauncherConfig.Load();
         PackagesGrid.ItemsSource = _packages;
+        LauncherVersionText.Text = $"• версия {_launcherUpdater.CurrentVersion}";
 
         Loaded += async (_, _) => await RefreshManifestAsync();
         Closed += (_, _) =>
@@ -37,6 +41,11 @@ public partial class MainWindow : Window
     private async void InstallAndRunButton_Click(object sender, RoutedEventArgs e)
     {
         await InstallAndRunSelectedAsync();
+    }
+
+    private async void UpdateLauncherButton_Click(object sender, RoutedEventArgs e)
+    {
+        await UpdateLauncherAsync();
     }
 
     private async void PackagesGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -78,6 +87,9 @@ public partial class MainWindow : Window
         {
             var manifestUri = new Uri(_config.ManifestUrl);
             var manifest = await _manifestClient.DownloadManifestAsync(manifestUri, _operationCancellation!.Token);
+            _launcherUpdate = _launcherUpdater.IsUpdateAvailable(manifest.Launcher)
+                ? manifest.Launcher
+                : null;
 
             _packages.Clear();
             foreach (var package in manifest.Packages.OrderBy(item => item.DisplayName ?? item.Id))
@@ -156,6 +168,43 @@ public partial class MainWindow : Window
         }
     }
 
+    private async Task UpdateLauncherAsync()
+    {
+        var release = _launcherUpdate;
+        if (release is null || !BeginOperation($"Подготовка обновления лаунчера {release.Version}..."))
+        {
+            return;
+        }
+
+        try
+        {
+            var progress = new Progress<int>(value => DownloadProgress.Value = value);
+            SetStatus($"Скачивание лаунчера {release.Version}...");
+            await _launcherUpdater.PrepareAndRestartAsync(
+                release,
+                progress,
+                _operationCancellation!.Token);
+
+            SetStatus("Обновление готово. Перезапускаю лаунчер...");
+            await Task.Delay(300);
+            Application.Current.Shutdown();
+        }
+        catch (OperationCanceledException)
+        {
+            SetStatus("Обновление отменено");
+            LauncherLog.Warning("Launcher update cancelled");
+        }
+        catch (Exception exception)
+        {
+            ShowOperationError("Не удалось обновить лаунчер", exception);
+        }
+        finally
+        {
+            EndOperation();
+            UpdateActionButton();
+        }
+    }
+
     private bool BeginOperation(string status)
     {
         if (_operationCancellation is not null)
@@ -165,6 +214,7 @@ public partial class MainWindow : Window
 
         _operationCancellation = new CancellationTokenSource();
         RefreshButton.IsEnabled = false;
+        UpdateLauncherButton.IsEnabled = false;
         InstallAndRunButton.IsEnabled = false;
         PackagesGrid.IsEnabled = false;
         DownloadProgress.Value = 0;
@@ -179,6 +229,7 @@ public partial class MainWindow : Window
         RefreshButton.IsEnabled = true;
         PackagesGrid.IsEnabled = true;
         DownloadProgress.Value = 0;
+        UpdateLauncherButtonState();
     }
 
     private void UpdateActionButton()
@@ -214,6 +265,17 @@ public partial class MainWindow : Window
         SetStatus(_packages.Count == 0
             ? "Сейчас нет доступных программ и дополнений"
             : "Выберите программу или дополнение");
+    }
+
+    private void UpdateLauncherButtonState()
+    {
+        UpdateLauncherButton.Visibility = _launcherUpdate is null
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        UpdateLauncherButton.IsEnabled = _operationCancellation is null && _launcherUpdate is not null;
+        UpdateLauncherButton.Content = _launcherUpdate is null
+            ? "Обновить лаунчер"
+            : $"Обновить до {_launcherUpdate.Version}";
     }
 
     private void SetStatus(string status)

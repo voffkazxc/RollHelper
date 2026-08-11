@@ -1,6 +1,11 @@
 {
   "schema": 1,
   "release": "0.1.0",
+  "launcher": {
+    "version": "0.1.0",
+    "asset": "RollHelperLauncher-win-x64-0.1.0.zip",
+    "sha256": "REPLACE_WITH_SHA256"
+  },
   "packages": [
     {
       "id": "rollhouse",
