@@ -42,12 +42,14 @@
                         Orientation="Horizontal"
                         VerticalAlignment="Center">
                 <Button x:Name="UpdateLauncherButton"
-                        Content="Обновить лаунчер"
+                        Content="Проверить обновление лаунчера"
                         Margin="0,0,10,0"
-                        Visibility="Collapsed"
+                        Background="{StaticResource AccentBrush}"
+                        BorderBrush="{StaticResource AccentBrush}"
+                        Foreground="White"
                         Click="UpdateLauncherButton_Click" />
                 <Button x:Name="RefreshButton"
-                        Content="Обновить список"
+                        Content="Обновить список программ"
                         Margin="0,0,10,0"
                         Click="RefreshButton_Click" />
                 <Button Content="Открыть лог"

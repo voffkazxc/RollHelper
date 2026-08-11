@@ -1,7 +1,7 @@
 param(
-    [string]$ReleaseRoot = (Join-Path $env:TEMP "RollHelperRelease\0.1.8"),
-    [string]$OldVersion = "0.1.7",
-    [string]$NewVersion = "0.1.8"
+    [string]$ReleaseRoot = (Join-Path $env:TEMP "RollHelperRelease\0.1.9"),
+    [string]$OldVersion = "0.1.8",
+    [string]$NewVersion = "0.1.9"
 )
 
 $ErrorActionPreference = "Stop"
@@ -64,7 +64,7 @@ try {
         if ($window) {
             $nameCondition = New-Object Windows.Automation.PropertyCondition(
                 [Windows.Automation.AutomationElement]::NameProperty,
-                "Обновить до $NewVersion")
+                "Обновить лаунчер до $NewVersion")
             $updateButton = $window.FindFirst(
                 [Windows.Automation.TreeScope]::Descendants,
                 $nameCondition)

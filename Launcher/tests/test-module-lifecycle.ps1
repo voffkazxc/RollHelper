@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "0.1.8"
+    [string]$Version = "0.1.9"
 )
 
 $ErrorActionPreference = "Stop"
@@ -226,7 +226,7 @@ public static class ModuleTestNative {
         throw "Module installation must be disabled before its required program is installed."
     }
 
-    Invoke-Element (Find-ButtonByName -Root $window -Name "Установить и запустить")
+    Invoke-Element (Find-ButtonByName -Root $window -Name "Установить Test Program и запустить")
     for ($attempt = 0; $attempt -lt 100; $attempt++) {
         Start-Sleep -Milliseconds 150
         if (Test-Path -LiteralPath (Join-Path $programRoot "Packages\test-brand\1.0.0\package.json")) {

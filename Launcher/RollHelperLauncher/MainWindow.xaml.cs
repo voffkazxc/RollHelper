@@ -42,7 +42,27 @@ public partial class MainWindow : Window
 
     private async void InstallAndRunButton_Click(object sender, RoutedEventArgs e) => await InstallAndRunSelectedProgramAsync();
 
-    private async void UpdateLauncherButton_Click(object sender, RoutedEventArgs e) => await UpdateLauncherAsync();
+    private async void UpdateLauncherButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_launcherUpdate is null)
+        {
+            await RefreshManifestAsync();
+        }
+
+        if (_launcherUpdate is null)
+        {
+            SetStatus($"Установлена актуальная версия лаунчера {_launcherUpdater.CurrentVersion}");
+            MessageBox.Show(
+                this,
+                $"У вас уже установлена актуальная версия лаунчера {_launcherUpdater.CurrentVersion}.",
+                "Обновление лаунчера",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        await UpdateLauncherAsync();
+    }
 
     private async void ProgramsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e) => await InstallAndRunSelectedProgramAsync();
 
@@ -472,10 +492,10 @@ public partial class MainWindow : Window
         }
 
         InstallAndRunButton.Content = _packageInstaller.IsInstalled(selectedRow.Package)
-            ? "Запустить"
+            ? $"Запустить {selectedRow.DisplayName}"
             : _packageInstaller.HasInstalledVersion(selectedRow.Package.Id)
-                ? "Обновить и запустить"
-                : "Установить и запустить";
+                ? $"Обновить {selectedRow.DisplayName} и запустить"
+                : $"Установить {selectedRow.DisplayName} и запустить";
         InstallAndRunButton.IsEnabled = true;
     }
 
@@ -542,11 +562,11 @@ public partial class MainWindow : Window
 
     private void UpdateLauncherButtonState()
     {
-        UpdateLauncherButton.Visibility = _launcherUpdate is null ? Visibility.Collapsed : Visibility.Visible;
-        UpdateLauncherButton.IsEnabled = _operationCancellation is null && _launcherUpdate is not null;
+        UpdateLauncherButton.Visibility = Visibility.Visible;
+        UpdateLauncherButton.IsEnabled = _operationCancellation is null;
         UpdateLauncherButton.Content = _launcherUpdate is null
-            ? "Обновить лаунчер"
-            : $"Обновить до {_launcherUpdate.Version}";
+            ? "Проверить обновление лаунчера"
+            : $"Обновить лаунчер до {_launcherUpdate.Version}";
     }
 
     private static bool IsModule(ReleasePackage package)
