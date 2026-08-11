@@ -9,6 +9,69 @@
         WindowStartupLocation="CenterScreen"
         PreviewKeyDown="MainWindow_PreviewKeyDown"
         Background="{StaticResource WindowBackgroundBrush}">
+    <Window.Resources>
+        <Style x:Key="LauncherDataGridStyle" TargetType="DataGrid">
+            <Setter Property="Background" Value="#F8FAFC" />
+            <Setter Property="BorderBrush" Value="#D7DEE8" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="GridLinesVisibility" Value="None" />
+            <Setter Property="HorizontalGridLinesBrush" Value="Transparent" />
+            <Setter Property="VerticalGridLinesBrush" Value="Transparent" />
+            <Setter Property="RowHeaderWidth" Value="0" />
+            <Setter Property="RowHeight" Value="46" />
+            <Setter Property="ColumnHeaderHeight" Value="40" />
+        </Style>
+
+        <Style x:Key="LauncherColumnHeaderStyle" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#E9EFF6" />
+            <Setter Property="Foreground" Value="#475569" />
+            <Setter Property="BorderBrush" Value="#D7DEE8" />
+            <Setter Property="BorderThickness" Value="0,0,1,1" />
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="LauncherRowStyle" TargetType="DataGridRow">
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
+            <Setter Property="BorderBrush" Value="#E2E8F0" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F1F5F9" />
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#DBEAFE" />
+                    <Setter Property="Foreground" Value="#1E3A8A" />
+                    <Setter Property="BorderBrush" Value="#93C5FD" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="LauncherCellStyle" TargetType="DataGridCell">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        </Style>
+
+        <Style x:Key="ProgramNameTextStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
+        <Style x:Key="ProgramVersionTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+    </Window.Resources>
+
     <Grid Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -107,20 +170,43 @@
                               IsReadOnly="True"
                               SelectionMode="Single"
                               SelectionUnit="FullRow"
-                              GridLinesVisibility="Horizontal"
-                              BorderThickness="0"
-                              RowHeaderWidth="0"
-                              RowHeight="42"
-                              ColumnHeaderHeight="38"
+                              Style="{StaticResource LauncherDataGridStyle}"
+                              ColumnHeaderStyle="{StaticResource LauncherColumnHeaderStyle}"
+                              RowStyle="{StaticResource LauncherRowStyle}"
+                              CellStyle="{StaticResource LauncherCellStyle}"
                               FontFamily="Segoe UI"
                               FontSize="13"
                               SelectionChanged="ProgramsGrid_SelectionChanged"
                               MouseLeftButtonUp="ProgramsGrid_MouseLeftButtonUp"
                               MouseDoubleClick="ProgramsGrid_MouseDoubleClick">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Название" Binding="{Binding DisplayName}" Width="1.2*" MinWidth="110" />
-                            <DataGridTextColumn Header="Версия" Binding="{Binding Version}" Width="72" MinWidth="58" />
-                            <DataGridTextColumn Header="Состояние" Binding="{Binding Status}" Width="*" MinWidth="105" />
+                            <DataGridTextColumn Header="Название"
+                                                Binding="{Binding DisplayName}"
+                                                ElementStyle="{StaticResource ProgramNameTextStyle}"
+                                                Width="1.2*"
+                                                MinWidth="110" />
+                            <DataGridTextColumn Header="Версия"
+                                                Binding="{Binding Version}"
+                                                ElementStyle="{StaticResource ProgramVersionTextStyle}"
+                                                Width="72"
+                                                MinWidth="58" />
+                            <DataGridTemplateColumn Header="Состояние" Width="*" MinWidth="105">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border Padding="9,4"
+                                                HorizontalAlignment="Left"
+                                                VerticalAlignment="Center"
+                                                Background="#E0ECFF"
+                                                CornerRadius="10">
+                                            <TextBlock Text="{Binding Status}"
+                                                       FontSize="12"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#1D4ED8"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
@@ -199,11 +285,10 @@
                                   IsReadOnly="True"
                                   SelectionMode="Single"
                                   SelectionUnit="FullRow"
-                                  GridLinesVisibility="Horizontal"
-                                  BorderThickness="0"
-                                  RowHeaderWidth="0"
-                                  RowHeight="42"
-                                  ColumnHeaderHeight="38"
+                                  Style="{StaticResource LauncherDataGridStyle}"
+                                  ColumnHeaderStyle="{StaticResource LauncherColumnHeaderStyle}"
+                                  RowStyle="{StaticResource LauncherRowStyle}"
+                                  CellStyle="{StaticResource LauncherCellStyle}"
                                   FontFamily="Segoe UI"
                                   FontSize="13"
                                   SelectionChanged="ModulesGrid_SelectionChanged"
@@ -223,9 +308,33 @@
                                 </ContextMenu>
                             </DataGrid.ContextMenu>
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Название" Binding="{Binding DisplayName}" Width="1.2*" MinWidth="110" />
-                                <DataGridTextColumn Header="Версия" Binding="{Binding Version}" Width="72" MinWidth="58" />
-                                <DataGridTextColumn Header="Состояние" Binding="{Binding Status}" Width="*" MinWidth="100" />
+                                <DataGridTextColumn Header="Название"
+                                                    Binding="{Binding DisplayName}"
+                                                    ElementStyle="{StaticResource ProgramNameTextStyle}"
+                                                    Width="1.2*"
+                                                    MinWidth="110" />
+                                <DataGridTextColumn Header="Версия"
+                                                    Binding="{Binding Version}"
+                                                    ElementStyle="{StaticResource ProgramVersionTextStyle}"
+                                                    Width="72"
+                                                    MinWidth="58" />
+                                <DataGridTemplateColumn Header="Состояние" Width="*" MinWidth="100">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Border Padding="9,4"
+                                                    HorizontalAlignment="Left"
+                                                    VerticalAlignment="Center"
+                                                    Background="#E0ECFF"
+                                                    CornerRadius="10">
+                                                <TextBlock Text="{Binding Status}"
+                                                           FontSize="12"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="#1D4ED8"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </Border>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                             </DataGrid.Columns>
                         </DataGrid>
 

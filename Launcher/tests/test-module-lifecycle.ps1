@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "0.1.13"
+    [string]$Version = "0.1.14"
 )
 
 $ErrorActionPreference = "Stop"
@@ -337,7 +337,7 @@ public static class ModuleTestNative {
     [ModuleTestNative]::SetForegroundWindow([IntPtr]$window.Current.NativeWindowHandle) | Out-Null
     [ModuleTestNative]::SetCursorPos(
         [int]($gridBounds.Left + ($gridBounds.Width / 2)),
-        [int]($gridBounds.Bottom - 18)) | Out-Null
+        [int]($gridBounds.Top + 40 + 46 + 30)) | Out-Null
     [ModuleTestNative]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
     [ModuleTestNative]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
     [ModuleTestNative]::SetCursorPos($originalGridCursor.X, $originalGridCursor.Y) | Out-Null
