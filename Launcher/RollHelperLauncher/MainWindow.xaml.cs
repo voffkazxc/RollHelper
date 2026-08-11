@@ -18,7 +18,6 @@ public partial class MainWindow : Window
     private readonly LauncherUiSettingsStore _uiSettingsStore = new();
     private readonly PackageInstaller _packageInstaller;
     private readonly LauncherUpdater _launcherUpdater;
-    private readonly LauncherConfig _config;
     private CancellationTokenSource? _operationCancellation;
     private LauncherRelease? _launcherUpdate;
     private bool _modulesPanelOpened;
@@ -30,7 +29,7 @@ public partial class MainWindow : Window
 
         _packageInstaller = new PackageInstaller(_manifestClient, _packageStateStore);
         _launcherUpdater = new LauncherUpdater(_manifestClient);
-        _config = LauncherConfig.Load();
+        _ = LauncherConfig.Load();
         ProgramsGrid.ItemsSource = _programs;
         ModulesGrid.ItemsSource = _modules;
         LauncherVersionText.Text = $"• версия {_launcherUpdater.CurrentVersion}";
@@ -201,7 +200,7 @@ public partial class MainWindow : Window
         try
         {
             var selectedProgramId = (ProgramsGrid.SelectedItem as PackageRow)?.Package.Id;
-            var manifestUri = new Uri(_config.ManifestUrl);
+            var manifestUri = new Uri(LauncherConfig.Load().ManifestUrl);
             var manifest = await _manifestClient.DownloadManifestAsync(manifestUri, _operationCancellation!.Token);
             _launcherUpdate = _launcherUpdater.IsUpdateAvailable(manifest.Launcher)
                 ? manifest.Launcher
