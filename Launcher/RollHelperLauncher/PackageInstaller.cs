@@ -20,6 +20,16 @@ internal sealed class PackageInstaller
         return File.Exists(Path.Combine(installDirectory, "package.json"));
     }
 
+    public bool HasInstalledVersion(string packageId)
+    {
+        var packageDirectory = Path.Combine(
+            LauncherPaths.PackagesDirectory,
+            LauncherPaths.SafePathSegment(packageId));
+
+        return Directory.Exists(packageDirectory)
+            && Directory.EnumerateFiles(packageDirectory, "package.json", SearchOption.AllDirectories).Any();
+    }
+
     public async Task<string> InstallAsync(
         ReleasePackage package,
         IProgress<int>? progress,

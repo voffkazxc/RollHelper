@@ -81,9 +81,14 @@ public partial class MainWindow : Window
             _packages.Clear();
             foreach (var package in manifest.Packages.OrderBy(item => item.DisplayName ?? item.Id))
             {
+                var status = _packageInstaller.IsInstalled(package)
+                    ? "Установлен"
+                    : _packageInstaller.HasInstalledVersion(package.Id)
+                        ? "Доступно обновление"
+                        : "Доступен";
                 _packages.Add(new PackageRow(
                     package,
-                    _packageInstaller.IsInstalled(package) ? "Установлен" : "Доступен"));
+                    status));
             }
 
             SetStatus($"Релиз {manifest.Release ?? "без номера"}. Пакетов: {manifest.Packages.Count}");
@@ -182,7 +187,9 @@ public partial class MainWindow : Window
 
         InstallAndRunButton.Content = _packageInstaller.IsInstalled(selectedRow.Package)
             ? "Запустить"
-            : "Установить и запустить";
+            : _packageInstaller.HasInstalledVersion(selectedRow.Package.Id)
+                ? "Обновить и запустить"
+                : "Установить и запустить";
         InstallAndRunButton.IsEnabled = true;
     }
 

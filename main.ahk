@@ -158,6 +158,40 @@ RhLaunchServer() {
     Run, pythonw "%serverDir%\app.py", %serverDir%, Hide
 }
 
+RhRestartServer() {
+    psCommand := "powershell.exe -NoProfile -WindowStyle Hidden -Command ""Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }"""
+    RunWait, %psCommand%,, Hide
+    Sleep, 400
+    RhLaunchServer()
+}
+
+RhKeepWindowOnScreen(hwnd) {
+    if (!hwnd)
+        return
+    WinGetPos, wx, wy, ww, wh, ahk_id %hwnd%
+    hMonitor := DllCall("MonitorFromWindow", "Ptr", hwnd, "UInt", 2, "Ptr")
+    VarSetCapacity(mi, 40, 0)
+    NumPut(40, mi, 0, "UInt")
+    if (!hMonitor || !DllCall("GetMonitorInfo", "Ptr", hMonitor, "Ptr", &mi))
+        return
+    workLeft := NumGet(mi, 20, "Int")
+    workTop := NumGet(mi, 24, "Int")
+    workRight := NumGet(mi, 28, "Int")
+    workBottom := NumGet(mi, 32, "Int")
+    newX := wx
+    newY := wy
+    if (newX + ww > workRight)
+        newX := workRight - ww
+    if (newY + wh > workBottom)
+        newY := workBottom - wh
+    if (newX < workLeft)
+        newX := workLeft
+    if (newY < workTop)
+        newY := workTop
+    if (newX != wx || newY != wy)
+        WinMove, ahk_id %hwnd%,, %newX%, %newY%
+}
+
 ; Отримати дані клієнта по номеру (повертає JSON-рядок або "")
 RhGetCustomer(phone) {
     phone := RegExReplace(phone, "[\s\-\(\)\+]", "")
@@ -1283,6 +1317,7 @@ DrawRollclub:
     FormatTime, _rhNow,, dd.MM.yyyy HH:mm
 
     Gui, Roll:Destroy
+    Gui, Roll:-DPIScale
     Gui, Roll:+AlwaysOnTop -MaximizeBox -MinimizeBox +ToolWindow +LastFound
     Gui, Roll:Color, %RhC_BG%, %RhC_Panel%
     Gui, Roll:Margin, 12, 12
@@ -1464,6 +1499,7 @@ DrawRollclub:
     Gui, Roll:Show, x%rollWinX% y%rollWinY%, RollHouse MEGA 3.0 (PLU)
     Gui, Roll:+LastFound
     RhRollHwnd := WinExist()
+    RhKeepWindowOnScreen(RhRollHwnd)
     ; примусова перерисовка всіх дітей — інакше кольори з'являються лише з 2-го показу (баг №2)
     DllCall("RedrawWindow", "Ptr", RhRollHwnd, "Ptr", 0, "Ptr", 0, "UInt", 0x185)
     GuiControlGet, _rhp, Roll:Pos, RhRawEdit
@@ -2204,6 +2240,7 @@ return
 OpenSettings:
     RhApplyTheme()
     Gui, Settings:Destroy
+    Gui, Settings:-DPIScale
     Gui, Settings:+AlwaysOnTop +ToolWindow +OwnDialogs +HwndSettingsHwnd
     Gui, Settings:Color, %RhC_BG%, %RhC_Panel%
     Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
@@ -3930,11 +3967,17 @@ return
 
 RestartPythonServer:
     ToolTip, Перезапускаю сервер...
-    SetTimer, RemoveToolTip, -2000
-    _serverDir := APP_DIR . "\..\server"
-    Run, cmd /c start.bat, %_serverDir%, Hide
-    Sleep, 2000
-    if (RhPing())
+    RhRestartServer()
+    _serverReady := 0
+    Loop, 10 {
+        Sleep, 400
+        if (RhPing()) {
+            _serverReady := 1
+            break
+        }
+    }
+    ToolTip
+    if (_serverReady)
         TrayTip, RollHouse, 🟢 Сервер успішно перезапущено!, 2, 1
     else
         TrayTip, RollHouse, ⚠️ Помилка: Сервер не відповідає, 3, 2

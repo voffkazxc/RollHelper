@@ -54,7 +54,7 @@ $cleanConfig = git -C $repoRoot show HEAD:brands/rollhouse/RkConfig.ini
 if ($LASTEXITCODE -ne 0) {
     throw "Cannot read the committed RollHouse configuration"
 }
-$cleanConfig | Set-Content -LiteralPath (Join-Path $rollHelperRoot "brands\rollhouse\RkConfig.ini") -Encoding UTF8
+$cleanConfig | Set-Content -LiteralPath (Join-Path $rollHelperRoot "brands\rollhouse\RkConfig.ini") -Encoding Unicode
 
 $emptyEnterState = @"
 [Enter]
