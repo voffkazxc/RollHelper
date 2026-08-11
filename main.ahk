@@ -147,6 +147,17 @@ RhPing() {
     return RH_SERVER_OK
 }
 
+RhLaunchServer() {
+    global APP_DIR
+    serverDir := APP_DIR . "\..\server"
+    embeddedPython := APP_DIR . "\..\runtime\python\pythonw.exe"
+    if FileExist(embeddedPython) {
+        Run, "%embeddedPython%" "%serverDir%\app.py", %serverDir%, Hide
+        return
+    }
+    Run, pythonw "%serverDir%\app.py", %serverDir%, Hide
+}
+
 ; Отримати дані клієнта по номеру (повертає JSON-рядок або "")
 RhGetCustomer(phone) {
     phone := RegExReplace(phone, "[\s\-\(\)\+]", "")
@@ -924,10 +935,10 @@ if (Module_IsEnabled("web_pult"))
     Menu, Tray, Add, 🌐 Веб-пульт (бета), OpenWebPult
 
 ; --- Запуск Python-сервера (читає поля iiko «по іменах», надійніше за прицели) ---
-; Сервер спільний для брендів; беремо вже робочий поряд: APP_DIR\..\server.
+; У дистрибутиві Python лежить у APP_DIR\..\runtime\python.
+; У робочій копії зберігаємо сумісність із Python, встановленим у Windows.
 if (!RhPing()) {
-    _serverDir := APP_DIR . "\..\server"
-    Run, pythonw "%_serverDir%\app.py", %_serverDir%, Hide
+    RhLaunchServer()
     Loop, 10 {
         Sleep, 500
         if (RhPing())
@@ -1018,7 +1029,7 @@ WatchdogPing:
     ; Наступний тик (через 60с) сам перевірить, чи піднявся сервер.
     _ahkLog := A_ScriptDir . "\ahk_debug.log"
     FileAppend, % "[" . A_Now . "] WATCHDOG: server down, fire restart (non-blocking)`n", %_ahkLog%
-    Run, cmd /c start.bat, %APP_DIR%\..\server, Hide
+    RhLaunchServer()
 return
 
 ; --- ГОЛОВНИЙ ТРИГЕР ПАРСИНГУ ---
