@@ -113,6 +113,16 @@ endlocal
 "@
 $startScript | Set-Content -LiteralPath (Join-Path $packageRoot "start_rollclub.bat") -Encoding ASCII
 
+$restartServerScript = @"
+@echo off
+setlocal
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":5000 " ^| findstr LISTENING') do taskkill /PID %%a /F >nul 2>&1
+timeout /t 1 /nobreak >nul
+start "RollClub Server" /min "%~dp0runtime\python\pythonw.exe" "%~dp0server\app.py"
+endlocal
+"@
+$restartServerScript | Set-Content -LiteralPath (Join-Path $packageRoot "restart_rollclub_server.bat") -Encoding ASCII
+
 $packageDescription = @{
     schema = 1
     id = "rollclub"

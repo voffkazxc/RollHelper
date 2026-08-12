@@ -37,20 +37,18 @@ SetDefaultMouseSpeed, 0
 SetWinDelay, -1
 SetControlDelay, -1
 
-; ── RollHelper: перемикання бренду назад на Roll House (через трей) ──
+; ── RollHelper MVP: тільки дії поточного бренду ──
 Menu, Tray, Add
-Menu, Tray, Add, Перемкнути на Roll House, SwitchToRollHouse
+Menu, Tray, Add, ⚙ Налаштування RollClub, OpenSettings
+Menu, Tray, Add, Кухні та навантаження, OpenKitchensEditor
 Menu, Tray, Add, 🔄 Перезапустити сервер, RestartRhServer
-Menu, Tray, Add, 🌐 Веб-пульт (бета), OpenWebPult
 
 ; ── RollHelper: сервер iiko-моста (читання полів ПО ІМЕНАХ) ──
 global RH_SERVER := "http://127.0.0.1:5000"
 global RH_SERVER_OK := 0
 RhPing()
 if (!RH_SERVER_OK) {
-    ; Запуск через start.bat — надійніше: прибиває старий сервер, чистить кеш,
-    ; ставить правильну робочу папку. (Прямий pythonw інколи не піднімався.)
-    Run, cmd /c start.bat, %A_ScriptDir%\..\server, Hide
+    RcLaunchServerProcess(0)
     Loop, 16 {
         Sleep, 500
         if (RhPing())
@@ -108,8 +106,6 @@ if !FileExist(ConfigPath) {
     IniWrite, 0,     %ConfigPath%, Targets, KontsY
     IniWrite, vkC0,  %ConfigPath%, Hotkeys, Main
     IniWrite, F1,    %ConfigPath%, Hotkeys, Siv
-    IniWrite, F2,    %ConfigPath%, Hotkeys, WaitOrder
-    IniWrite, F3,    %ConfigPath%, Hotkeys, WaitCall
     MsgBox, 64, Rollclub PRO, Створено новий RkConfig.ini`nЗараз відкриється вікно налаштувань!, 3
     GoSub, OpenSettings
 }
@@ -177,8 +173,6 @@ IniRead, pluWasabi,     %ConfigPath%, PLU_SIV, Wasabi,     00426
 
 IniRead, hkMain,   %ConfigPath%, Hotkeys, Main,      vkC0
 IniRead, hkSiv,   %ConfigPath%, Hotkeys, Siv,       F1
-IniRead, hkWait,  %ConfigPath%, Hotkeys, WaitOrder, F2
-IniRead, hkCall,  %ConfigPath%, Hotkeys, WaitCall,  F3
 IniRead, hkFinish,%ConfigPath%, Hotkeys, Finish,    ^+Enter
 IniRead, uiTheme, %ConfigPath%, UI, Theme, light
 global uiTheme
@@ -186,13 +180,9 @@ global uiTheme
 ; Очищення від можливих артефактів кодування (нульових байтів)
 hkMain   := RegExReplace(hkMain,   "[^a-zA-Z0-9!#^+]")
 hkSiv    := RegExReplace(hkSiv,    "[^a-zA-Z0-9!#^+]")
-hkWait   := RegExReplace(hkWait,   "[^a-zA-Z0-9!#^+]")
-hkCall   := RegExReplace(hkCall,   "[^a-zA-Z0-9!#^+]")
 hkFinish := RegExReplace(hkFinish, "[^a-zA-Z0-9!#^+]")
 if (hkMain   = "") hkMain   := "vkC0"
 if (hkSiv    = "") hkSiv    := "F1"
-if (hkWait   = "") hkWait   := "F2"
-if (hkCall   = "") hkCall   := "F3"
 if (hkFinish = "") hkFinish := "^+Enter"
 
 ; ========================================================
@@ -299,8 +289,6 @@ global RcZonesOk   := 0   ; 1 = KML завантажено
 ; ========================================================
 Hotkey, %hkMain%, TriggerMain, On
 Hotkey, %hkSiv%,  TriggerSiv,  On
-Hotkey, %hkWait%, TriggerWait, On
-Hotkey, %hkCall%, TriggerCall, On
 ; FinishOrder тепер статична клавіша в #IfWinActive блоках (надійніше ніж Hotkey динамічний)
 
 SetTimer, RollFocusWatcher, 300
@@ -314,7 +302,7 @@ RollFocusWatcher:
         return
     if WinActive("Rollclub PRO 33.0")
         return
-    if WinActive("Налаштування PRO")
+    if WinActive("Налаштування RollClub")
         return
     if WinActive("Кухні — статуси")
         return
@@ -1731,24 +1719,16 @@ DrawRollclub:
     Gui, Roll:Add, Text, x%x0% y32 w142 h26 +0x200, Roll Club
 
     Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
-    Gui, Roll:Add, Text, x174 y14 w104 h18 Right +0x200, %_rhNow%
-    Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
-    Gui, Roll:Add, Text, x280 y14 w36 h22 Center +Border +0x200 HwndhSwitchBrand gSwitchToRollHouse, RH
-    Gui, Roll:Add, Text, x320 y14 w28 h22 Center +Border +0x200 HwndhSettingsGear gOpenSettings, Set
-    RhRegColor(hSwitchBrand, RhB_CardFill, RhB_Text)
+    Gui, Roll:Add, Text, x174 y14 w136 h22 Right +0x200, %_rhNow%
+    Gui, Roll:Font, s13 bold c%RhC_Text%, Segoe UI Symbol
+    Gui, Roll:Add, Text, x316 y14 w32 h26 Center +Border +0x200 HwndhSettingsGear gOpenSettings, ⚙
     RhRegColor(hSettingsGear, RhB_CardFill, RhB_Text)
-    ; --- Тумблер авто-режиму ---
-    Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
-    Gui, Roll:Add, Text, x166 y34 w178 h22 Center +Border +0x200 HwndhAutoToggle vRhAutoLbl gRhAutoToggle, 🤖 АВТО: ВИМК
-    RhRegColor(hAutoToggle, RhB_CardFill, RhB_Text)
 
     Gui, Roll:Font, s8 bold cFFFFFF, %RhFontName%
     Gui, Roll:Add, Text, x16 y54 w66 h20 Center +0x200 HwndhOnlinePill vRhServerPill, %_serverPill%
     RhRegColor(hOnlinePill, (RH_SERVER_OK ? RhB_Green : RhB_Red), RhB_White)
     Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
-    Gui, Roll:Add, Text, x90 y54 w52 h22 Center +Border +0x200 HwndhRestartServer gRestartRhServer, Srv
-    Gui, Roll:Add, Text, x150 y54 w194 h22 Center +Border +0x200 HwndhOpenKitchens gOpenKitchensEditor, Кухні
-    RhRegColor(hRestartServer, RhB_CardFill, RhB_Text)
+    Gui, Roll:Add, Text, x90 y54 w254 h22 Center +Border +0x200 HwndhOpenKitchens gOpenKitchensEditor, Кухні та навантаження
     RhRegColor(hOpenKitchens, RhB_CardFill, RhB_Text)
     curY := 84
 
@@ -2521,17 +2501,8 @@ OpenSettings:
     Gui, Settings:Add, Button, x10 y+10 w290 h28 gRcLoadKmlFile, Завантажити KML-файл зон
 
     Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, w300 Center x10 y+15, PLU КОДИ ПОДАРУНКІВ
+    Gui, Settings:Add, Text, w300 Center x10 y+15, PLU КОДИ СИВ
     Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, x10 y+10 w60, Гункан:
-    Gui, Settings:Add, Edit, x+5 yp-3 w80 vNewGunkan Center, %pluGunkan%
-    Gui, Settings:Add, Text, x+10 yp+3 w50, Пепсі:
-    Gui, Settings:Add, Edit, x+5 yp-3 w80 vNewPepsi Center, %pluPepsi%
-    Gui, Settings:Add, Text, x10 y+10 w60, Бургер:
-    Gui, Settings:Add, Edit, x+5 yp-3 w80 vNewBurger Center, %pluBurger%
-    Gui, Settings:Add, Text, x+10 yp+3 w55, Сендвіч:
-    Gui, Settings:Add, Edit, x+5 yp-3 w80 vNewSandwich Center, %pluSandwich%
-
     Gui, Settings:Add, Text, x10 y+10 w60, Бамбукові:
     Gui, Settings:Add, Edit, x+5 yp-3 w80 vNewSticksNorm Center, %pluSticksNorm%
     Gui, Settings:Add, Text, x+10 yp+3 w55, Навчальні:
@@ -2547,16 +2518,12 @@ OpenSettings:
     Gui, Settings:Add, Hotkey, x+5 yp-3 w140 vNewHkMain, %hkMain%
     Gui, Settings:Add, Text, x10 y+10 w140, Швидкий СИВ:
     Gui, Settings:Add, Hotkey, x+5 yp-3 w140 vNewHkSiv, %hkSiv%
-    Gui, Settings:Add, Text, x10 y+10 w140, Авто-Прийом CRM:
-    Gui, Settings:Add, Hotkey, x+5 yp-3 w140 vNewHkWait, %hkWait%
-    Gui, Settings:Add, Text, x10 y+10 w140, Автоприйом Дзвінка:
-    Gui, Settings:Add, Hotkey, x+5 yp-3 w140 vNewHkCall, %hkCall%
     Gui, Settings:Add, Text, x10 y+10 w140, Фініш (Зберегти):
     Gui, Settings:Add, Hotkey, x+5 yp-3 w140 vNewHkFinish, %hkFinish%
 
     Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
     Gui, Settings:Add, Button, w290 h35 x10 y+15 gSaveSettings, Зберегти та Перезапустити
-    Gui, Settings:Show,, Налаштування PRO
+    Gui, Settings:Show,, Налаштування RollClub
 return
 
 SaveSettings:
@@ -2566,17 +2533,11 @@ SaveSettings:
 
     CHECK_POINT_ENABLED := NewCheckPoint
     IniWrite, %NewCheckPoint%, RkConfig.ini, Main, CheckPoint
-    IniWrite, %NewGunkan%,   RkConfig.ini, PLU, Gunkan
-    IniWrite, %NewPepsi%,    RkConfig.ini, PLU, Pepsi
-    IniWrite, %NewBurger%,   RkConfig.ini, PLU, Burger
-    IniWrite, %NewSandwich%, RkConfig.ini, PLU, Sandwich
     IniWrite, %NewSticksNorm%, RkConfig.ini, PLU, SticksNorm
     IniWrite, %NewSticksEdu%,  RkConfig.ini, PLU, SticksEdu
     IniWrite, %NewUtensils%,   RkConfig.ini, PLU, Utensils
     IniWrite, %NewHkMain%,   RkConfig.ini, Hotkeys, Main
     IniWrite, %NewHkSiv%,    RkConfig.ini, Hotkeys, Siv
-    IniWrite, %NewHkWait%,   RkConfig.ini, Hotkeys, WaitOrder
-    IniWrite, %NewHkCall%,   RkConfig.ini, Hotkeys, WaitCall
     IniWrite, %NewHkFinish%, RkConfig.ini, Hotkeys, Finish
     MsgBox, 64, Збережено, Налаштування збережено! Перезапуск..., 2
     Reload
@@ -3187,7 +3148,7 @@ AddSivVisual:
     Gui, SivVis:Font, s10 bold c0055AA, Segoe UI
     Gui, SivVis:Add, Text, x10 y10 w260, 📌 ПАЛОЧКИ (соуси автоматично)
     Gui, SivVis:Font, s10 norm cBlack, Segoe UI
-    Gui, SivVis:Add, Text,  x10  y45  w180, 🍣 ІНФО: Соуси пробиваються автоматично!
+    Gui, SivVis:Add, Text,  x10  y42  w250 h20 Center, ІНФО: соуси пробиваються автоматично
     Gui, SivVis:Add, Text,  x10  y75  w180, 🥢 БАМБУКОВІ палички:
     Gui, SivVis:Add, Edit,  x190 y73  w70  vVisNorm Number Center, %parsedSticksNorm%
     Gui, SivVis:Add, Text,  x10  y105 w180, 🥢 НАВЧАЛЬНІ палички:
@@ -3745,7 +3706,7 @@ RestartRhServer:
         GuiControl, Roll:, RhServerPill, RESTART
     TrayTip, RollClub PRO, 🔄 Перезапускаю сервер iiko-моста..., 2, 1
 
-    Run, cmd /c start.bat, %A_ScriptDir%\..\server, Hide
+    RcLaunchServerProcess(1)
     Loop, 20 {
         Sleep, 500
         if (RhPing())
@@ -4671,6 +4632,33 @@ LoadUiaMapToListView:
             LV_Add("", _name, _id)
     }
 return
+
+RcLaunchServerProcess(forceRestart := 0) {
+    _packageRoot := A_ScriptDir . "\.."
+    _serverDir := _packageRoot . "\server"
+    _serverApp := _serverDir . "\app.py"
+    _embeddedPython := _packageRoot . "\runtime\python\pythonw.exe"
+    _packageRestart := _packageRoot . "\restart_rollclub_server.bat"
+    _developmentStart := _serverDir . "\start.bat"
+
+    if (forceRestart && FileExist(_packageRestart)) {
+        Run, %ComSpec% /c ""%_packageRestart%"", %_packageRoot%, Hide
+        return 1
+    }
+
+    if (!forceRestart && FileExist(_embeddedPython) && FileExist(_serverApp)) {
+        Run, "%_embeddedPython%" "%_serverApp%", %_serverDir%, Hide
+        return 1
+    }
+
+    if FileExist(_developmentStart) {
+        Run, %ComSpec% /c ""%_developmentStart%"", %_serverDir%, Hide
+        return 1
+    }
+
+    TrayTip, RollClub, Не знайдено файли локального сервера., 4, 2
+    return 0
+}
 
 UiaListClick:
     if (A_GuiEvent = "DoubleClick")

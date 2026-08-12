@@ -94,11 +94,13 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 if ($Publish) {
     $notesPath = Join-Path $releaseRoot "release-notes.md"
     @"
-Додано RollClub як окрему програму.
+Оновлено RollClub MVP без змін RollHouse та його доповнень.
 
 - RollClub: $RollClubVersion
-- Доповнення «Дежурство заказов (F4)»: $DutyVersion
-- RollHouse і лаунчер без змін
+- у базі залишено тільки тільду та F1
+- F4 залишається окремим доповненням
+- виправлено шапку, вікно F1 і перезапуск сервера
+- RollHouse, його доповнення та лаунчер без змін
 "@ | Set-Content -LiteralPath $notesPath -Encoding UTF8
 
     $assetsToPublish = @($rollClubBuild.AssetPath, $manifestPath)
