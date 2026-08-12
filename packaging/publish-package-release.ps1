@@ -119,8 +119,17 @@ if ($Publish) {
 - Лаунчер остаётся на версии $launcherVersion
 "@ | Set-Content -LiteralPath $notesPath -Encoding UTF8
 
-    $existingRelease = gh release view $catalogTag --repo $Repository --json tagName 2>$null
-    if ($LASTEXITCODE -eq 0 -and $existingRelease) {
+    $previousErrorPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $existingRelease = gh release view $catalogTag --repo $Repository --json tagName 2>$null
+        $releaseLookupExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorPreference
+    }
+
+    if ($releaseLookupExitCode -eq 0 -and $existingRelease) {
         gh release upload $catalogTag `
             $rollhouseBuild.Package `
             $reportBuild.AssetPath `
