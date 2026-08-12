@@ -56,6 +56,16 @@ if ($LASTEXITCODE -ne 0) {
 $cleanConfig | Set-Content -LiteralPath (Join-Path $rollHelperRoot "brands\rollclub\RkConfig.ini") -Encoding Unicode
 $packageConfig = Join-Path $rollHelperRoot "brands\rollclub\RkConfig.ini"
 $configText = [IO.File]::ReadAllText($packageConfig, [Text.Encoding]::Unicode)
+$configText = [regex]::Replace(
+    $configText,
+    "(?ms)^\[UiaMap\]\r?\n.*?(?=^\[|\z)",
+    ""
+)
+$configText = [regex]::Replace(
+    $configText,
+    "(?ms)^\[UiaHidden\]\r?\n.*?(?=^\[|\z)",
+    ""
+)
 if ($configText -match "(?im)^\[Features\]\s*$") {
     if ($configText -match "(?im)^Gifts\s*=") {
         $configText = [regex]::Replace($configText, "(?im)^Gifts\s*=.*$", "Gifts=0")

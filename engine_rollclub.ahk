@@ -61,7 +61,7 @@ else
 ; АВТОСТВОРЕННЯ КОНФІГУ якщо немає
 ; ========================================================
 ConfigPath := A_ScriptDir "\brands\rollclub\RkConfig.ini"
-global UIA_MAP_CONFIG := ConfigPath
+global UIA_MAP_CONFIG := RcPrepareUiaMapConfig(ConfigPath)
 rcLogPath  := A_ScriptDir "\siv_debug.log"
 
 if !FileExist(ConfigPath) {
@@ -690,6 +690,73 @@ RcUserDataDir() {
     dir := RcProgramRoot() . "\UserData\rollclub"
     FileCreateDir, %dir%
     return dir
+}
+
+RcPrepareUiaMapConfig(packageConfig) {
+    userConfig := RcUserDataDir() . "\RkUiaMap.ini"
+    if FileExist(userConfig) {
+        RcCleanupUiaMap(userConfig)
+        return userConfig
+    }
+
+    FileAppend,, %userConfig%, UTF-16
+    bestConfig := ""
+    bestCount := 0
+    versionsRoot := A_ScriptDir . "\..\.."
+    pattern := versionsRoot . "\*\RollHelper\brands\rollclub\RkConfig.ini"
+    Loop, Files, %pattern%, F
+    {
+        entryCount := RcIniSectionEntryCount(A_LoopFileFullPath, "UiaMap")
+        if (entryCount > bestCount) {
+            bestCount := entryCount
+            bestConfig := A_LoopFileFullPath
+        }
+    }
+    if (bestConfig = "" && RcIniSectionEntryCount(packageConfig, "UiaMap") > 0)
+        bestConfig := packageConfig
+    if (bestConfig != "") {
+        RcCopyIniSection(bestConfig, userConfig, "UiaMap")
+        RcCopyIniSection(bestConfig, userConfig, "UiaHidden")
+    }
+    RcCleanupUiaMap(userConfig)
+    return userConfig
+}
+
+RcCleanupUiaMap(configPath) {
+    obsoleteRoles := ["Зона CRM (zxc)", "Авто-Прийом Дзв. (zxc1)", "цццц"]
+    for _, role in obsoleteRoles {
+        IniDelete, %configPath%, UiaMap, %role%
+        IniDelete, %configPath%, UiaHidden, %role%
+    }
+}
+
+RcIniSectionEntryCount(configPath, sectionName) {
+    IniRead, sectionText, %configPath%, %sectionName%
+    if (sectionText = "" || sectionText = "ERROR")
+        return 0
+    count := 0
+    Loop, Parse, sectionText, `n, `r
+    {
+        if (InStr(A_LoopField, "="))
+            count++
+    }
+    return count
+}
+
+RcCopyIniSection(sourceConfig, targetConfig, sectionName) {
+    IniRead, sectionText, %sourceConfig%, %sectionName%
+    if (sectionText = "" || sectionText = "ERROR")
+        return
+    Loop, Parse, sectionText, `n, `r
+    {
+        pair := StrSplit(A_LoopField, "=", "", 2)
+        if (pair.Length() < 2)
+            continue
+        key := Trim(pair[1])
+        value := Trim(pair[2])
+        if (key != "")
+            IniWrite, %value%, %targetConfig%, %sectionName%, %key%
+    }
 }
 
 RcRollclubPackageDataPath(fileName) {
@@ -2569,18 +2636,20 @@ OpenSettings:
     Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
     Gui, Settings:Add, Text, x16 y36 w430 Center, WinAPI: ЗАМІНА СТАРИХ ПРИЦІЛІВ
     Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, ListView, x16 y62 w430 h230 vUiaListView gUiaListClick Grid, Назва (роль)|AutomationId / Name|Коорд.
+    Gui, Settings:Add, ListView, x16 y62 w430 h230 vUiaListView gUiaListClick Grid, Елемент Syrve|AutomationId / Name|Коорд.|Ключ
     Gui, Settings:Default
     Gui, ListView, UiaListView
     LV_ModifyCol(1, 150)
     LV_ModifyCol(2, 210)
     LV_ModifyCol(3, 58)
+    LV_ModifyCol(4, 0)
     GoSub, LoadUiaMapToListView
     Gui, Settings:Font, s9 bold c%RhC_Text%, %RhFontName%
     Gui, Settings:Add, Button, x16 y302 w210 h32 gLaunchScanner, Замінити вибране
-    Gui, Settings:Add, Button, x236 y302 w210 h32 gDeleteSelectedUiaBinding, Видалити прив'язку
+    Gui, Settings:Add, Button, x236 y302 w210 h32 gDeleteSelectedUiaBinding, Видалити зі списку
     Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
-    Gui, Settings:Add, Text, x16 y342 w430 h50, Виберіть старий приціл у списку, натисніть «Замінити вибране», потім клікніть потрібний елемент у Syrve.`nПоки WinAPI порожній, працює старий координатний fallback.
+    Gui, Settings:Add, Text, x16 y342 w430 h50, Виберіть елемент, натисніть «Замінити вибране», потім клікніть потрібну комірку або кнопку Syrve.`n⚠ означає тимчасову прив'язку — її бажано замінити. Старі координати залишаються запасним варіантом.
+    Gui, Settings:Add, Button, x16 y394 w430 h26 gRestoreHiddenUiaTargets, Повернути приховані елементи
 
     ; ── Вкладка 2: PLU-коди оператора ─────────────────────────
     Gui, Settings:Tab, 2
@@ -2624,16 +2693,16 @@ OpenSettings:
     Gui, Settings:Add, Button, w140 x10  y+5 gSetCrossTarget, Хрестик Опл.
     Gui, Settings:Add, Button, w140 x+10 yp  gSetCashTarget,  Поле Оплати
     Gui, Settings:Add, Button, w140 x10  y+5 gSetSumTarget,   Сума Замовлення
-    Gui, Settings:Add, Button, w140 x+10 yp  gCalibrateWaitZoneFromSettings,  Зона CRM (zxc)
-    Gui, Settings:Add, Button, w140 x10  y+5 gSetCallTarget,  Авто-Прийом Дзв. (zxc1)
     Gui, Settings:Add, Button, w140 x+10 yp  gSetAdrReadTarget, Поле читання адреси
     Gui, Settings:Add, Button, w290 x10  y+5 gSetKontsTarget,  Концепція (самовивіз)
     Gui, Settings:Add, Button, w140 x10  y+5 gSetConfirmTarget, Подтвердить (фініш)
     Gui, Settings:Add, Button, w140 x+10 yp  gSetSaveTarget,    Зберегти на точку
     Gui, Settings:Add, Button, w290 x10  y+5 gSetNaitiTarget,  Найти точку (кнопка iiko)
     Gui, Settings:Add, Button, w290 x10  y+5 gSetTochkaTarget, Точка (поле для звірки зони)
-    Gui, Settings:Add, Button, w140 x10  y+5 gSetPoiskTarget,  Поле Поиск (КЦ)
-    Gui, Settings:Add, Button, w140 x+10 yp  gSetRowTarget,    1-й рядок списку
+    if (Module_IsEnabled("duty")) {
+        Gui, Settings:Add, Button, w140 x10  y+5 gSetPoiskTarget,  F4: Пошук доставок
+        Gui, Settings:Add, Button, w140 x+10 yp  gSetRowTarget,    F4: Перший рядок
+    }
 
     Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
     Gui, Settings:Add, Text, w300 Center x10 y+15, ФУНКЦІЇ
@@ -3201,14 +3270,14 @@ ProcessTimeCalc:
     FileAppend, % "[" . A_Now . "] FINISH UIA/Coord attempt`n", %A_ScriptDir%\ahk_debug.log
     
     ; 1. Нативный UIA-клик Подтвердить (или fallback по координатам)
-    if (!RcClickConfirm()) {
+    if (!RcUiaClick("Подтвердить (фініш)", "buttonDeliveryConfirmation")) {
         if (confirmX != 0)
             Click, %confirmX%, %confirmY%
     }
     Sleep, 400
     
     ; 2. Нативный UIA-клик Сохранить на точку (или fallback по координатам)
-    if (!RcClickSaveAndClose()) {
+    if (!RcUiaClick("Зберегти на точку", "buttonSaveAndClose")) {
         if (saveX != 0)
             Click, %saveX%, %saveY%
     }
@@ -3489,9 +3558,10 @@ ApplyRollclub:
         Sleep, 200
     }
 
-    if (autoCash == 1 && crossX != 0 && cashX != 0) {
+    if (autoCash == 1 && (crossX != 0 || RcHasUiaMap("Хрестик Опл.")) && cashX != 0) {
         Sleep, 400
-        Click, %crossX%, %crossY%
+        if (!RcUiaClick("Хрестик Опл.", "buttonDeletePaymentItem"))
+            Click, %crossX%, %crossY%
         Sleep, 400
         IikoUI_NoChange()
         Sleep, 400
@@ -3640,11 +3710,13 @@ FinishOrder:
     FileAppend, % "[" . A_Now . "] FINISH via IikoUI Driver`n", %A_ScriptDir%\ahk_debug.log
     
     ; 1. Подтвердить (UIA + fallback)
-    IikoUI_ConfirmDelivery()
+    if (!RcUiaClick("Подтвердить (фініш)", "buttonDeliveryConfirmation") && confirmX != 0)
+        Click, %confirmX%, %confirmY%
     Sleep, 400
     
     ; 2. Сохранить на точку (UIA + fallback)
-    IikoUI_SaveAndClose()
+    if (!RcUiaClick("Зберегти на точку", "buttonSaveAndClose") && saveX != 0)
+        Click, %saveX%, %saveY%
     Sleep, 400
     
     kcPaused := 0
@@ -3760,29 +3832,57 @@ RcUiaFind(role, defaultAid := "") {
     return IikoDriver_FindElement(aid)
 }
 
+RcUiaClick(role, defaultAid := "") {
+    element := RcUiaFind(role, defaultAid)
+    if (!IsObject(element))
+        return 0
+    try {
+        element.Click()
+        return 1
+    } catch e {
+        return 0
+    }
+}
+
+RcHasUiaMap(role) {
+    global UIA_MAP_CONFIG
+    IniRead, mappedAid, %UIA_MAP_CONFIG%, UiaMap, %role%, %A_Space%
+    return mappedAid != "" && mappedAid != "ERROR"
+}
+
 RcClickFirstOrderRowUIA() {
-    root := RcUiaFind("Табл. Страв", "treeListItems")
-    try rootAid := root.CurrentAutomationId
-    catch e0
-        rootAid := ""
-    if (!IsObject(root) || rootAid != "treeListItems")
-        root := IikoDriver_FindElement("treeListItems")
+    mapped := RcUiaFind("Табл. Страв", "")
+    if (IsObject(mapped)) {
+        try mappedName := mapped.CurrentName
+        catch e0
+            mappedName := ""
+        if (RegExMatch(mappedName, "^Блюдо row \d+$")) {
+            try {
+                mapped.Click()
+                Sleep, 180
+                return 1
+            } catch e1 {
+            }
+        }
+    }
+
+    root := IikoDriver_FindElement("treeListItems")
     if (!IsObject(root))
         return 0
 
     try best := root.FindFirstBy("Name=Блюдо row 1")
-    catch e1
+    catch e2
         best := ""
     if (!IsObject(best)) {
         try children := root.FindAllBy("TrueCondition")
-        catch e2
+        catch e3
             children := ""
         if (IsObject(children)) {
             bestRow := 999999
             Loop, % children.MaxIndex() {
                 el := children[A_Index]
                 try name := el.CurrentName
-                catch e3
+                catch e4
                     name := ""
                 if (RegExMatch(name, "^Блюдо row (\d+)$", rowMatch) && rowMatch1 > 0 && rowMatch1 < bestRow) {
                     best := el
@@ -3799,7 +3899,7 @@ RcClickFirstOrderRowUIA() {
             root.Click()
         Sleep, 180
         return 1
-    } catch e4 {
+    } catch e5 {
         return 0
     }
 }
@@ -4270,7 +4370,8 @@ RcBlkNorm(s) {
     if (iikoWinExe != "" && iikoWinExe != "ERROR")
         WinActivate, ahk_exe %iikoWinExe%
     Sleep, 150
-    IikoUI_AssignDeliveryTerminal()
+    if (!RcUiaClick("Найти точку (кнопка iiko)", "buttonAssignDeliveryTerminal"))
+        IikoUI_AssignDeliveryTerminal()
     
     diagSuccess := false
     iikoPoint := ""
@@ -4793,7 +4894,8 @@ RcDiagnosePointTest:
         WinActivate, ahk_exe %iikoWinExe%
     Sleep, 150
     ToolTip, CLICK: Натискаю "Найти точку"...
-    Click, %naitiX%, %naitiY%
+    if (!RcUiaClick("Найти точку (кнопка iiko)", "buttonAssignDeliveryTerminal"))
+        Click, %naitiX%, %naitiY%
     
     ToolTip, COLLECT: Очікування popup та читання Точки...
     _diagRes := RhGet("/api/iiko/diagnose_point_collect?session_id=" sessionId, 25000)
@@ -4877,25 +4979,25 @@ return
 ; ========================================================
 RcUiaTargetCatalog() {
     targets := []
-    targets.Push({role: "Коментар", x: "CommX", y: "CommY"})
-    targets.Push({role: "Карта Клієнта", x: "CardX", y: "CardY"})
-    targets.Push({role: "Кухня", x: "InfoX", y: "InfoY"})
-    targets.Push({role: "Адреса", x: "AddrX", y: "AddrY"})
-    targets.Push({role: "Час", x: "TimeX", y: "TimeY"})
-    targets.Push({role: "Табл. Страв", x: "ItemX", y: "ItemY"})
-    targets.Push({role: "Хрестик Опл.", x: "CrossX", y: "CrossY"})
-    targets.Push({role: "Поле Оплати", x: "CashX", y: "CashY"})
-    targets.Push({role: "Сума Замовлення", x: "SumX", y: "SumY"})
-    targets.Push({role: "Зона CRM (zxc)", zone: "WaitZone"})
-    targets.Push({role: "Авто-Прийом Дзв. (zxc1)", x: "CallX", y: "CallY"})
-    targets.Push({role: "Поле читання адреси", x: "AdrReadX", y: "AdrReadY"})
-    targets.Push({role: "Концепція (самовивіз)", x: "KontsX", y: "KontsY"})
-    targets.Push({role: "Подтвердить (фініш)", x: "ConfirmX", y: "ConfirmY"})
-    targets.Push({role: "Зберегти на точку", x: "SaveX", y: "SaveY"})
-    targets.Push({role: "Найти точку (кнопка iiko)", x: "NaitiX", y: "NaitiY"})
-    targets.Push({role: "Точка (поле для звірки зони)", x: "TochkaX", y: "TochkaY"})
-    targets.Push({role: "Поле Поиск (КЦ)", x: "PoiskX", y: "PoiskY"})
-    targets.Push({role: "1-й рядок списку", x: "RowX", y: "RowY"})
+    targets.Push({role: "Коментар", label: "Основний коментар", x: "CommX", y: "CommY"})
+    targets.Push({role: "Карта Клієнта", label: "Карта клієнта", x: "CardX", y: "CardY"})
+    targets.Push({role: "Кухня", label: "Коментар кухні", x: "InfoX", y: "InfoY"})
+    targets.Push({role: "Адреса", label: "Примітка кур'єру", x: "AddrX", y: "AddrY"})
+    targets.Push({role: "Час", label: "Час замовлення", x: "TimeX", y: "TimeY"})
+    targets.Push({role: "Табл. Страв", label: "Перша страва (PLU)", x: "ItemX", y: "ItemY"})
+    targets.Push({role: "Хрестик Опл.", label: "Видалити оплату", x: "CrossX", y: "CrossY"})
+    targets.Push({role: "Поле Оплати", label: "Тип оплати", x: "CashX", y: "CashY"})
+    targets.Push({role: "Сума Замовлення", label: "Сума замовлення", x: "SumX", y: "SumY"})
+    targets.Push({role: "Поле читання адреси", label: "Адреса замовлення", x: "AdrReadX", y: "AdrReadY"})
+    targets.Push({role: "Концепція (самовивіз)", label: "Концепція самовивозу", x: "KontsX", y: "KontsY"})
+    targets.Push({role: "Подтвердить (фініш)", label: "Підтвердити", x: "ConfirmX", y: "ConfirmY"})
+    targets.Push({role: "Зберегти на точку", label: "Зберегти на точку", x: "SaveX", y: "SaveY"})
+    targets.Push({role: "Найти точку (кнопка iiko)", label: "Знайти точку", x: "NaitiX", y: "NaitiY"})
+    targets.Push({role: "Точка (поле для звірки зони)", label: "Поле «Точка»", x: "TochkaX", y: "TochkaY"})
+    if (Module_IsEnabled("duty")) {
+        targets.Push({role: "Поле Поиск (КЦ)", label: "F4: Пошук доставок", x: "PoiskX", y: "PoiskY"})
+        targets.Push({role: "1-й рядок списку", label: "F4: Перший рядок", x: "RowX", y: "RowY"})
+    }
     return targets
 }
 
@@ -4918,6 +5020,36 @@ RcUiaCoordLabel(target) {
     return xVal . "," . yVal
 }
 
+RcUiaSelectorIsRisky(selector) {
+    selector := Trim(selector)
+    if (selector = "")
+        return 0
+    if RegExMatch(selector, "^\d+$")
+        return 1
+    return selector = "Name=Элемент редактирования"
+        || selector = "Name=поле"
+        || selector = "Name=Edit"
+}
+
+RcUiaNameIsMeaningful(name) {
+    name := Trim(name)
+    if (name = "")
+        return 0
+    return name != "Элемент редактирования"
+        && name != "поле"
+        && name != "Edit"
+}
+
+RcBuildUiaSelector(automationId, elementName) {
+    automationId := Trim(automationId)
+    elementName := Trim(elementName)
+    if (automationId != "" && !RegExMatch(automationId, "^\d+$"))
+        return automationId
+    if RcUiaNameIsMeaningful(elementName)
+        return "Name=" . elementName
+    return ""
+}
+
 LoadUiaMapToListView:
     RcSelectedUiaRow := 0
     Gui, Settings:Default
@@ -4928,11 +5060,17 @@ LoadUiaMapToListView:
     for _idx, _target in _catalog
     {
         _role := _target.role
+        IniRead, _hidden, %UIA_MAP_CONFIG%, UiaHidden, %_role%, 0
+        if (_hidden = 1)
+            continue
         IniRead, _savedId, %UIA_MAP_CONFIG%, UiaMap, %_role%, %A_Space%
         if (_savedId = "ERROR")
             _savedId := ""
         _coordLabel := RcUiaCoordLabel(_target)
-        LV_Add("", _role, _savedId, _coordLabel)
+        _label := _target.HasKey("label") ? _target.label : _role
+        if RcUiaSelectorIsRisky(_savedId)
+            _label := "⚠ " . _label
+        LV_Add("", _label, _savedId, _coordLabel, _role)
         _seenUiaRoles[_role] := 1
     }
     IniRead, _uiaKeys, %UIA_MAP_CONFIG%, UiaMap
@@ -4947,8 +5085,11 @@ LoadUiaMapToListView:
             continue
         _name := Trim(_pair[1])
         _id := Trim(_pair[2])
-        if (_name != "" && _id != "" && !_seenUiaRoles.HasKey(_name))
-            LV_Add("", _name, _id, "інше")
+        IniRead, _hidden, %UIA_MAP_CONFIG%, UiaHidden, %_name%, 0
+        if (_name != "" && _id != "" && !_seenUiaRoles.HasKey(_name) && _hidden != 1) {
+            _extraLabel := RcUiaSelectorIsRisky(_id) ? "⚠ " . _name : _name
+            LV_Add("", _extraLabel, _id, "інше", _name)
+        }
     }
 return
 
@@ -4999,23 +5140,33 @@ DeleteSelectedUiaBinding:
     }
     LV_GetText(_delName, _row, 1)
     LV_GetText(_delValue, _row, 2)
-    if (_delValue = "") {
-        MsgBox, 48, WinAPI Сканер, У ролі "%_delName%" ще немає WinAPI-прив'язки.
-        return
-    }
+    LV_GetText(_delRole, _row, 4)
+    if (_delRole = "")
+        _delRole := _delName
     Gui, Settings:+OwnDialogs +Disabled
-    MsgBox, 292, Видалення WinAPI елемента, Видалити прив'язку?`n`nРоль: %_delName%`nID: %_delValue%
+    if (_delValue != "")
+        _deleteText := "Видалити прив'язку та прибрати елемент зі списку?`n`nЕлемент: " . _delName . "`nID: " . _delValue
+    else
+        _deleteText := "У цього елемента ще немає WinAPI-прив'язки.`nПрибрати його зі списку?`n`nЕлемент: " . _delName
+    MsgBox, 292, Видалення WinAPI елемента, %_deleteText%
     Gui, Settings:-Disabled
     WinActivate, ahk_id %SettingsHwnd%
     IfMsgBox, No
         return
-    IniDelete, %UIA_MAP_CONFIG%, UiaMap, %_delName%
+    IniDelete, %UIA_MAP_CONFIG%, UiaMap, %_delRole%
+    IniWrite, 1, %UIA_MAP_CONFIG%, UiaHidden, %_delRole%
     IniRead, _remainingUiaMap, %UIA_MAP_CONFIG%, UiaMap
     if (_remainingUiaMap = "" || _remainingUiaMap = "ERROR")
         IniDelete, %UIA_MAP_CONFIG%, UiaMap
     GoSub, LoadUiaMapToListView
-    FileAppend, % "[" . A_Now . "] UIA_MAP_DELETE role=" . _delName . " value=" . _delValue . "`n", %A_ScriptDir%\ahk_debug.log
-    MsgBox, 64, Видалено, Прив'язку "%_delName%" видалено з конфігурації Roll Club.
+    FileAppend, % "[" . A_Now . "] UIA_MAP_DELETE role=" . _delRole . " value=" . _delValue . "`n", %A_ScriptDir%\ahk_debug.log
+    MsgBox, 64, Видалено, Елемент "%_delName%" прибрано зі списку.
+return
+
+RestoreHiddenUiaTargets:
+    IniDelete, %UIA_MAP_CONFIG%, UiaHidden
+    GoSub, LoadUiaMapToListView
+    MsgBox, 64, WinAPI Сканер, Приховані елементи повернуто до списку.
 return
 
 LaunchScanner:
@@ -5024,7 +5175,10 @@ LaunchScanner:
         MsgBox, 48, WinAPI Сканер, Спочатку виберіть старий приціл у списку, який потрібно замінити.
         return
     }
-    LV_GetText(_targetRole, _row, 1)
+    LV_GetText(_targetName, _row, 1)
+    LV_GetText(_targetRole, _row, 4)
+    if (_targetRole = "")
+        _targetRole := _targetName
     LV_GetText(_oldValue, _row, 2)
     if (_targetRole = "") {
         MsgBox, 48, WinAPI Сканер, Не вдалося прочитати роль вибраного рядка.
@@ -5048,14 +5202,15 @@ LaunchScanner:
         _aName := ""
         try _aId := _el.CurrentAutomationId
         try _aName := _el.CurrentName
-        _saveVal := _aId != "" ? _aId : (_aName != "" ? "Name=" . _aName : "")
+        _saveVal := RcBuildUiaSelector(_aId, _aName)
         if (_saveVal = "") {
-            MsgBox, 48, Помилка, Не вдалося знайти AutomationId або Name цього елемента.
+            MsgBox, 48, Нестабільний елемент, Цей елемент має лише тимчасовий числовий ID або загальну назву.`n`nНе відкривайте поле на редагування. Клікніть саму комірку або кнопку Syrve.`n`nСтара координатна прив'язка залишилася без змін.
             GoSub, OpenSettings
             return
         }
+        IniDelete, %UIA_MAP_CONFIG%, UiaHidden, %_targetRole%
         IniWrite, %_saveVal%, %UIA_MAP_CONFIG%, UiaMap, %_targetRole%
-        MsgBox, 64, Збережено, Роль "%_targetRole%" тепер прив'язана через WinAPI.`n`n%_saveVal%
+        MsgBox, 64, Збережено, Елемент "%_targetName%" тепер прив'язаний через WinAPI.`n`n%_saveVal%
     } catch _ex {
         MsgBox, 48, Помилка UIA, Не вдалося зчитати елемент:`n%_ex%
     }
