@@ -2555,6 +2555,7 @@ NumpadEnter::GoSub, SivVisApply
 OpenSettings:
     RcRefreshZonesModuleState()
     Gui, Settings:Destroy
+    RcSelectedUiaRow := 0
     Gui, Settings:+AlwaysOnTop +ToolWindow +OwnDialogs +HwndSettingsHwnd
 
     RhApplyTheme()
@@ -4918,6 +4919,7 @@ RcUiaCoordLabel(target) {
 }
 
 LoadUiaMapToListView:
+    RcSelectedUiaRow := 0
     Gui, Settings:Default
     Gui, ListView, UiaListView
     LV_Delete()
@@ -4978,14 +4980,14 @@ RcLaunchServerProcess(forceRestart := 0) {
 }
 
 UiaListClick:
+    if ((A_GuiEvent = "Normal" || A_GuiEvent = "DoubleClick") && A_EventInfo)
+        RcSelectedUiaRow := A_EventInfo
     if (A_GuiEvent = "DoubleClick")
         GoSub, LaunchScanner
 return
 
 DeleteSelectedUiaBinding:
-    Gui, Settings:Default
-    Gui, ListView, UiaListView
-    _row := LV_GetNext(0, "S")
+    _row := RcGetSelectedUiaRow()
     if (!_row) {
         MsgBox, 48, WinAPI Сканер, Спочатку виберіть елемент у списку.
         return
@@ -5012,9 +5014,7 @@ DeleteSelectedUiaBinding:
 return
 
 LaunchScanner:
-    Gui, Settings:Default
-    Gui, ListView, UiaListView
-    _row := LV_GetNext(0, "S")
+    _row := RcGetSelectedUiaRow()
     if (!_row) {
         MsgBox, 48, WinAPI Сканер, Спочатку виберіть старий приціл у списку, який потрібно замінити.
         return
@@ -5056,6 +5056,23 @@ LaunchScanner:
     }
     GoSub, OpenSettings
 return
+
+RcGetSelectedUiaRow() {
+    global RcSelectedUiaRow
+
+    Gui, Settings:Default
+    Gui, ListView, UiaListView
+    _row := LV_GetNext(0, "S")
+    if (_row)
+        return _row
+
+    if (!RcSelectedUiaRow)
+        return 0
+
+    _role := ""
+    LV_GetText(_role, RcSelectedUiaRow, 1)
+    return _role != "" ? RcSelectedUiaRow : 0
+}
 
 RcStopLegacyDutyProcess() {
     DetectHiddenWindows, On
