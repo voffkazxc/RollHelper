@@ -37,11 +37,8 @@ SetDefaultMouseSpeed, 0
 SetWinDelay, -1
 SetControlDelay, -1
 
-; ── RollHelper MVP: тільки дії поточного бренду ──
 Menu, Tray, Add
 Menu, Tray, Add, ⚙ Налаштування RollClub, OpenSettings
-Menu, Tray, Add, Кухні та навантаження, OpenKitchensEditor
-Menu, Tray, Add, 🔄 Перезапустити сервер, RestartRhServer
 
 ; ── RollHelper: сервер iiko-моста (читання полів ПО ІМЕНАХ) ──
 global RH_SERVER := "http://127.0.0.1:5000"
@@ -96,6 +93,9 @@ if !FileExist(ConfigPath) {
     IniWrite, 02439, %ConfigPath%, PLU, Utensils
     IniWrite, 00140, %ConfigPath%, PLU, Fork
     IniWrite, 00142, %ConfigPath%, PLU, Knife
+    IniWrite, 00424, %ConfigPath%, PLU_SIV, Soy
+    IniWrite, 00428, %ConfigPath%, PLU_SIV, Ginger
+    IniWrite, 00426, %ConfigPath%, PLU_SIV, Wasabi
     IniWrite, 0,     %ConfigPath%, Targets, WaitX
     IniWrite, 0,     %ConfigPath%, Targets, WaitY
     IniWrite, 0,     %ConfigPath%, Targets, CallX
@@ -1728,8 +1728,8 @@ DrawRollclub:
     Gui, Roll:Add, Text, x16 y54 w66 h20 Center +0x200 HwndhOnlinePill vRhServerPill, %_serverPill%
     RhRegColor(hOnlinePill, (RH_SERVER_OK ? RhB_Green : RhB_Red), RhB_White)
     Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
-    Gui, Roll:Add, Text, x90 y54 w254 h22 Center +Border +0x200 HwndhOpenKitchens gOpenKitchensEditor, Кухні та навантаження
-    RhRegColor(hOpenKitchens, RhB_CardFill, RhB_Text)
+    Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    Gui, Roll:Add, Text, x90 y54 w254 h22 Center +0x200, %_rhNow% · F1 СІВ
     curY := 84
 
     ; ZONE BLOCK — саме важливе, має бути одразу помітним!
@@ -2438,7 +2438,7 @@ OpenSettings:
     Gui, Settings:Color, %RhC_BG%, %RhC_Panel%
 
     Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Tab3, x6 y6 w348 h870 vSettingsTab, WinAPI|Координати та інше
+    Gui, Settings:Add, Tab3, x6 y6 w348 h610 vSettingsTab, WinAPI|PLU коди|Координати
 
     ; ── Вкладка 1: WinAPI scanner ───────────────────────────
     Gui, Settings:Tab, 1
@@ -2457,8 +2457,35 @@ OpenSettings:
     Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
     Gui, Settings:Add, Text, x16 y302 w322 h42, Наведіть курсор на кнопку в Syrve та натисніть ліву кнопку миші.`nВиберіть рядок і натисніть «Видалити».
 
-    ; ── Вкладка 2: резервні координати та інші налаштування ──
+    ; ── Вкладка 2: PLU-коди оператора ─────────────────────────
     Gui, Settings:Tab, 2
+
+    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Text, w320 Center x16 y36, PLU КОДИ СІВ / ПРИБОРИ
+    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Text, x24 y66 w170 h18, Позиція
+    Gui, Settings:Add, Text, x+5 yp w80 h18 Center, PLU
+    Gui, Settings:Add, Text, x24 y+6 w170 h22 +0x200, Бамбукові палички
+    Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewSticksNorm Center Limit10, %pluSticksNorm%
+    Gui, Settings:Add, Text, x24 y+6 w170 h22 +0x200, Навчальні палички
+    Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewSticksEdu Center Limit10, %pluSticksEdu%
+    Gui, Settings:Add, Text, x24 y+6 w170 h22 +0x200, Соєвий соус
+    Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewPluSoy Center Limit10, %pluSoy%
+    Gui, Settings:Add, Text, x24 y+6 w170 h22 +0x200, Імбир
+    Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewPluGinger Center Limit10, %pluGinger%
+    Gui, Settings:Add, Text, x24 y+6 w170 h22 +0x200, Васабі
+    Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewPluWasabi Center Limit10, %pluWasabi%
+    Gui, Settings:Add, Text, x24 y+6 w170 h22 +0x200, Прибори разом
+    Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewUtensils Center Limit10, %pluUtensils%
+    Gui, Settings:Add, Text, x24 y+6 w170 h22 +0x200, Вилка
+    Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewPluFork Center Limit10, %pluFork%
+    Gui, Settings:Add, Text, x24 y+6 w170 h22 +0x200, Ніж
+    Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewPluKnife Center Limit10, %pluKnife%
+    Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    Gui, Settings:Add, Text, x24 y+8 w300, PLU вводиться повністю, разом із нулями на початку.
+
+    ; ── Вкладка 3: резервні координати та інші налаштування ──
+    Gui, Settings:Tab, 3
 
     Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
     Gui, Settings:Add, Text, w300 Center, ПРИЦІЛИ (координати)
@@ -2501,17 +2528,6 @@ OpenSettings:
     Gui, Settings:Add, Button, x10 y+10 w290 h28 gRcLoadKmlFile, Завантажити KML-файл зон
 
     Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, w300 Center x10 y+15, PLU КОДИ СИВ
-    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, x10 y+10 w60, Бамбукові:
-    Gui, Settings:Add, Edit, x+5 yp-3 w80 vNewSticksNorm Center, %pluSticksNorm%
-    Gui, Settings:Add, Text, x+10 yp+3 w55, Навчальні:
-    Gui, Settings:Add, Edit, x+5 yp-3 w80 vNewSticksEdu Center, %pluSticksEdu%
-
-    Gui, Settings:Add, Text, x10 y+10 w70, Прибори В/Н/Л:
-    Gui, Settings:Add, Edit, x+5 yp-3 w80 vNewUtensils Center, %pluUtensils%
-
-    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
     Gui, Settings:Add, Text, w300 Center x10 y+15, ГАРЯЧІ КЛАВІШІ
     Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
     Gui, Settings:Add, Text, x10 y+10 w140, Головне меню:
@@ -2521,9 +2537,10 @@ OpenSettings:
     Gui, Settings:Add, Text, x10 y+10 w140, Фініш (Зберегти):
     Gui, Settings:Add, Hotkey, x+5 yp-3 w140 vNewHkFinish, %hkFinish%
 
+    Gui, Settings:Tab
     Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Button, w290 h35 x10 y+15 gSaveSettings, Зберегти та Перезапустити
-    Gui, Settings:Show,, Налаштування RollClub
+    Gui, Settings:Add, Button, w322 h35 x16 y630 gSaveSettings, Зберегти та Перезапустити
+    Gui, Settings:Show, w360 h680, Налаштування RollClub
 return
 
 SaveSettings:
@@ -2536,6 +2553,11 @@ SaveSettings:
     IniWrite, %NewSticksNorm%, RkConfig.ini, PLU, SticksNorm
     IniWrite, %NewSticksEdu%,  RkConfig.ini, PLU, SticksEdu
     IniWrite, %NewUtensils%,   RkConfig.ini, PLU, Utensils
+    IniWrite, %NewPluFork%,    RkConfig.ini, PLU, Fork
+    IniWrite, %NewPluKnife%,   RkConfig.ini, PLU, Knife
+    IniWrite, %NewPluSoy%,     RkConfig.ini, PLU_SIV, Soy
+    IniWrite, %NewPluGinger%,  RkConfig.ini, PLU_SIV, Ginger
+    IniWrite, %NewPluWasabi%,  RkConfig.ini, PLU_SIV, Wasabi
     IniWrite, %NewHkMain%,   RkConfig.ini, Hotkeys, Main
     IniWrite, %NewHkSiv%,    RkConfig.ini, Hotkeys, Siv
     IniWrite, %NewHkFinish%, RkConfig.ini, Hotkeys, Finish
@@ -2796,27 +2818,30 @@ OpenKitchensEditor:
         presetNotes := "Стандарт|Стоп|по узгодженню"
 
     rowY := 80
+    guiRow := 0
     for idx, k in Kitchens {
+        guiRow += 1
+        Kitchens[idx].GuiRow := guiRow
         label := k.Name . " (" . k.City . ")"
         Gui, Kitch:Add, Text, x10 y%rowY% w130 h22 +0x200, %label%
 
-        vRemark := "KRem_" . idx
+        vRemark := "KRem_" . guiRow
         valRem := k.Remark
         Gui, Kitch:Add, Edit, x150 y%rowY% w150 h22 v%vRemark%, %valRem%
 
-        vCenter := "KCen_" . idx
+        vCenter := "KCen_" . guiRow
         optCenter := RcBuildKitchOpts(k.Center, presetNotes)
         Gui, Kitch:Add, ComboBox, x310 y%rowY% w110 v%vCenter%, %optCenter%
 
-        vPickup := "KPic_" . idx
+        vPickup := "KPic_" . guiRow
         optPickup := RcBuildKitchOpts(k.Pickup, presetNotes)
         Gui, Kitch:Add, ComboBox, x430 y%rowY% w110 v%vPickup%, %optPickup%
 
-        vFar := "KFar_" . idx
+        vFar := "KFar_" . guiRow
         optFar := RcBuildKitchOpts(k.FarZone, presetNotes)
         Gui, Kitch:Add, ComboBox, x550 y%rowY% w110 v%vFar%, %optFar%
 
-        vStop := "KSto_" . idx
+        vStop := "KSto_" . guiRow
         valStop := k.StopList
         Gui, Kitch:Add, Edit, x670 y%rowY% w150 h22 v%vStop%, %valStop%
 
@@ -2838,11 +2863,12 @@ return
 SaveKitchens:
     Gui, Kitch:Submit, NoHide
     for idx, k in Kitchens {
-        vRem := "KRem_" . idx
-        vCen := "KCen_" . idx
-        vPic := "KPic_" . idx
-        vFar := "KFar_" . idx
-        vSto := "KSto_" . idx
+        guiRow := Kitchens[idx].GuiRow ? Kitchens[idx].GuiRow : idx
+        vRem := "KRem_" . guiRow
+        vCen := "KCen_" . guiRow
+        vPic := "KPic_" . guiRow
+        vFar := "KFar_" . guiRow
+        vSto := "KSto_" . guiRow
 
         Kitchens[idx].Remark   := %vRem%
         Kitchens[idx].Center   := (%vCen% != "") ? %vCen% : "Стандарт"
@@ -3212,18 +3238,13 @@ SivVisApply:
     ; ---- Пробивання: один RcStartPunch, потім серія RcPunchByPlu ----
     FileAppend, % "`n=== СИВ F1 === " . A_Now . " norm=" . VisNorm . " edu=" . VisEdu . " soy=" . soyQty . " gw=" . gwQty . "`n", %A_ScriptDir%\siv_debug.log
 
-    if (itemX != 0) {
-        if (VisNorm > 0)
-            RcPunchByPlu(pluSticksNorm, VisNorm)
-        if (VisEdu > 0)
-            RcPunchByPlu(pluSticksEdu, VisEdu)
-        if (soyQty > 0)
-            RcPunchByPlu(pluSoy, soyQty)
-        if (gwQty > 0) {
-            RcPunchByPlu(pluGinger, gwQty)
-            RcPunchByPlu(pluWasabi, gwQty)
-        }
-    }
+    _pluJobs := []
+    RcAddPluJob(_pluJobs, pluSticksNorm, VisNorm)
+    RcAddPluJob(_pluJobs, pluSticksEdu, VisEdu)
+    RcAddPluJob(_pluJobs, pluSoy, soyQty)
+    RcAddPluJob(_pluJobs, pluGinger, gwQty)
+    RcAddPluJob(_pluJobs, pluWasabi, gwQty)
+    RcPunchPluSeries(_pluJobs)
 
     MouseMove, %originalMouseX%, %originalMouseY%, 0
     Gui, Roll:Show
@@ -3402,7 +3423,7 @@ ApplyRollclub:
     VisEdu := (VisEdu = "") ? 0 : RegExReplace(VisEdu, "[^\d]", "") + 0
     VisUtensils := (VisUtensils = "") ? 0 : RegExReplace(VisUtensils, "[^\d]", "") + 0
 
-    if (itemX != 0 && (VisNorm > 0 || VisEdu > 0)) {
+    if (VisNorm > 0 || VisEdu > 0 || VisUtensils > 0) {
         ; Розраховуємо соуси як у Roll House
         _soyQty := Floor((VisRolls + 1) / 2)
         _gwQty  := Floor((VisRolls + 3) / 4)
@@ -3417,25 +3438,16 @@ ApplyRollclub:
             _gwQty  := (_gwQty  > _totalSt) ? _totalSt : _gwQty
         }
         _rcLog := A_ScriptDir "\siv_debug.log"
-        FileAppend, % "[" . A_Now . "] STICKS_START itemX=" . itemX . " norm=" . VisNorm . " edu=" . VisEdu . "`n", %_rcLog%
-        if (VisNorm > 0)
-            RcPunchByPlu(pluSticksNorm, VisNorm)
-        if (VisEdu > 0)
-            RcPunchByPlu(pluSticksEdu, VisEdu)
-        if (_soyQty > 0)
-            RcPunchByPlu(pluSoy, _soyQty)
-        if (_gwQty > 0) {
-            RcPunchByPlu(pluGinger, _gwQty)
-            RcPunchByPlu(pluWasabi, _gwQty)
-        }
-    }
-
-    ; --- Прибори: вилка (Fork 00140) + ніж (Knife 00142). Ложку НЕ б'ємо, палички вже погашені. ---
-    if (itemX != 0 && VisUtensils > 0) {
-        _rcLog := A_ScriptDir "\siv_debug.log"
-        FileAppend, % "[" . A_Now . "] UTENSILS_START itemX=" . itemX . " qty=" . VisUtensils . "`n", %_rcLog%
-        RcPunchByPlu(pluFork,  VisUtensils)
-        RcPunchByPlu(pluKnife, VisUtensils)
+        FileAppend, % "[" . A_Now . "] SIV_SERIES_START itemX=" . itemX . " norm=" . VisNorm . " edu=" . VisEdu . " utensils=" . VisUtensils . "`n", %_rcLog%
+        _pluJobs := []
+        RcAddPluJob(_pluJobs, pluSticksNorm, VisNorm)
+        RcAddPluJob(_pluJobs, pluSticksEdu, VisEdu)
+        RcAddPluJob(_pluJobs, pluSoy, _soyQty)
+        RcAddPluJob(_pluJobs, pluGinger, _gwQty)
+        RcAddPluJob(_pluJobs, pluWasabi, _gwQty)
+        RcAddPluJob(_pluJobs, pluFork, VisUtensils)
+        RcAddPluJob(_pluJobs, pluKnife, VisUtensils)
+        RcPunchPluSeries(_pluJobs)
     }
 
     ; --- Самовивіз: авто Концепція + Точка за точкою з коментаря (1:1) ---
@@ -3586,13 +3598,126 @@ FinishGiftMacro:
     Sleep, 500
 return
 
-; ========================================================
-; RcPunchByPlu — пробивання PLU з кількістю + верифікація
-; Точна копія оригінальної GOLDEN-логіки + Ctrl+A+C перевірка.
-; Кожен виклик: Click → PgDn → Enter → PLU → Down → Enter →
-;               ^a{BackSpace} → qty → ^a^c verify → Enter/Escape
-; ========================================================
-RcPunchByPlu(pluCode, qty) {
+RcAddPluJob(ByRef jobs, pluCode, qty) {
+    if (qty <= 0 || pluCode = "" || pluCode = "0000")
+        return
+    jobs.Push({plu: pluCode, qty: qty})
+}
+
+RcUiaFind(role, defaultAid := "") {
+    global UIA_MAP_CONFIG
+    IniRead, mappedAid, %UIA_MAP_CONFIG%, UiaMap, %role%, %A_Space%
+    aid := (mappedAid != "" && mappedAid != "ERROR") ? mappedAid : (defaultAid != "" ? defaultAid : role)
+    if (aid = "")
+        return ""
+    iikoWin := IikoDriver_GetWindow()
+    if (!iikoWin)
+        return ""
+    if (SubStr(aid, 1, 5) = "Name=") {
+        try return iikoWin.FindFirstBy("Name=" . SubStr(aid, 6))
+        catch e0
+            return ""
+    }
+    try el := iikoWin.FindFirstBy("AutomationId=" . aid)
+    catch e1
+        el := ""
+    if (IsObject(el))
+        return el
+    return IikoDriver_FindElement(aid)
+}
+
+RcClickFirstOrderRowUIA() {
+    root := RcUiaFind("Табл. Страв", "treeListItems")
+    try rootAid := root.CurrentAutomationId
+    catch e0
+        rootAid := ""
+    if (!IsObject(root) || rootAid != "treeListItems")
+        root := IikoDriver_FindElement("treeListItems")
+    if (!IsObject(root))
+        return 0
+
+    try best := root.FindFirstBy("Name=Блюдо row 1")
+    catch e1
+        best := ""
+    if (!IsObject(best)) {
+        try children := root.FindAllBy("TrueCondition")
+        catch e2
+            children := ""
+        if (IsObject(children)) {
+            bestRow := 999999
+            Loop, % children.MaxIndex() {
+                el := children[A_Index]
+                try name := el.CurrentName
+                catch e3
+                    name := ""
+                if (RegExMatch(name, "^Блюдо row (\d+)$", rowMatch) && rowMatch1 > 0 && rowMatch1 < bestRow) {
+                    best := el
+                    bestRow := rowMatch1
+                }
+            }
+        }
+    }
+
+    try {
+        if (IsObject(best))
+            best.Click()
+        else
+            root.Click()
+        Sleep, 180
+        return 1
+    } catch e4 {
+        return 0
+    }
+}
+
+RcFocusOrderItems() {
+    global itemX, itemY, rcLogPath
+    MouseGetPos, _mx, _my
+    if (RcClickFirstOrderRowUIA()) {
+        MouseMove, %_mx%, %_my%, 0
+        FileAppend, % "[" . A_Now . "] ITEMS_FOCUS uia=1`n", %rcLogPath%
+        return 1
+    }
+    if (itemX = 0 || itemX = "ERROR") {
+        FileAppend, % "[" . A_Now . "] ITEMS_FOCUS fail no_item_target`n", %rcLogPath%
+        return 0
+    }
+    Click, %itemX%, %itemY%
+    Sleep, 180
+    MouseMove, %_mx%, %_my%, 0
+    FileAppend, % "[" . A_Now . "] ITEMS_FOCUS fallback=coord itemX=" . itemX . "`n", %rcLogPath%
+    return 1
+}
+
+RcPunchPluSeries(jobs) {
+    global rcLogPath
+    if (!IsObject(jobs) || jobs.MaxIndex() = "")
+        return 1
+    if (!RcFocusOrderItems()) {
+        ToolTip, Не вдалося відкрити таблицю страв. СІВ зупинено.
+        SetTimer, RcClearOkTip, -2000
+        return 0
+    }
+
+    Sleep, 300
+    Send, {PgDn}
+    Sleep, 300
+    Send, {Enter}
+    Sleep, 400
+
+    Loop, % jobs.MaxIndex() {
+        job := jobs[A_Index]
+        if (A_Index > 1) {
+            Send, {Enter}
+            Sleep, 350
+        }
+        RcPunchPluInOpenEditor(job.plu, job.qty)
+        FileAppend, % "[" . A_Now . "] PUNCH_SERIES_JOB plu=" . job.plu . " qty=" . job.qty . "`n", %rcLogPath%
+    }
+    return 1
+}
+
+RcPunchPluInOpenEditor(pluCode, qty) {
     global itemX, itemY, rcLogPath, rhPunchBusy, dutyOn, kcForce, kcStop
     rhPunchBusy := 1
     dutyOn := 0
@@ -3600,22 +3725,11 @@ RcPunchByPlu(pluCode, qty) {
     kcStop := 1
     SetTimer, KcDutyTick, Off
     SetTimer, KcMonitor, Off
-    FileAppend, % "[" . A_Now . "] PUNCH_CALL plu=" . pluCode . " qty=" . qty . " itemX=" . itemX . "`n", %rcLogPath%
+    FileAppend, % "[" . A_Now . "] PUNCH_CALL plu=" . pluCode . " qty=" . qty . "`n", %rcLogPath%
     if (qty <= 0 || pluCode = "" || pluCode = "0000") {
         FileAppend, % "[" . A_Now . "] SKIP bad`n", %rcLogPath%
-        return
+        return 1
     }
-    if (itemX = 0 || itemX = "ERROR") {
-        FileAppend, % "[" . A_Now . "] SKIP itemX=0`n", %rcLogPath%
-        return
-    }
-
-    ; Позиціонування — клік + PgDn (кожен раз, як в GOLDEN)
-    Click, %itemX%, %itemY%
-    Sleep, 400
-    Send, {PgDn}
-    Sleep, 300
-    ; {Enter} для активації НЕ потрібен — одразу набиваємо PLU
 
     ; PLU → вниз (автокомплет) → Enter → перехід на qty
     SendInput, %pluCode%
@@ -3657,6 +3771,14 @@ RcPunchByPlu(pluCode, qty) {
         SoundPlay, %A_ScriptDir%\beep_err.wav
         SetTimer, RcClearOkTip, -2500
     }
+    return 1
+}
+
+; Backward-compatible wrapper for older call sites.
+RcPunchByPlu(pluCode, qty) {
+    jobs := []
+    RcAddPluJob(jobs, pluCode, qty)
+    return RcPunchPluSeries(jobs)
 }
 
 RcClearOkTip:
