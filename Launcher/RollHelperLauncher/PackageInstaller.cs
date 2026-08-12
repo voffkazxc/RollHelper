@@ -207,6 +207,33 @@ internal sealed class PackageInstaller
         return process;
     }
 
+    public Process LaunchInstalled(ReleasePackage package)
+    {
+        var installedVersion = _stateStore.Get(package.Id)?.Version;
+        if (string.IsNullOrWhiteSpace(installedVersion))
+        {
+            installedVersion = GetInstalledVersions(package.Id)
+                .OrderByDescending(version => version, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault();
+        }
+
+        if (string.IsNullOrWhiteSpace(installedVersion))
+        {
+            throw new InvalidOperationException($"Package {package.Id} is not installed.");
+        }
+
+        var installedPackage = new ReleasePackage
+        {
+            Id = package.Id,
+            Version = installedVersion,
+            DisplayName = package.DisplayName,
+            Type = package.Type,
+            Extends = package.Extends
+        };
+
+        return Launch(installedPackage);
+    }
+
     private static PackageManifest LoadPackageManifest(string packageDirectory)
     {
         var manifestPath = Path.Combine(packageDirectory, "package.json");

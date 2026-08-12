@@ -102,15 +102,15 @@ public partial class MainWindow : Window
 
     private async void InstallEnableModuleButton_Click(object sender, RoutedEventArgs e) => await InstallOrEnableSelectedModuleAsync();
 
-    private void DisableModuleButton_Click(object sender, RoutedEventArgs e) => DisableSelectedModule();
+    private async void DisableModuleButton_Click(object sender, RoutedEventArgs e) => await DisableSelectedModuleAsync();
 
-    private void RemoveModuleButton_Click(object sender, RoutedEventArgs e) => RemoveSelectedModule();
+    private async void RemoveModuleButton_Click(object sender, RoutedEventArgs e) => await RemoveSelectedModuleAsync();
 
     private async void ContextInstallModuleItem_Click(object sender, RoutedEventArgs e) => await InstallOrEnableSelectedModuleAsync();
 
-    private void ContextDisableModuleItem_Click(object sender, RoutedEventArgs e) => DisableSelectedModule();
+    private async void ContextDisableModuleItem_Click(object sender, RoutedEventArgs e) => await DisableSelectedModuleAsync();
 
-    private void ContextRemoveModuleItem_Click(object sender, RoutedEventArgs e) => RemoveSelectedModule();
+    private async void ContextRemoveModuleItem_Click(object sender, RoutedEventArgs e) => await RemoveSelectedModuleAsync();
 
     private void ProgramsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -308,15 +308,25 @@ public partial class MainWindow : Window
 
         if (_packageInstaller.IsInstalled(package) && !_packageInstaller.IsEnabled(package))
         {
+            if (!BeginOperation($"Включение дополнения {selectedRow.DisplayName}..."))
+            {
+                return;
+            }
+
             try
             {
                 _packageInstaller.SetEnabled(package, true);
-                SetStatus($"Дополнение «{selectedRow.DisplayName}» включено");
-                RefreshAllStatuses();
+                ApplyModuleChange(package, selectedRow.DisplayName);
+                SetStatus($"Дополнение «{selectedRow.DisplayName}» включено и применено");
             }
             catch (Exception exception)
             {
                 ShowOperationError($"Не удалось включить {selectedRow.DisplayName}", exception);
+            }
+            finally
+            {
+                EndOperation();
+                RefreshAllStatuses();
             }
 
             return;
@@ -335,7 +345,8 @@ public partial class MainWindow : Window
             var progress = new Progress<int>(value => DownloadProgress.Value = value);
             await _packageInstaller.InstallAsync(package, progress, _operationCancellation!.Token);
             _packageInstaller.SetEnabled(package, true);
-            SetStatus($"Дополнение «{selectedRow.DisplayName}» {(isUpdate ? "обновлено" : "установлено")} и включено");
+            ApplyModuleChange(package, selectedRow.DisplayName);
+            SetStatus($"Дополнение «{selectedRow.DisplayName}» {(isUpdate ? "обновлено" : "установлено")} и применено");
         }
         catch (OperationCanceledException)
         {
@@ -353,9 +364,14 @@ public partial class MainWindow : Window
         }
     }
 
-    private void DisableSelectedModule()
+    private async Task DisableSelectedModuleAsync()
     {
         if (ModulesGrid.SelectedItem is not PackageRow selectedRow)
+        {
+            return;
+        }
+
+        if (!BeginOperation($"Отключение дополнения {selectedRow.DisplayName}..."))
         {
             return;
         }
@@ -363,16 +379,22 @@ public partial class MainWindow : Window
         try
         {
             _packageInstaller.SetEnabled(selectedRow.Package, false);
-            SetStatus($"Дополнение «{selectedRow.DisplayName}» отключено");
-            RefreshAllStatuses();
+            ApplyModuleChange(selectedRow.Package, selectedRow.DisplayName);
+            SetStatus($"Дополнение «{selectedRow.DisplayName}» отключено и применено");
+            await Task.CompletedTask;
         }
         catch (Exception exception)
         {
             ShowOperationError($"Не удалось отключить {selectedRow.DisplayName}", exception);
         }
+        finally
+        {
+            EndOperation();
+            RefreshAllStatuses();
+        }
     }
 
-    private void RemoveSelectedModule()
+    private async Task RemoveSelectedModuleAsync()
     {
         if (ModulesGrid.SelectedItem is not PackageRow selectedRow)
         {
@@ -395,15 +417,27 @@ public partial class MainWindow : Window
             return;
         }
 
+        var package = selectedRow.Package;
+        if (!BeginOperation($"Удаление дополнения {selectedRow.DisplayName}..."))
+        {
+            return;
+        }
+
         try
         {
-            _packageInstaller.Remove(selectedRow.Package);
-            SetStatus($"Дополнение «{selectedRow.DisplayName}» удалено");
-            RefreshAllStatuses();
+            _packageInstaller.Remove(package);
+            ApplyModuleChange(package, selectedRow.DisplayName);
+            SetStatus($"Дополнение «{selectedRow.DisplayName}» удалено и применено");
+            await Task.CompletedTask;
         }
         catch (Exception exception)
         {
             ShowOperationError($"Не удалось удалить {selectedRow.DisplayName}", exception);
+        }
+        finally
+        {
+            EndOperation();
+            RefreshAllStatuses();
         }
     }
 
@@ -594,6 +628,39 @@ public partial class MainWindow : Window
         ModulesGrid.Items.Refresh();
         UpdateProgramActionButton();
         UpdateModuleActionButtons();
+    }
+
+    private void ApplyModuleChange(ReleasePackage modulePackage, string moduleDisplayName)
+    {
+        if (!IsModule(modulePackage) || string.IsNullOrWhiteSpace(modulePackage.Extends))
+        {
+            return;
+        }
+
+        var parentPackage = _manifestPackages.FirstOrDefault(package =>
+            !IsModule(package)
+            && string.Equals(package.Id, modulePackage.Extends, StringComparison.OrdinalIgnoreCase));
+
+        if (parentPackage is null)
+        {
+            LauncherLog.Warning(
+                $"Module change cannot be applied: parent package not found. Module={modulePackage.Id}, extends={modulePackage.Extends}");
+            SetStatus($"Дополнение «{moduleDisplayName}» изменено. Родительская программа не найдена в списке.");
+            return;
+        }
+
+        if (!_packageInstaller.HasInstalledVersion(parentPackage.Id))
+        {
+            LauncherLog.Info(
+                $"Module change will apply after parent package is installed. Module={modulePackage.Id}, parent={parentPackage.Id}");
+            SetStatus($"Дополнение «{moduleDisplayName}» изменено. Применится после установки {parentPackage.DisplayName ?? parentPackage.Id}.");
+            return;
+        }
+
+        SetStatus($"Применяю дополнение «{moduleDisplayName}»: перезапускаю {parentPackage.DisplayName ?? parentPackage.Id}...");
+        LauncherLog.Info(
+            $"Applying module change by launching parent package. Module={modulePackage.Id}, parent={parentPackage.Id}");
+        _packageInstaller.LaunchInstalled(parentPackage);
     }
 
     private bool BeginOperation(string status)
