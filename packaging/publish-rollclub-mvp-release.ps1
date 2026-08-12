@@ -5,6 +5,7 @@ param(
     [string]$SourceRelease = "0.1.22",
     [string]$Repository = "voffkazxc/RollHelper",
     [string]$OutputDirectory = (Join-Path $env:TEMP "RollHelperRollClubRelease"),
+    [switch]$RebuildDuty,
     [switch]$Publish
 )
 
@@ -28,12 +29,11 @@ New-Item -ItemType Directory -Force -Path $releaseRoot | Out-Null
 $rollClubBuild = & (Join-Path $PSScriptRoot "build-rollclub-mvp.ps1") `
     -Version $RollClubVersion `
     -OutputDirectory $OutputDirectory
-$dutyBuild = & (Join-Path $PSScriptRoot "build-rollclub-duty-module.ps1") `
-    -Version $DutyVersion `
-    -OutputDirectory $OutputDirectory
-
 $sourceManifestUrl = "https://github.com/$Repository/releases/download/v$SourceRelease/release-manifest.json"
-$sourceManifest = Invoke-RestMethod -Uri $sourceManifestUrl
+$sourceManifestPath = Join-Path $releaseRoot "source-release-manifest.json"
+Invoke-WebRequest -UseBasicParsing -Uri $sourceManifestUrl -OutFile $sourceManifestPath
+$sourceManifest = [IO.File]::ReadAllText($sourceManifestPath, [Text.Encoding]::UTF8) | ConvertFrom-Json
+Remove-Item -LiteralPath $sourceManifestPath -Force
 if ($null -eq $sourceManifest.launcher) {
     throw "Source manifest has no launcher section: $sourceManifestUrl"
 }
@@ -41,7 +41,29 @@ if ($null -eq $sourceManifest.launcher) {
 $catalogTag = "v$CatalogVersion"
 $assetBaseUrl = "https://github.com/$Repository/releases/download/$catalogTag"
 $rollClubAsset = Split-Path -Leaf $rollClubBuild.AssetPath
-$dutyAsset = Split-Path -Leaf $dutyBuild.AssetPath
+$sourceDuty = @($sourceManifest.packages) | Where-Object { $_.id -eq "rollclub-duty" } | Select-Object -First 1
+if ($RebuildDuty) {
+    $dutyBuild = & (Join-Path $PSScriptRoot "build-rollclub-duty-module.ps1") `
+        -Version $DutyVersion `
+        -OutputDirectory $OutputDirectory
+    $dutyAsset = Split-Path -Leaf $dutyBuild.AssetPath
+    $dutyPackage = [ordered]@{
+        id = "rollclub-duty"
+        type = "module"
+        displayName = "Дежурство заказов (F4)"
+        version = $DutyVersion
+        extends = "rollclub"
+        requires = @(
+            [ordered]@{ id = "rollclub"; minVersion = $RollClubVersion }
+        )
+        url = "$assetBaseUrl/$dutyAsset"
+        sha256 = [string]$dutyBuild.Sha256
+    }
+} elseif ($null -ne $sourceDuty) {
+    $dutyPackage = $sourceDuty
+} else {
+    throw "Source manifest has no rollclub-duty package. Use -RebuildDuty for the first release."
+}
 
 $packages = @()
 foreach ($package in @($sourceManifest.packages)) {
@@ -57,18 +79,7 @@ $packages += [ordered]@{
     url = "$assetBaseUrl/$rollClubAsset"
     sha256 = [string]$rollClubBuild.Sha256
 }
-$packages += [ordered]@{
-    id = "rollclub-duty"
-    type = "module"
-    displayName = "Дежурство заказов (F4)"
-    version = $DutyVersion
-    extends = "rollclub"
-    requires = @(
-        [ordered]@{ id = "rollclub"; minVersion = $RollClubVersion }
-    )
-    url = "$assetBaseUrl/$dutyAsset"
-    sha256 = [string]$dutyBuild.Sha256
-}
+$packages += $dutyPackage
 
 $manifest = [ordered]@{
     schema = 1
@@ -90,8 +101,12 @@ if ($Publish) {
 - RollHouse і лаунчер без змін
 "@ | Set-Content -LiteralPath $notesPath -Encoding UTF8
 
+    $assetsToPublish = @($rollClubBuild.AssetPath, $manifestPath)
+    if ($RebuildDuty) {
+        $assetsToPublish += $dutyBuild.AssetPath
+    }
     gh release create $catalogTag `
-        $rollClubBuild.AssetPath $dutyBuild.AssetPath $manifestPath `
+        $assetsToPublish `
         --target master `
         --title "RollHelper $CatalogVersion" `
         --notes-file $notesPath `
@@ -105,7 +120,7 @@ if ($Publish) {
 [pscustomobject]@{
     CatalogVersion = $CatalogVersion
     RollClubAsset = $rollClubBuild.AssetPath
-    DutyAsset = $dutyBuild.AssetPath
+    DutyAsset = if ($RebuildDuty) { $dutyBuild.AssetPath } else { [string]$dutyPackage.url }
     Manifest = $manifestPath
     Published = [bool]$Publish
 }

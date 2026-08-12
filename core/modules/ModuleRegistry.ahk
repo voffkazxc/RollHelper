@@ -161,11 +161,11 @@ ModuleRegistry_ApplyRollHouseMvpPolicy() {
         callFrozen := 0
         callAutoNext := 0
         callAutoListenBusy := 0
-        SetTimer, CheckCall, Off
-        SetTimer, WaitForCallEnd, Off
-        SetTimer, AutoDialNext, Off
-        SetTimer, WaitForTalkStart, Off
-        SetTimer, CallAutoListenAfterGreeting, Off
+        ModuleRegistry_StopTimerIfPresent("CheckCall")
+        ModuleRegistry_StopTimerIfPresent("WaitForCallEnd")
+        ModuleRegistry_StopTimerIfPresent("AutoDialNext")
+        ModuleRegistry_StopTimerIfPresent("WaitForTalkStart")
+        ModuleRegistry_StopTimerIfPresent("CallAutoListenAfterGreeting")
         ModuleRegistry_Log("runtime_disabled", "module=calling")
     }
 
@@ -185,6 +185,15 @@ ModuleRegistry_DisableHotkey(keyName, moduleId) {
         ModuleRegistry_Log("hotkey_disable_error", "module=" . moduleId . ";key=" . keyName . ";error=" . ErrorLevel)
     else
         ModuleRegistry_Log("hotkey_disabled", "module=" . moduleId . ";key=" . keyName)
+}
+
+; Реєстр спільний для брендів. Частина таймерів існує лише у RollHouse,
+; тому назву передаємо динамічно й не вимагаємо мітку в RollClub.
+ModuleRegistry_StopTimerIfPresent(labelName) {
+    if !IsLabel(labelName)
+        return 0
+    SetTimer, %labelName%, Off
+    return 1
 }
 
 ModuleRegistry_Log(event, details := "") {
