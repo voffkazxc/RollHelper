@@ -51,8 +51,9 @@ RcZonesLoadKml:
         MsgBox, 16, Зони доставки, Не вдалося скопіювати KML.
         return
     }
+    RcZonesTouchChangedFlag()
     GuiControl, Zones:, ZonesStatus, % RcZonesStatusText()
-    MsgBox, 64, Зони доставки, KML завантажено.`nПерезапустіть RollClub, щоб карта перечиталась., 2
+    MsgBox, 64, Зони доставки, KML завантажено.`nRollClub перечитає карту автоматично при наступному відкритті пульта., 2
 return
 
 RcZonesSyncGoogle:
@@ -72,8 +73,9 @@ RcZonesSyncGoogle:
         MsgBox, 16, Зони доставки, Синхронізація Google не виконалась.
         return
     }
+    RcZonesTouchChangedFlag()
     GuiControl, Zones:, ZonesStatus, % RcZonesStatusText()
-    MsgBox, 64, Зони доставки, Кухні оновлено.`nПерезапустіть RollClub, щоб він перечитав дані., 2
+    MsgBox, 64, Зони доставки, Кухні оновлено.`nRollClub перечитає дані автоматично при наступному відкритті пульта., 2
 return
 
 RcZonesOpenFolder:
@@ -116,12 +118,24 @@ RcZonesUserDataDir() {
 RcZonesEnsureDefaults() {
     global ZonesUserDir
     FileCreateDir, %ZonesUserDir%
+    copied := 0
     for _, name in ["RkKitchens.ini", "RkPresets.txt", "zones.kml", "zones_map.ini"] {
         src := A_ScriptDir . "\data\" . name
         dst := ZonesUserDir . "\" . name
-        if (!FileExist(dst) && FileExist(src))
+        if (!FileExist(dst) && FileExist(src)) {
             FileCopy, %src%, %dst%, 0
+            if (!ErrorLevel)
+                copied := 1
+        }
     }
+    if (copied)
+        RcZonesTouchChangedFlag()
+}
+
+RcZonesTouchChangedFlag() {
+    global ZonesUserDir
+    FileDelete, %ZonesUserDir%\zones_changed.flag
+    FileAppend, %A_Now%, %ZonesUserDir%\zones_changed.flag
 }
 
 RcZonesStatusText() {

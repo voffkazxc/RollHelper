@@ -289,6 +289,7 @@ global kcStop      := 0   ; F4-стоп: сигнал негайно перер�
 global kcLastNo    := ""  ; останній помічений № (щоб не дублювати звук)
 global kcPaused    := 0   ; пауза монітора: чекаємо Ctrl+Enter оператора
 global RcZonesOk   := 0   ; 1 = KML завантажено
+global RcZonesDataStamp := ""
 
 ; ========================================================
 ; ГАРЯЧІ КЛАВІШІ
@@ -693,28 +694,86 @@ RcRollclubPackageDataPath(fileName) {
     return A_ScriptDir . "\brands\rollclub\" . fileName
 }
 
+RcRollclubModuleDataPath(fileName) {
+    global ModuleRegistry_ExternalPackages
+
+    if (!IsObject(ModuleRegistry_ExternalPackages) || !ModuleRegistry_ExternalPackages.HasKey("zones"))
+        return ""
+    moduleDir := ModuleRegistry_ExternalPackages["zones"].workingDir
+    if (moduleDir = "")
+        return ""
+    return moduleDir . "\data\" . fileName
+}
+
 RcReadableRollclubDataPath(fileName) {
     userPath := RcUserDataDir() . "\" . fileName
     if FileExist(userPath)
         return userPath
+    modulePath := RcRollclubModuleDataPath(fileName)
+    if (modulePath != "" && FileExist(modulePath))
+        return modulePath
     return RcRollclubPackageDataPath(fileName)
 }
 
 RcWritableRollclubDataPath(fileName) {
     userPath := RcUserDataDir() . "\" . fileName
+    modulePath := RcRollclubModuleDataPath(fileName)
     packagePath := RcRollclubPackageDataPath(fileName)
+    if (!FileExist(userPath) && modulePath != "" && FileExist(modulePath))
+        FileCopy, %modulePath%, %userPath%, 0
     if (!FileExist(userPath) && FileExist(packagePath))
         FileCopy, %packagePath%, %userPath%, 0
     return userPath
 }
 
+RcRefreshZonesModuleState() {
+    global RcZonesModuleEnabled, RcZonesOk, KitchensPath, PresetsPath
+
+    wasEnabled := RcZonesModuleEnabled ? 1 : 0
+    ModuleRegistry_RefreshExternal("zones", "rollclub-zones")
+    RcZonesModuleEnabled := Module_IsEnabled("zones")
+    KitchensPath := RcReadableRollclubDataPath("RkKitchens.ini")
+    PresetsPath := RcReadableRollclubDataPath("RkPresets.txt")
+    if (RcZonesModuleEnabled && !wasEnabled)
+        RcZonesOk := 0
+    if (RcZonesModuleEnabled)
+        RcRefreshZonesDataIfChanged()
+    return RcZonesModuleEnabled
+}
+
+RcRefreshZonesDataIfChanged() {
+    global RcZonesDataStamp, RcZonesOk, Kitchens
+
+    stamp := ""
+    for _, fileName in ["zones.kml", "zones_map.ini", "RkKitchens.ini", "RkPresets.txt"] {
+        path := RcReadableRollclubDataPath(fileName)
+        if FileExist(path) {
+            FileGetTime, modTime, %path%, M
+            stamp .= fileName . ":" . modTime . ";"
+        }
+    }
+    flagPath := RcUserDataDir() . "\zones_changed.flag"
+    if FileExist(flagPath) {
+        FileGetTime, flagTime, %flagPath%, M
+        stamp .= "flag:" . flagTime
+    }
+    if (stamp != "" && stamp != RcZonesDataStamp) {
+        RcZonesDataStamp := stamp
+        RcZonesOk := 0
+        Kitchens := []
+        RcLoadZoneMap()
+    }
+}
+
 OpenZonesModule:
+    RcRefreshZonesModuleState()
     if (!ModuleRegistry_RunExternal("zones"))
         MsgBox, 48, Зони доставки, Доповнення «Зони доставки RollClub» не встановлено або вимкнено в лаунчері.
 return
 
 LoadKitchens:
     global RcZonesModuleEnabled
+    RcRefreshZonesModuleState()
     if (!RcZonesModuleEnabled)
         return
     RcLoadZoneMap()
@@ -2499,6 +2558,7 @@ NumpadEnter::GoSub, SivVisApply
 ; НАЛАШТУВАННЯ
 ; ========================================================
 OpenSettings:
+    RcRefreshZonesModuleState()
     Gui, Settings:Destroy
     Gui, Settings:+AlwaysOnTop +ToolWindow +OwnDialogs +HwndSettingsHwnd
 
@@ -3957,11 +4017,13 @@ return
 RcCheckZone:
     global rawAddress, hasPickup, RcZones, RcZonesOk, detectedCity, RcCurrentKitchen, extractedTimeAuto
     SetTimer, RcCheckZone, Off
-    if (!Module_IsEnabled("zones")) {
+    if (!RcRefreshZonesModuleState()) {
         GuiControl, Roll:, MapSearch, Зони: встановіть доповнення
         GuiControl, Roll:, KitchenStatusText,
         return
     }
+    if (!Kitchens.MaxIndex())
+        GoSub, LoadKitchens
     addr := Trim(rawAddress)
     if (addr = "" || hasPickup) {
         GuiControl, Roll:, KitchenStatusText,

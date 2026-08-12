@@ -92,6 +92,21 @@ ModuleRegistry_RegisterExternal(moduleId, packageId) {
     return 1
 }
 
+ModuleRegistry_RefreshExternal(moduleId, packageId) {
+    global ModuleRegistry_Modules, ModuleRegistry_ExternalPackages
+
+    if (!IsObject(ModuleRegistry_Modules))
+        ModuleRegistry_Modules := {}
+    if (!IsObject(ModuleRegistry_ExternalPackages))
+        ModuleRegistry_ExternalPackages := {}
+
+    ModuleRegistry_Modules[moduleId] := 0
+    if (ModuleRegistry_ExternalPackages.HasKey(moduleId))
+        ModuleRegistry_ExternalPackages.Delete(moduleId)
+
+    return ModuleRegistry_RegisterExternal(moduleId, packageId)
+}
+
 ModuleRegistry_RunExternal(moduleId) {
     global ModuleRegistry_ExternalPackages
 
