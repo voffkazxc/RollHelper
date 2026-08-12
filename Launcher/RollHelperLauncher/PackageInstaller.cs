@@ -123,7 +123,19 @@ internal sealed class PackageInstaller
             throw new InvalidOperationException($"Package {package.Id} is not installed.");
         }
 
-        _stateStore.SetEnabled(package.Id, enabled);
+        var installedState = _stateStore.Get(package.Id);
+        if (installedState is null
+            || !string.Equals(installedState.Version, package.Version, StringComparison.OrdinalIgnoreCase))
+        {
+            _stateStore.MarkInstalled(package.Id, package.Version, enabled);
+            LauncherLog.Warning(
+                $"Rebuilt missing package state before {(enabled ? "enable" : "disable")}: {package.Id} {package.Version}");
+        }
+        else
+        {
+            _stateStore.SetEnabled(package.Id, enabled);
+        }
+
         LauncherLog.Info($"Package {(enabled ? "enabled" : "disabled")}: {package.Id} {package.Version}");
     }
 
@@ -162,9 +174,12 @@ internal sealed class PackageInstaller
         var installDirectory = LauncherPaths.GetPackageVersionDirectory(package.Id, package.Version);
         if (IsInstalled(package))
         {
-            if (_stateStore.Get(package.Id) is null)
+            var installedState = _stateStore.Get(package.Id);
+            if (installedState is null
+                || !string.Equals(installedState.Version, package.Version, StringComparison.OrdinalIgnoreCase))
             {
-                _stateStore.MarkInstalled(package.Id, package.Version);
+                _stateStore.MarkInstalled(package.Id, package.Version, installedState?.Enabled ?? true);
+                LauncherLog.Warning($"Rebuilt package state from installed files: {package.Id} {package.Version}");
             }
             LauncherLog.Info($"Package already installed: {package.Id} {package.Version}");
             return installDirectory;

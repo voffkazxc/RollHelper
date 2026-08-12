@@ -339,23 +339,9 @@ public partial class MainWindow : Window
 
     private async Task EnsureModuleInstalledAndEnabledAsync(ReleasePackage package)
     {
-        if (!_packageInstaller.IsInstalled(package))
-        {
-            var progress = new Progress<int>(value => DownloadProgress.Value = value);
-            await _packageInstaller.InstallAsync(package, progress, _operationCancellation!.Token);
-        }
-
-        try
-        {
-            _packageInstaller.SetEnabled(package, true);
-        }
-        catch (InvalidOperationException) when (!_packageInstaller.IsInstalled(package))
-        {
-            LauncherLog.Warning($"Module files disappeared before enable; repairing package: {package.Id} {package.Version}");
-            var progress = new Progress<int>(value => DownloadProgress.Value = value);
-            await _packageInstaller.InstallAsync(package, progress, _operationCancellation!.Token);
-            _packageInstaller.SetEnabled(package, true);
-        }
+        var progress = new Progress<int>(value => DownloadProgress.Value = value);
+        await _packageInstaller.InstallAsync(package, progress, _operationCancellation!.Token);
+        _packageInstaller.SetEnabled(package, true);
     }
 
     private async Task DisableSelectedModuleAsync()

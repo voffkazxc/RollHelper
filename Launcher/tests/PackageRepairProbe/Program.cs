@@ -66,6 +66,20 @@ try
         throw new InvalidOperationException("Incomplete module package was not repaired and enabled.");
     }
 
+    stateStore.Remove(package.Id);
+    if (!installer.IsInstalled(package) || installer.IsEnabled(package))
+    {
+        throw new InvalidOperationException("Missing-state scenario was not created correctly.");
+    }
+
+    await installer.InstallAsync(package, progress: null, CancellationToken.None);
+    installer.SetEnabled(package, true);
+    if (!installer.IsEnabled(package)
+        || !string.Equals(stateStore.Get(package.Id)?.Version, package.Version, StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException("Installed module files did not rebuild missing package state.");
+    }
+
     Console.WriteLine("Package repair test passed.");
 }
 finally
