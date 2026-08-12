@@ -80,15 +80,12 @@ flowchart TD
     Server --> DB["../data/rollhouse.db"]
     Server --> BrandConfigs["RollHelper/brands/*"]
 
-    RC --> Tests["test_uia_hotkeys.ahk"]
-    Tests --> OCRAHK["lib/IikoOCR.ahk"]
-    OCRAHK --> OCRServer["/api/iiko/ocr_crop"]
+    RC --> RCDuty["module rollclub-duty: F4"]
 
     RH --> Calls["tools/call_listener/*"]
     Calls --> PyAudio["Python + audio/ASR packages + models"]
     RH --> Report["F5: подключаемый UIA-отчёт"]
-    RH --> Duty["Ctrl+F4: duty mode"]
-    RC --> Duty
+    RH --> Duty["дополнение duty"]
 ```
 
 ## 4. Что является обязательным ядром
@@ -207,7 +204,7 @@ flowchart TD
 
 - чтение и разбор заказа;
 - применение полей в Syrve;
-- оплата и подарки;
+- оплата;
 - СІВ и приборы;
 - зоны и адреса;
 - локальная база кухонь;
@@ -218,11 +215,12 @@ flowchart TD
 ### Отдельные опциональные части RollClub
 
 - синхронизация кухонь из Google Sheets;
+- дежурство по заказам: отдельное дополнение `rollclub-duty`, горячая клавиша F4;
 - диагностический сбор UIA-дерева;
 - OCR состава заказа;
 - тестовые Ctrl+F2…Ctrl+F10.
 
-Текущий прямой `#Include test_uia_hotkeys.ahk` должен быть убран из production только после появления отдельного диагностического модуля и проверки, что ни одна рабочая функция не вызывает его метки.
+`test_uia_hotkeys.ahk` не входит в пакет RollClub MVP и не должен подключаться к production-entrypoint. Это диагностический инструмент, а не рабочая функция оператора.
 
 ## 7. Подключаемые модули
 
@@ -238,7 +236,7 @@ flowchart TD
   "entrypoint": "module.ahk",
   "enabledByDefault": false,
   "requires": ["core.iiko", "core.server_client"],
-  "hotkeys": ["Ctrl+F4"]
+  "hotkeys": ["F4"]
 }
 ```
 
