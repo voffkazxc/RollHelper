@@ -5,8 +5,17 @@ SetWorkingDir %A_ScriptDir%\brands\rollclub   ; дані Roll Club (конфіг
 FileEncoding, UTF-8
 #Include %A_ScriptDir%\lib\IikoUI.ahk
 #Include %A_ScriptDir%\core\orchestration\OperationCoordinator.ahk
+#Include %A_ScriptDir%\core\modules\ModuleRegistry.ahk
 
 OpCoord_Init("rollclub", A_ScriptDir)
+ModuleRegistry_Init(A_ScriptDir, "rollclub", "mvp")
+ModuleRegistry_RegisterExternal("duty", "rollclub-duty")
+OnMessage(0x8001, "RcDutyModuleMessage")
+
+if (Module_IsEnabled("duty")) {
+    EnvSet, ROLLHELPER_ROLLCLUB_DUTY_HWND, %A_ScriptHwnd%
+    ModuleRegistry_RunExternal("duty")
+}
 RhKillDuplicateInstances()
 
 ; Налаштування координат
@@ -149,6 +158,9 @@ IniRead, rowY,     %ConfigPath%, Targets, RowY,     0
 
 ; Рубильники
 IniRead, CHECK_POINT_ENABLED, %ConfigPath%, Main, CheckPoint, 1
+; У старих конфігураціях подарунки залишаються доступними. У пакеті RollClub
+; цей перемикач вимкнено, бо акція завершилась.
+IniRead, RC_GIFTS_ENABLED, %ConfigPath%, Features, Gifts, 1
 
 IniRead, pluGunkan,   %ConfigPath%, PLU, Gunkan,   02929
 IniRead, pluPepsi,    %ConfigPath%, PLU, Pepsi,    02216
@@ -1244,7 +1256,7 @@ SilentMagicClean:
         autoSticksEdu := 1
     }
 
-    if RegExMatch(workComment, "i)!!!ПЕРШЕМОБ") {
+    if (RC_GIFTS_ENABLED && RegExMatch(workComment, "i)!!!ПЕРШЕМОБ")) {
         autoGunkan := 1
         if (cardText == "")
             cardText := "ПЕРШЕМОБ"
@@ -1252,7 +1264,7 @@ SilentMagicClean:
             cardText := "ПЕРШЕМОБ | " . cardText
     }
 
-    if (orderSum > 0) {
+    if (RC_GIFTS_ENABLED && orderSum > 0) {
         if (orderSum >= 1599)
             autoBurger := 1
         else if (orderSum >= 999)
@@ -1882,23 +1894,25 @@ DrawRollclub:
 
     ControlsToMove := []
 
-    ; Extras block
-    Gui, Roll:Font, s8 bold c%RhC_Muted%, %RhFontName%
-    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200 vLblGifts HwndhC1, ДОПИ
-    ControlsToMove.Push(hC1)
-    curY += 20
+    if (RC_GIFTS_ENABLED) {
+        ; Extras block
+        Gui, Roll:Font, s8 bold c%RhC_Muted%, %RhFontName%
+        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200 vLblGifts HwndhC1, ДОПИ
+        ControlsToMove.Push(hC1)
+        curY += 20
 
-    Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
-    Gui, Roll:Add, Text, x16  y%curY% w76 h24 Center +0x200 HwndhGiftG gToggleGiftG, Гункан
-    Gui, Roll:Add, Text, x100 y%curY% w76 h24 Center +0x200 HwndhGiftP gToggleGiftP, Пепсі
-    Gui, Roll:Add, Text, x184 y%curY% w76 h24 Center +0x200 HwndhGiftB gToggleGiftB, Бургер
-    Gui, Roll:Add, Text, x268 y%curY% w76 h24 Center +0x200 HwndhGiftS gToggleGiftS, Сендвіч
-    ControlsToMove.Push(hGiftG), ControlsToMove.Push(hGiftP), ControlsToMove.Push(hGiftB), ControlsToMove.Push(hGiftS)
-    RhRegColor(hGiftG, (autoGunkan   ? RhB_GiftGunkan   : RhB_Chip), RhB_Text)
-    RhRegColor(hGiftP, (autoPepsi    ? RhB_GiftPepsi    : RhB_Chip), RhB_Text)
-    RhRegColor(hGiftB, (autoBurger   ? RhB_GiftBurger   : RhB_Chip), RhB_Text)
-    RhRegColor(hGiftS, (autoSandwich ? RhB_GiftSandwich : RhB_Chip), RhB_Text)
-    curY += 34
+        Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
+        Gui, Roll:Add, Text, x16  y%curY% w76 h24 Center +0x200 HwndhGiftG gToggleGiftG, Гункан
+        Gui, Roll:Add, Text, x100 y%curY% w76 h24 Center +0x200 HwndhGiftP gToggleGiftP, Пепсі
+        Gui, Roll:Add, Text, x184 y%curY% w76 h24 Center +0x200 HwndhGiftB gToggleGiftB, Бургер
+        Gui, Roll:Add, Text, x268 y%curY% w76 h24 Center +0x200 HwndhGiftS gToggleGiftS, Сендвіч
+        ControlsToMove.Push(hGiftG), ControlsToMove.Push(hGiftP), ControlsToMove.Push(hGiftB), ControlsToMove.Push(hGiftS)
+        RhRegColor(hGiftG, (autoGunkan   ? RhB_GiftGunkan   : RhB_Chip), RhB_Text)
+        RhRegColor(hGiftP, (autoPepsi    ? RhB_GiftPepsi    : RhB_Chip), RhB_Text)
+        RhRegColor(hGiftB, (autoBurger   ? RhB_GiftBurger   : RhB_Chip), RhB_Text)
+        RhRegColor(hGiftS, (autoSandwich ? RhB_GiftSandwich : RhB_Chip), RhB_Text)
+        curY += 34
+    }
 
     Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
     Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200 vLblPayment HwndhC2, Оплата
@@ -2002,6 +2016,8 @@ ToggleGiftS:
     GoSub, RefreshGifts
 return
 RefreshGifts:
+    if (!RC_GIFTS_ENABLED)
+        return
     RhRegColor(hGiftG, (autoGunkan   ? RhB_GiftGunkan   : RhB_Chip), RhB_Text)
     RhRegColor(hGiftP, (autoPepsi    ? RhB_GiftPepsi    : RhB_Chip), RhB_Text)
     RhRegColor(hGiftB, (autoBurger   ? RhB_GiftBurger   : RhB_Chip), RhB_Text)
@@ -2115,22 +2131,22 @@ return
 
 KcDutyToggle:
     OpCoord_Event("DutyScanning", "toggle", "KcDutyToggle", "was_dutyOn=" . dutyOn . ";punchBusy=" . rhPunchBusy . ";inDutyTake=" . _inDutyTake)
-    ; Ctrl+F4: дежурство — сам ловить перший вільний годний заказ, бере і зупиняється з гучним сигналом
-    FileAppend, % "[" . A_Now . "] Ctrl+F4-TOGGLE (was dutyOn=" . dutyOn . ")`n", %A_ScriptDir%\parse_debug.log
+    ; F4 з доповнення «Дежурство заказов»: бере перше вільне замовлення і зупиняється.
+    FileAppend, % "[" . A_Now . "] F4-TOGGLE (was dutyOn=" . dutyOn . ")`n", %A_ScriptDir%\parse_debug.log
     if (rhPunchBusy || _inDutyTake)
     {
         dutyOn := 0
         kcStop := 1
         SetTimer, KcDutyTick, Off
         SetTimer, KcMonitor, Off
-        FileAppend, % "[" . A_Now . "] Ctrl+F4 BLOCKED — punchBusy=" . rhPunchBusy . " inTake=" . _inDutyTake . "`n", %A_ScriptDir%\parse_debug.log
-        ToolTip, Ctrl+F4 заблоковано: йде пробиття
+        FileAppend, % "[" . A_Now . "] F4 BLOCKED — punchBusy=" . rhPunchBusy . " inTake=" . _inDutyTake . "`n", %A_ScriptDir%\parse_debug.log
+        ToolTip, F4 заблоковано: йде пробиття
         SetTimer, RemoveToolTip, -1500
         return
     }
     if (A_TickCount < _punchUntil)
     {
-        FileAppend, % "[" . A_Now . "] Ctrl+F4 IGNORED — під час пробиття (спрацював не фізичний Ctrl+F4?)`n", %A_ScriptDir%\parse_debug.log
+        FileAppend, % "[" . A_Now . "] F4 IGNORED — під час пробиття`n", %A_ScriptDir%\parse_debug.log
         return
     }
     dutyOn := !dutyOn
@@ -2138,7 +2154,7 @@ KcDutyToggle:
     {
         kcStop := 0
         kcTook := 0
-        ToolTip, ⏳ Дежурю по заказах... (Ctrl+F4 — стоп)
+        ToolTip, ⏳ Дежурю по заказах... (F4 — стоп)
         SetTimer, KcDutyTick, 1500
     }
     else
@@ -2148,6 +2164,13 @@ KcDutyToggle:
         ToolTip, Дежурство ВИМКНЕНО
         SetTimer, RemoveToolTip, -3000
     }
+return
+
+RcDutyModuleInvoke:
+    global RcDutyModuleRequest
+    if (RcDutyModuleRequest = 1)
+        GoSub, KcDutyToggle
+    RcDutyModuleRequest := 0
 return
 
 KcDutyTick:
@@ -2235,7 +2258,7 @@ KcMonitor:
     SetTitleMatchMode, 2
     if !WinExist("Syrve Office")
     {
-        ToolTip, Ctrl+F4: вікно РК (Syrve Office) не знайдено — відкрий Доставки
+        ToolTip, F4: вікно РК (Syrve Office) не знайдено — відкрий Доставки
         SetTimer, RemoveToolTip, -6000
         kcBusy := 0
         return
@@ -2255,16 +2278,16 @@ KcMonitor:
     if (kcStop)
     {
         kcBusy := 0
-        ToolTip, Стоп (Ctrl+F4)
+        ToolTip, Стоп (F4)
         SetTimer, RemoveToolTip, -1500
         return
     }
     ; 2) список свіжий — тепер питаємо сервер (+ серверний таймінг у bridge.log)
-    ToolTip, Ctrl+F4: питаю сервер про годний заказ...
+    ToolTip, F4: питаю сервер про годний заказ...
     listResp := RhGet("/api/iiko/kc-list", 12000)
     if InStr(listResp, "ACTIVE_ORDER_CARD")
     {
-        ToolTip, Ctrl+F4: активна карточка — переходжу на Доставки...
+        ToolTip, F4: активна карточка — переходжу на Доставки...
         Send, {Esc}
         Sleep, 180
         Send, ^{Tab}
@@ -2274,7 +2297,7 @@ KcMonitor:
     if InStr(listResp, "ACTIVE_ORDER_CARD")
     {
         kcBusy := 0
-        ToolTip, Ctrl+F4: досі карточка заказа — відкрий вкладку Доставки
+        ToolTip, F4: досі карточка заказа — відкрий вкладку Доставки
         SetTimer, RemoveToolTip, -6000
         return
     }
@@ -2282,7 +2305,7 @@ KcMonitor:
     if (kcStop)
     {
         kcBusy := 0
-        ToolTip, Стоп (Ctrl+F4) — заказ не чіпаю
+        ToolTip, Стоп (F4) — заказ не чіпаю
         SetTimer, RemoveToolTip, -1500
         return
     }
@@ -2295,12 +2318,12 @@ KcMonitor:
         _reason := ""
         RegExMatch(listResp, "reason""\s*:\s*""([^""]*)", _rM)
         _reason := _rM1
-        ToolTip, % "Ctrl+F4: нема вільних для взяття`n" . _reason
+        ToolTip, % "F4: нема вільних для взяття`n" . _reason
         SetTimer, RemoveToolTip, -8000
         kcBusy := 0
         return
     }
-    ToolTip, Ctrl+F4: беру заказ №%takeNo%...
+    ToolTip, F4: беру заказ №%takeNo%...
     ; 3) тільки зараз можна чіпати поле Поиск: сервер підтвердив, що активний список Доставки.
     ; --- capture: Poisk -> open first row ---
     if (poiskX != 0)
@@ -2322,7 +2345,7 @@ KcMonitor:
     _cnt := _cM1
     if (_cnt != "1" || !InStr(_chk, takeNo))
     {
-        ToolTip, % "Ctrl+F4: список не звузився до №" . takeNo . " — НЕ пробиваю (не на Доставках?)"
+        ToolTip, % "F4: список не звузився до №" . takeNo . " — НЕ пробиваю (не на Доставках?)"
         SetTimer, RemoveToolTip, -5000
         kcBusy := 0
         return
@@ -2332,7 +2355,7 @@ KcMonitor:
     if (kcStop)
     {
         kcBusy := 0
-        ToolTip, Стоп (Ctrl+F4) — заказ не відкриваю
+        ToolTip, Стоп (F4) — заказ не відкриваю
         SetTimer, RemoveToolTip, -1500
         return
     }
@@ -2374,7 +2397,7 @@ KcMonitor:
     if (kcStop)
     {
         kcBusy := 0
-        ToolTip, Стоп (Ctrl+F4) — не пробиваю
+        ToolTip, Стоп (F4) — не пробиваю
         SetTimer, RemoveToolTip, -1500
         return
     }
@@ -2423,8 +2446,6 @@ NumpadEnter::GoSub, SivVisApply
 #IfWinActive
 
 ^!r::Reload                ; Ctrl+Alt+R — перезавантажити скрипт (підхопити свіжий код з диску)
-F6::GoSub, KcTakeOnce      ; F6 — один захід (ручний, без циклу)
-^F4::GoSub, KcDutyToggle   ; Ctrl+F4 — дежурство: сам лови вільний заказ (повторний Ctrl+F4 — стоп)
 
 ; ========================================================
 ; НАЛАШТУВАННЯ
@@ -3374,7 +3395,7 @@ ApplyRollclub:
         Sleep, 500
     }
 
-    if ((autoGunkan || autoPepsi || autoBurger || autoSandwich) && itemX != 0) {
+    if (RC_GIFTS_ENABLED && (autoGunkan || autoPepsi || autoBurger || autoSandwich) && itemX != 0) {
         if (autoBurger) {
             GoSub, NewGiftMacro
             SendInput, %pluBurger%
@@ -3483,7 +3504,7 @@ ApplyRollclub:
         }
     }
 
-    if (autoMode) {
+    if (RC_GIFTS_ENABLED && autoMode) {
     ; --- Подарунок: сервер обирає найдорожчий → пробиваємо по PLU (к-сть 1) ---
     Sleep, 500
     giftResp := RhGet("/api/iiko/gift", 15000)
@@ -4717,6 +4738,12 @@ LaunchScanner:
     GoSub, OpenSettings
 return
 
+RcDutyModuleMessage(wParam, lParam, msg, hwnd) {
+    global RcDutyModuleRequest
+    if (wParam != 1)
+        return 0
 
-#Include %A_ScriptDir%\test_uia_hotkeys.ahk
-
+    RcDutyModuleRequest := wParam
+    SetTimer, RcDutyModuleInvoke, -10
+    return 1
+}
