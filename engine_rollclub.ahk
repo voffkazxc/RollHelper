@@ -10,12 +10,15 @@ FileEncoding, UTF-8
 OpCoord_Init("rollclub", A_ScriptDir)
 ModuleRegistry_Init(A_ScriptDir, "rollclub", "mvp")
 ModuleRegistry_RegisterExternal("duty", "rollclub-duty")
+ModuleRegistry_RegisterExternal("zones", "rollclub-zones")
 OnMessage(0x8001, "RcDutyModuleMessage")
 
 if (Module_IsEnabled("duty")) {
     EnvSet, ROLLHELPER_ROLLCLUB_DUTY_HWND, %A_ScriptHwnd%
     ModuleRegistry_RunExternal("duty")
 }
+if (Module_IsEnabled("zones"))
+    Menu, Tray, Add, 🌍 Зони доставки RollClub, OpenZonesModule
 RhKillDuplicateInstances()
 
 ; Налаштування координат
@@ -244,9 +247,10 @@ global PromoPath := A_ScriptDir "\brands\rollclub\RkPromo.ini"
 global KnownPromos := {}
 GoSub, LoadPromoBase
 
-; --- База кухонь ---
-global KitchensPath  := A_ScriptDir "\brands\rollclub\RkKitchens.ini"
-global PresetsPath   := A_ScriptDir "\brands\rollclub\RkPresets.txt"
+; --- База кухонь / зон ---
+global RcZonesModuleEnabled := Module_IsEnabled("zones")
+global KitchensPath  := RcReadableRollclubDataPath("RkKitchens.ini")
+global PresetsPath   := RcReadableRollclubDataPath("RkPresets.txt")
 global Kitchens := []          ; масив об'єктів {Name, City, Address, ...}
 global rawAddress      := ""   ; скопійований адрес з iiko
 global detectedCity    := ""   ; визначене місто
@@ -255,8 +259,10 @@ global hasKitchenAlert := 0    ; 1 якщо хоч одна точка міст�
 global RcCurrentKitchen := ""   ; поточна кухня з RkKitchens.ini для часу/алертів
 global RcKitchenLastSyncTick := 0
 global RcKitchenSyncCooldownMs := 180000
-GoSub, SyncKitchensFromSheet
-GoSub, LoadKitchens
+if (RcZonesModuleEnabled) {
+    GoSub, SyncKitchensFromSheet
+    GoSub, LoadKitchens
+}
 
 ; Зона пошуку вікна модифікаторів (по скринах)
 global SIVSearchX1 := 490
@@ -292,7 +298,8 @@ Hotkey, %hkSiv%,  TriggerSiv,  On
 ; FinishOrder тепер статична клавіша в #IfWinActive блоках (надійніше ніж Hotkey динамічний)
 
 SetTimer, RollFocusWatcher, 300
-SetTimer, RcKitchensBackgroundSync, 180000
+if (RcZonesModuleEnabled)
+    SetTimer, RcKitchensBackgroundSync, 180000
 
 
 return
@@ -665,9 +672,55 @@ LoadPromoBase:
             KnownPromos[kLow] := 1
     }
 return
+
+RcProgramRoot() {
+    EnvGet, programRoot, ROLLHELPER_PROGRAM_ROOT
+    if (programRoot != "")
+        return programRoot
+    EnvGet, localAppData, LOCALAPPDATA
+    if (localAppData = "")
+        localAppData := A_AppData
+    return localAppData . "\Programs\RollHelper"
+}
+
+RcUserDataDir() {
+    dir := RcProgramRoot() . "\UserData\rollclub"
+    FileCreateDir, %dir%
+    return dir
+}
+
+RcRollclubPackageDataPath(fileName) {
+    return A_ScriptDir . "\brands\rollclub\" . fileName
+}
+
+RcReadableRollclubDataPath(fileName) {
+    userPath := RcUserDataDir() . "\" . fileName
+    if FileExist(userPath)
+        return userPath
+    return RcRollclubPackageDataPath(fileName)
+}
+
+RcWritableRollclubDataPath(fileName) {
+    userPath := RcUserDataDir() . "\" . fileName
+    packagePath := RcRollclubPackageDataPath(fileName)
+    if (!FileExist(userPath) && FileExist(packagePath))
+        FileCopy, %packagePath%, %userPath%, 0
+    return userPath
+}
+
+OpenZonesModule:
+    if (!ModuleRegistry_RunExternal("zones"))
+        MsgBox, 48, Зони доставки, Доповнення «Зони доставки RollClub» не встановлено або вимкнено в лаунчері.
+return
+
 LoadKitchens:
+    global RcZonesModuleEnabled
+    if (!RcZonesModuleEnabled)
+        return
     RcLoadZoneMap()
     global Kitchens, RcKitchensOk:= []
+    Kitchens := []
+    KitchensPath := RcReadableRollclubDataPath("RkKitchens.ini")
     if !FileExist(KitchensPath)
         return
     ; читаємо файл напряму як UTF-8 (IniRead через WinAPI ламає кирилицю)
@@ -718,11 +771,20 @@ LoadKitchens:
 return
 
 SyncKitchensFromSheet:
+    global RcZonesModuleEnabled
+    if (!RcZonesModuleEnabled)
+        return
     global RcKitchenLastSyncTick
     syncScript := A_ScriptDir "\..\server\sync_rollclub_kitchens.py"
     if !FileExist(syncScript)
         return
-    RunWait, %ComSpec% /c python sync_rollclub_kitchens.py --quiet, %A_ScriptDir%\..\server, Hide UseErrorLevel
+    _userDataDir := RcUserDataDir()
+    EnvSet, ROLLHELPER_ROLLCLUB_USERDATA, %_userDataDir%
+    _pythonExe := A_ScriptDir "\..\runtime\python\python.exe"
+    if !FileExist(_pythonExe)
+        _pythonExe := "python"
+    _syncCmd := """" . _pythonExe . """ sync_rollclub_kitchens.py --quiet"
+    RunWait, %ComSpec% /c %_syncCmd%, %A_ScriptDir%\..\server, Hide UseErrorLevel
     if (ErrorLevel) {
         logFile := A_ScriptDir "\siv_debug.log"
         FileAppend, `n[DEBUG] %A_Now% - Event: Kitchens sheet sync failed, ErrorLevel=%ErrorLevel%`n, %logFile%
@@ -734,6 +796,9 @@ SyncKitchensFromSheet:
 return
 
 RcKitchensSyncIfStale:
+    global RcZonesModuleEnabled
+    if (!RcZonesModuleEnabled)
+        return
     global RcKitchenLastSyncTick, RcKitchenSyncCooldownMs
     if (RcKitchensSyncBlocked())
         return
@@ -744,6 +809,9 @@ RcKitchensSyncIfStale:
 return
 
 RcKitchensBackgroundSync:
+    global RcZonesModuleEnabled
+    if (!RcZonesModuleEnabled)
+        return
     GoSub, RcKitchensSyncIfStale
 return
 
@@ -2523,9 +2591,12 @@ OpenSettings:
     Gui, Settings:Add, DropDownList, x+5 yp-3 w220 vNewUiTheme Choose%_themeIdx%, Light Premium|Neon Dark
 
     Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, w300 Center x10 y+15, ЗОНИ ДОСТАВКИ (KML)
+    Gui, Settings:Add, Text, w300 Center x10 y+15, ЗОНИ ДОСТАВКИ
     Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Button, x10 y+10 w290 h28 gRcLoadKmlFile, Завантажити KML-файл зон
+    if (Module_IsEnabled("zones"))
+        Gui, Settings:Add, Button, x10 y+10 w290 h28 gOpenZonesModule, Відкрити доповнення зон
+    else
+        Gui, Settings:Add, Text, x10 y+10 w290 h34 c%RhC_Muted%, Зони винесені в окреме доповнення.`nУстановіть «Зони доставки RollClub» у лаунчері.
 
     Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
     Gui, Settings:Add, Text, w300 Center x10 y+15, ГАРЯЧІ КЛАВІШІ
@@ -2786,6 +2857,10 @@ return
 ; РЕДАКТОР СТАТУСІВ КУХОНЬ
 ; ========================================================
 OpenKitchensEditor:
+    if (!Module_IsEnabled("zones")) {
+        MsgBox, 48, Зони доставки, Кухні та зони винесені в окреме доповнення.`nУстановіть «Зони доставки RollClub» у лаунчері.
+        return
+    }
     GoSub, LoadKitchens          ; перечитати з диска
     Gui, Kitch:Destroy
     Gui, Kitch:+AlwaysOnTop +ToolWindow
@@ -2947,6 +3022,7 @@ return
 SavePresets:
     Gui, Preset:Submit, NoHide
     ; Очищаємо і записуємо рядки
+    PresetsPath := RcWritableRollclubDataPath("RkPresets.txt")
     f := FileOpen(PresetsPath, "w", "UTF-8")
     if (!f) {
         MsgBox, 16, Помилка, Не вдалося зберегти файл пресетів!
@@ -3009,6 +3085,7 @@ RcBuildKitchOpts(val, presets) {
 }
 
 WriteKitchensFile:
+    KitchensPath := RcWritableRollclubDataPath("RkKitchens.ini")
     out := "; ===========================================================`n"
     out .= "; База кухонь Rollclub`n"
     out .= "; Status: ok | slow | nonstandard | stopped`n"
@@ -3859,7 +3936,7 @@ RcLoadKmlFile:
     FileSelectFile, _kmlSrc, 3, , Оберіть KML-файл зон доставки, KML-файл (*.kml)
     if (_kmlSrc = "")
         return
-    _kmlDst := A_ScriptDir "\brands\rollclub\zones.kml"
+    _kmlDst := RcWritableRollclubDataPath("zones.kml")
     FileCopy, %_kmlSrc%, %_kmlDst%, 1
     if (ErrorLevel) {
         MsgBox, 16, Помилка, Не вдалося скопіювати файл.
@@ -3879,6 +3956,11 @@ return
 RcCheckZone:
     global rawAddress, hasPickup, RcZones, RcZonesOk, detectedCity, RcCurrentKitchen, extractedTimeAuto
     SetTimer, RcCheckZone, Off
+    if (!Module_IsEnabled("zones")) {
+        GuiControl, Roll:, MapSearch, Зони: встановіть доповнення
+        GuiControl, Roll:, KitchenStatusText,
+        return
+    }
     addr := Trim(rawAddress)
     if (addr = "" || hasPickup) {
         GuiControl, Roll:, KitchenStatusText,
@@ -3937,7 +4019,7 @@ RcCheckZone:
     }
     lat := mLat1 + 0
     lng := mLon1 + 0
-    kmlPath := A_ScriptDir "\brands\rollclub\zones.kml"
+    kmlPath := RcReadableRollclubDataPath("zones.kml")
     if (!RcZonesOk && FileExist(kmlPath))
         RcLoadKml(kmlPath)
     if (RcZonesOk && RcZones.MaxIndex() > 0) {
@@ -4282,7 +4364,7 @@ RcUriEncode(str) {
 RcLoadZoneMap() {
     global RcZoneMap
     RcZoneMap := {}
-    mapPath := A_ScriptDir "\brands\rollclub\zones_map.ini"
+    mapPath := RcReadableRollclubDataPath("zones_map.ini")
     if (!FileExist(mapPath))
         return
     IniRead, SectionNames, %mapPath%

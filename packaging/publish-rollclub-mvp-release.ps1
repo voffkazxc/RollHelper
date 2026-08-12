@@ -2,10 +2,12 @@ param(
     [string]$CatalogVersion = "0.1.23",
     [string]$RollClubVersion = "0.1.0",
     [string]$DutyVersion = "0.1.0",
+    [string]$ZonesVersion = "0.1.0",
     [string]$SourceRelease = "0.1.22",
     [string]$Repository = "voffkazxc/RollHelper",
     [string]$OutputDirectory = (Join-Path $env:TEMP "RollHelperRollClubRelease"),
     [switch]$RebuildDuty,
+    [switch]$RebuildZones,
     [switch]$Publish
 )
 
@@ -15,6 +17,7 @@ foreach ($entry in @(
     @{ Name = "CatalogVersion"; Value = $CatalogVersion },
     @{ Name = "RollClubVersion"; Value = $RollClubVersion },
     @{ Name = "DutyVersion"; Value = $DutyVersion },
+    @{ Name = "ZonesVersion"; Value = $ZonesVersion },
     @{ Name = "SourceRelease"; Value = $SourceRelease }
 )) {
     if ($entry.Value -notmatch '^\d+\.\d+\.\d+$') {
@@ -42,6 +45,7 @@ $catalogTag = "v$CatalogVersion"
 $assetBaseUrl = "https://github.com/$Repository/releases/download/$catalogTag"
 $rollClubAsset = Split-Path -Leaf $rollClubBuild.AssetPath
 $sourceDuty = @($sourceManifest.packages) | Where-Object { $_.id -eq "rollclub-duty" } | Select-Object -First 1
+$sourceZones = @($sourceManifest.packages) | Where-Object { $_.id -eq "rollclub-zones" } | Select-Object -First 1
 if ($RebuildDuty) {
     $dutyBuild = & (Join-Path $PSScriptRoot "build-rollclub-duty-module.ps1") `
         -Version $DutyVersion `
@@ -65,9 +69,32 @@ if ($RebuildDuty) {
     throw "Source manifest has no rollclub-duty package. Use -RebuildDuty for the first release."
 }
 
+if ($RebuildZones) {
+    $zonesBuild = & (Join-Path $PSScriptRoot "build-rollclub-zones-module.ps1") `
+        -Version $ZonesVersion `
+        -OutputDirectory $OutputDirectory
+    $zonesAsset = Split-Path -Leaf $zonesBuild.AssetPath
+    $zonesPackage = [ordered]@{
+        id = "rollclub-zones"
+        type = "module"
+        displayName = "Зони доставки RollClub"
+        version = $ZonesVersion
+        extends = "rollclub"
+        requires = @(
+            [ordered]@{ id = "rollclub"; minVersion = $RollClubVersion }
+        )
+        url = "$assetBaseUrl/$zonesAsset"
+        sha256 = [string]$zonesBuild.Sha256
+    }
+} elseif ($null -ne $sourceZones) {
+    $zonesPackage = $sourceZones
+} else {
+    throw "Source manifest has no rollclub-zones package. Use -RebuildZones for the first release."
+}
+
 $packages = @()
 foreach ($package in @($sourceManifest.packages)) {
-    if ($package.id -notin @("rollclub", "rollclub-duty")) {
+    if ($package.id -notin @("rollclub", "rollclub-duty", "rollclub-zones")) {
         $packages += $package
     }
 }
@@ -80,6 +107,7 @@ $packages += [ordered]@{
     sha256 = [string]$rollClubBuild.Sha256
 }
 $packages += $dutyPackage
+$packages += $zonesPackage
 
 $manifest = [ordered]@{
     schema = 1
@@ -99,6 +127,7 @@ if ($Publish) {
 - RollClub: $RollClubVersion
 - у базі залишено тільки тільду та F1
 - F4 залишається окремим доповненням
+- зони доставки винесено в окреме доповнення
 - виправлено шапку, вікно F1 і перезапуск сервера
 - RollHouse, його доповнення та лаунчер без змін
 "@ | Set-Content -LiteralPath $notesPath -Encoding UTF8
@@ -106,6 +135,9 @@ if ($Publish) {
     $assetsToPublish = @($rollClubBuild.AssetPath, $manifestPath)
     if ($RebuildDuty) {
         $assetsToPublish += $dutyBuild.AssetPath
+    }
+    if ($RebuildZones) {
+        $assetsToPublish += $zonesBuild.AssetPath
     }
     gh release create $catalogTag `
         $assetsToPublish `
@@ -123,6 +155,7 @@ if ($Publish) {
     CatalogVersion = $CatalogVersion
     RollClubAsset = $rollClubBuild.AssetPath
     DutyAsset = if ($RebuildDuty) { $dutyBuild.AssetPath } else { [string]$dutyPackage.url }
+    ZonesAsset = if ($RebuildZones) { $zonesBuild.AssetPath } else { [string]$zonesPackage.url }
     Manifest = $manifestPath
     Published = [bool]$Publish
 }

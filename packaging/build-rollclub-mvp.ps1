@@ -35,6 +35,19 @@ Copy-Item -LiteralPath (Join-Path $repoRoot "config") -Destination $rollHelperRo
 Copy-Item -LiteralPath (Join-Path $repoRoot "core") -Destination $rollHelperRoot -Recurse
 Copy-Item -LiteralPath (Join-Path $repoRoot "lib") -Destination $rollHelperRoot -Recurse
 Copy-Item -Path (Join-Path $repoRoot "brands\rollclub\*") -Destination (Join-Path $rollHelperRoot "brands\rollclub") -Recurse
+foreach ($zoneFile in @(
+    "RkKitchens.ini",
+    "RkKitchens.ini.bak_sheet",
+    "RkPresets.txt",
+    "zones.kml",
+    "zones_map.ini",
+    "zones_map.BEFORE_NEW_MAPPINGS_20260726_215931.ini"
+)) {
+    $zonePath = Join-Path $rollHelperRoot "brands\rollclub\$zoneFile"
+    if (Test-Path -LiteralPath $zonePath) {
+        Remove-Item -LiteralPath $zonePath -Force
+    }
+}
 
 $cleanConfig = git -C $repoRoot show HEAD:brands/rollclub/RkConfig.ini
 if ($LASTEXITCODE -ne 0) {
@@ -75,6 +88,14 @@ foreach ($fileName in $serverFiles) {
     Copy-Item -LiteralPath (Join-Path $sourceServer $fileName) -Destination $serverRoot
 }
 Copy-Item -LiteralPath (Join-Path $sourceServer "static") -Destination $serverRoot -Recurse
+
+$syncScriptPath = Join-Path $serverRoot "sync_rollclub_kitchens.py"
+$syncScriptText = [IO.File]::ReadAllText($syncScriptPath, [Text.Encoding]::UTF8)
+if ($syncScriptText -notmatch "ROLLHELPER_ROLLCLUB_USERDATA") {
+    $syncScriptText = $syncScriptText -replace "import datetime as dt\r?\n", "import datetime as dt`r`nimport os`r`n"
+    $syncScriptText = $syncScriptText -replace "def kitchens_path\(\) -> Path:\r?\n\s+return root_dir\(\) / ""RollHelper"" / ""brands"" / ""rollclub"" / ""RkKitchens.ini""", "def kitchens_path() -> Path:`r`n    user_data = os.environ.get(""ROLLHELPER_ROLLCLUB_USERDATA"")`r`n    if user_data:`r`n        return Path(user_data) / ""RkKitchens.ini""`r`n    return root_dir() / ""RollHelper"" / ""brands"" / ""rollclub"" / ""RkKitchens.ini"""
+    [IO.File]::WriteAllText($syncScriptPath, $syncScriptText, [Text.Encoding]::UTF8)
+}
 
 $pythonVersion = "3.13.12"
 $pythonArchive = Join-Path $releaseRoot "python-embed.zip"
