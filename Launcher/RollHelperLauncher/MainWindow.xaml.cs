@@ -167,8 +167,8 @@ public partial class MainWindow : Window
         var enabled = _packageInstaller.IsEnabled(selectedRow.Package);
         var missingRequirements = _packageInstaller.GetMissingRequirements(selectedRow.Package);
 
-        ContextInstallModuleItem.Header = installed && !enabled ? "Включить" : "Установить";
-        ContextInstallModuleItem.IsEnabled = (!installed || !enabled) && missingRequirements.Count == 0;
+        ContextInstallModuleItem.Header = GetModulePrimaryActionLabel(selectedRow.Package);
+        ContextInstallModuleItem.IsEnabled = CanRunModulePrimaryAction(installed, enabled, missingRequirements);
         ContextDisableModuleItem.IsEnabled = installed && enabled;
         ContextRemoveModuleItem.IsEnabled = _packageInstaller.HasInstalledVersion(selectedRow.Package.Id);
     }
@@ -322,7 +322,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!BeginOperation($"Установка дополнения {selectedRow.DisplayName}..."))
+        var isUpdate = _packageInstaller.HasInstalledVersion(package.Id)
+                       && !_packageInstaller.IsInstalled(package);
+        var operationName = isUpdate ? "Обновление" : "Установка";
+        if (!BeginOperation($"{operationName} дополнения {selectedRow.DisplayName}..."))
         {
             return;
         }
@@ -332,16 +335,16 @@ public partial class MainWindow : Window
             var progress = new Progress<int>(value => DownloadProgress.Value = value);
             await _packageInstaller.InstallAsync(package, progress, _operationCancellation!.Token);
             _packageInstaller.SetEnabled(package, true);
-            SetStatus($"Дополнение «{selectedRow.DisplayName}» установлено и включено");
+            SetStatus($"Дополнение «{selectedRow.DisplayName}» {(isUpdate ? "обновлено" : "установлено")} и включено");
         }
         catch (OperationCanceledException)
         {
-            SetStatus("Установка дополнения отменена");
-            LauncherLog.Warning($"Module installation cancelled: {package.Id}");
+            SetStatus($"{operationName} дополнения отменено");
+            LauncherLog.Warning($"Module {operationName.ToLowerInvariant()} cancelled: {package.Id}");
         }
         catch (Exception exception)
         {
-            ShowOperationError($"Не удалось установить {selectedRow.DisplayName}", exception);
+            ShowOperationError($"Не удалось {operationName.ToLowerInvariant()} {selectedRow.DisplayName}", exception);
         }
         finally
         {
@@ -657,8 +660,8 @@ public partial class MainWindow : Window
         var enabled = _packageInstaller.IsEnabled(selectedRow.Package);
         var missingRequirements = _packageInstaller.GetMissingRequirements(selectedRow.Package);
 
-        InstallEnableModuleButton.Content = installed && !enabled ? "Включить" : "Установить";
-        InstallEnableModuleButton.IsEnabled = (!installed || !enabled) && missingRequirements.Count == 0;
+        InstallEnableModuleButton.Content = GetModulePrimaryActionLabel(selectedRow.Package);
+        InstallEnableModuleButton.IsEnabled = CanRunModulePrimaryAction(installed, enabled, missingRequirements);
         DisableModuleButton.IsEnabled = installed && enabled;
         RemoveModuleButton.IsEnabled = _packageInstaller.HasInstalledVersion(selectedRow.Package.Id);
     }
@@ -701,6 +704,25 @@ public partial class MainWindow : Window
         });
 
         return $"Сначала установите: {string.Join(", ", descriptions)}";
+    }
+
+    private string GetModulePrimaryActionLabel(ReleasePackage package)
+    {
+        if (_packageInstaller.IsInstalled(package))
+        {
+            return _packageInstaller.IsEnabled(package) ? "Установлено" : "Включить";
+        }
+
+        return _packageInstaller.HasInstalledVersion(package.Id) ? "Обновить" : "Установить";
+    }
+
+    private static bool CanRunModulePrimaryAction(
+        bool installed,
+        bool enabled,
+        IReadOnlyCollection<PackageRequirement> missingRequirements)
+    {
+        return (!installed || !enabled)
+            && missingRequirements.Count == 0;
     }
 
     private void UpdateLauncherButtonState()

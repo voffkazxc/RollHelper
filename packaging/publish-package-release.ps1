@@ -16,6 +16,7 @@ $catalogVersion = [string]$request.catalogVersion
 $launcherVersion = [string]$request.launcherVersion
 $rollhouseVersion = [string]$request.rollhouseVersion
 $reportLoadVersion = [string]$request.reportLoadVersion
+$rollhouseReuseRelease = [string]$request.rollhouseReuseRelease
 
 foreach ($versionEntry in @(
     @{ Name = "catalogVersion"; Value = $catalogVersion },
@@ -29,19 +30,66 @@ foreach ($versionEntry in @(
 }
 
 $catalogRoot = Join-Path $OutputDirectory $catalogVersion
-$rollhouseBuild = & (Join-Path $PSScriptRoot "build-rollhouse-mvp.ps1") `
-    -Version $rollhouseVersion `
-    -OutputDirectory $OutputDirectory
 $reportBuild = & (Join-Path $PSScriptRoot "build-report-load-module.ps1") `
     -Version $reportLoadVersion `
     -OutputDirectory $OutputDirectory
 
 New-Item -ItemType Directory -Force -Path $catalogRoot | Out-Null
 
-$rollhouseAssetName = Split-Path -Leaf $rollhouseBuild.Package
+$rollhouseBuild = $null
+$rollhousePackage = $null
+if ([string]::IsNullOrWhiteSpace($rollhouseReuseRelease)) {
+    $rollhouseBuild = & (Join-Path $PSScriptRoot "build-rollhouse-mvp.ps1") `
+        -Version $rollhouseVersion `
+        -OutputDirectory $OutputDirectory
+
+    $rollhouseAssetName = Split-Path -Leaf $rollhouseBuild.Package
+    $rollhousePackage = [ordered]@{
+        id = "rollhouse"
+        type = "brand"
+        displayName = "RollHouse"
+        version = $rollhouseVersion
+        url = "https://github.com/$Repository/releases/download/v$catalogVersion/$rollhouseAssetName"
+        sha256 = [string]$rollhouseBuild.Sha256
+    }
+}
+else {
+    if ($rollhouseReuseRelease -notmatch '^\d+\.\d+\.\d+$') {
+        throw "Invalid rollhouseReuseRelease: $rollhouseReuseRelease"
+    }
+
+    $reuseManifestUrl = "https://github.com/$Repository/releases/download/v$rollhouseReuseRelease/release-manifest.json"
+    $reuseManifest = Invoke-WebRequest -UseBasicParsing -Uri $reuseManifestUrl | Select-Object -ExpandProperty Content | ConvertFrom-Json
+    $sourcePackage = @($reuseManifest.packages) | Where-Object { $_.id -eq "rollhouse" } | Select-Object -First 1
+    if ($null -eq $sourcePackage) {
+        throw "RollHouse package was not found in source release $rollhouseReuseRelease"
+    }
+    if ([string]$sourcePackage.version -ne $rollhouseVersion) {
+        throw "rollhouseVersion $rollhouseVersion does not match source package version $($sourcePackage.version)"
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$sourcePackage.url) -or [string]::IsNullOrWhiteSpace([string]$sourcePackage.sha256)) {
+        throw "Source RollHouse package in $rollhouseReuseRelease has no URL or SHA-256"
+    }
+
+    $rollhousePackage = [ordered]@{
+        id = "rollhouse"
+        type = "brand"
+        displayName = "RollHouse"
+        version = $rollhouseVersion
+        url = [string]$sourcePackage.url
+        sha256 = [string]$sourcePackage.sha256
+    }
+}
+
 $reportAssetName = Split-Path -Leaf $reportBuild.AssetPath
 $catalogTag = "v$catalogVersion"
 $catalogAssetBaseUrl = "https://github.com/$Repository/releases/download/$catalogTag"
+$rollhousePackage.url = if ([string]::IsNullOrWhiteSpace($rollhouseReuseRelease)) {
+    "$catalogAssetBaseUrl/$rollhouseAssetName"
+}
+else {
+    $rollhousePackage.url
+}
 $launcherManifestUrl = "https://github.com/$Repository/releases/download/v$launcherVersion/release-manifest.json"
 $launcherManifestPath = Join-Path $catalogRoot "launcher-source-manifest.json"
 Invoke-WebRequest -Uri $launcherManifestUrl -OutFile $launcherManifestPath
@@ -63,14 +111,7 @@ $manifest = [ordered]@{
     schema = 1
     release = $catalogVersion
     packages = @(
-        [ordered]@{
-            id = "rollhouse"
-            type = "brand"
-            displayName = "RollHouse"
-            version = $rollhouseVersion
-            url = "$catalogAssetBaseUrl/$rollhouseAssetName"
-            sha256 = [string]$rollhouseBuild.Sha256
-        },
+        $rollhousePackage,
         [ordered]@{
             id = "rollhouse-report-load"
             type = "module"
@@ -103,7 +144,7 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 Remove-Item -LiteralPath $launcherManifestPath -Force
 
-foreach ($assetPath in @($rollhouseBuild.Package, $reportBuild.AssetPath, $manifestPath)) {
+foreach ($assetPath in @($reportBuild.AssetPath, $manifestPath)) {
     if (-not (Test-Path -LiteralPath $assetPath -PathType Leaf)) {
         throw "Release asset was not created: $assetPath"
     }
@@ -114,7 +155,7 @@ if ($Publish) {
     @"
 Обновлены пакеты RollHelper.
 
-- RollHouse: $rollhouseVersion
+- RollHouse: $(if ([string]::IsNullOrWhiteSpace($rollhouseReuseRelease)) { "$rollhouseVersion" } else { "$rollhouseVersion (без изменений)" })
 - Дополнение «Отчёт — нагрузка»: $reportLoadVersion
 - Лаунчер остаётся на версии $launcherVersion
 "@ | Set-Content -LiteralPath $notesPath -Encoding UTF8
@@ -130,10 +171,13 @@ if ($Publish) {
     }
 
     if ($releaseLookupExitCode -eq 0 -and $existingRelease) {
+        $assetsToUpload = @($reportBuild.AssetPath, $manifestPath)
+        if ([string]::IsNullOrWhiteSpace($rollhouseReuseRelease)) {
+            $assetsToUpload = @($rollhouseBuild.Package) + $assetsToUpload
+        }
+
         gh release upload $catalogTag `
-            $rollhouseBuild.Package `
-            $reportBuild.AssetPath `
-            $manifestPath `
+            $assetsToUpload `
             --clobber `
             --repo $Repository
         gh release edit $catalogTag `
@@ -143,10 +187,13 @@ if ($Publish) {
             --repo $Repository
     }
     else {
+        $assetsToPublish = @($reportBuild.AssetPath, $manifestPath)
+        if ([string]::IsNullOrWhiteSpace($rollhouseReuseRelease)) {
+            $assetsToPublish = @($rollhouseBuild.Package) + $assetsToPublish
+        }
+
         gh release create $catalogTag `
-            $rollhouseBuild.Package `
-            $reportBuild.AssetPath `
-            $manifestPath `
+            $assetsToPublish `
             --target master `
             --title "RollHelper $catalogVersion" `
             --notes-file $notesPath `
@@ -170,7 +217,7 @@ if ($Publish) {
     LauncherVersion = $launcherVersion
     RollHouseVersion = $rollhouseVersion
     ReportLoadVersion = $reportLoadVersion
-    RollHouseAsset = $rollhouseBuild.Package
+    RollHouseAsset = if ($null -ne $rollhouseBuild) { $rollhouseBuild.Package } else { $rollhousePackage.url }
     ReportLoadAsset = $reportBuild.AssetPath
     Manifest = $manifestPath
     Published = [bool]$Publish
