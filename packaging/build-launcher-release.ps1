@@ -78,6 +78,7 @@ $manifest = [ordered]@{
     launcher = [ordered]@{
         version = $Version
         asset = $launcherAssetName
+        url = "https://github.com/voffkazxc/RollHelper/releases/download/v$Version/$launcherAssetName"
         sha256 = $launcherSha256
     }
 }
