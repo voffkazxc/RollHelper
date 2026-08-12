@@ -11,12 +11,9 @@ OpCoord_Init("rollclub", A_ScriptDir)
 ModuleRegistry_Init(A_ScriptDir, "rollclub", "mvp")
 ModuleRegistry_RegisterExternal("duty", "rollclub-duty")
 ModuleRegistry_RegisterExternal("zones", "rollclub-zones")
-OnMessage(0x8001, "RcDutyModuleMessage")
 
-if (Module_IsEnabled("duty")) {
-    EnvSet, ROLLHELPER_ROLLCLUB_DUTY_HWND, %A_ScriptHwnd%
-    ModuleRegistry_RunExternal("duty")
-}
+if (Module_IsEnabled("duty"))
+    RcStopLegacyDutyProcess()
 if (Module_IsEnabled("zones"))
     Menu, Tray, Add, 🌍 Зони доставки RollClub, OpenZonesModule
 RhKillDuplicateInstances()
@@ -303,6 +300,12 @@ if (RcZonesModuleEnabled)
     SetTimer, RcKitchensBackgroundSync, 180000
 
 
+return
+
+F4::
+    if (!Module_IsEnabled("duty"))
+        return
+    GoSub, KcDutyToggle
 return
 
 RollFocusWatcher:
@@ -2271,13 +2274,6 @@ KcDutyToggle:
         ToolTip, Дежурство ВИМКНЕНО
         SetTimer, RemoveToolTip, -3000
     }
-return
-
-RcDutyModuleInvoke:
-    global RcDutyModuleRequest
-    if (RcDutyModuleRequest = 1)
-        GoSub, KcDutyToggle
-    RcDutyModuleRequest := 0
 return
 
 KcDutyTick:
@@ -5062,12 +5058,20 @@ LaunchScanner:
     GoSub, OpenSettings
 return
 
-RcDutyModuleMessage(wParam, lParam, msg, hwnd) {
-    global RcDutyModuleRequest
-    if (wParam != 1)
-        return 0
-
-    RcDutyModuleRequest := wParam
-    SetTimer, RcDutyModuleInvoke, -10
-    return 1
+RcStopLegacyDutyProcess() {
+    DetectHiddenWindows, On
+    WinGet, _dutyWindows, List, rollclub_duty.ahk ahk_class AutoHotkey
+    Loop, %_dutyWindows%
+    {
+        _dutyHwnd := _dutyWindows%A_Index%
+        WinClose, ahk_id %_dutyHwnd%
+        WinWaitClose, ahk_id %_dutyHwnd%,, 1
+        if WinExist("ahk_id " . _dutyHwnd)
+        {
+            WinGet, _dutyPid, PID, ahk_id %_dutyHwnd%
+            if (_dutyPid)
+                Process, Close, %_dutyPid%
+        }
+    }
+    DetectHiddenWindows, Off
 }
