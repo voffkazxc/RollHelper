@@ -471,7 +471,7 @@ public partial class MainWindow : Window
 
         ModulesEmptyText.Text = "Для этой программы пока нет дополнений";
         ModulesEmptyText.Visibility = _modules.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        ModulesGrid.SelectedIndex = _modules.Count > 0 ? 0 : -1;
+        ModulesGrid.SelectedIndex = -1;
         UpdateModuleActionButtons();
     }
 
