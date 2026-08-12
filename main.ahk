@@ -512,13 +512,53 @@ RhUiaWindow() {
         return ""
 }
 
+RhUiaFindVisible(container, condition) {
+    global iikoWinExe
+    if (!IsObject(container) || condition = "")
+        return ""
+    try elements := container.FindAllBy(condition)
+    catch e
+        return ""
+    if (!IsObject(elements))
+        return ""
+
+    hwnd := WinExist("ahk_exe " . iikoWinExe)
+    if (hwnd)
+        WinGetPos, winX, winY, winW, winH, ahk_id %hwnd%
+    best := ""
+    bestArea := 0
+    Loop, % elements.MaxIndex() {
+        el := elements[A_Index]
+        try offscreen := el.CurrentIsOffscreen
+        catch e1
+            offscreen := 0
+        if (offscreen)
+            continue
+        try rect := el.CurrentBoundingRectangle
+        catch e2
+            continue
+        width := rect.r - rect.l
+        height := rect.b - rect.t
+        if (width <= 1 || height <= 1)
+            continue
+        centerX := rect.l + (width / 2)
+        centerY := rect.t + (height / 2)
+        if (hwnd && (centerX < winX || centerX > winX + winW || centerY < winY || centerY > winY + winH))
+            continue
+        area := width * height
+        if (!IsObject(best) || area > bestArea) {
+            best := el
+            bestArea := area
+        }
+    }
+    return best
+}
+
 RhUiaRoot() {
     win := RhUiaWindow()
     if (!IsObject(win))
         return ""
-    try root := win.FindFirstBy("AutomationId=DeliveryOrderEditControl")
-    catch e
-        root := ""
+    root := RhUiaFindVisible(win, "AutomationId=DeliveryOrderEditControl")
     return IsObject(root) ? root : win
 }
 
@@ -537,17 +577,13 @@ RhUiaFind(role, defaultAid:="") {
     root := RhUiaRoot()
     if (!IsObject(root) || aid = "")
         return ""
-    try el := root.FindFirstBy("AutomationId=" . aid)
-    catch e
-        el := ""
+    el := RhUiaFindVisible(root, "AutomationId=" . aid)
     if (IsObject(el))
         return el
     win := RhUiaWindow()
     if (!IsObject(win))
         return ""
-    try return win.FindFirstBy("AutomationId=" . aid)
-    catch e
-        return ""
+    return RhUiaFindVisible(win, "AutomationId=" . aid)
 }
 
 RhUiaFindByAutomationId(aid) {
@@ -555,35 +591,27 @@ RhUiaFindByAutomationId(aid) {
         return ""
     root := RhUiaRoot()
     if (IsObject(root)) {
-        try el := root.FindFirstBy("AutomationId=" . aid)
-        catch e
-            el := ""
+        el := RhUiaFindVisible(root, "AutomationId=" . aid)
         if (IsObject(el))
             return el
     }
     win := RhUiaWindow()
     if (!IsObject(win))
         return ""
-    try return win.FindFirstBy("AutomationId=" . aid)
-    catch e2
-        return ""
+    return RhUiaFindVisible(win, "AutomationId=" . aid)
 }
 
 RhUiaFindByName(name) {
     root := RhUiaRoot()
     if (!IsObject(root) || name = "")
         return ""
-    try el := root.FindFirstBy("Name=" . name)
-    catch e
-        el := ""
+    el := RhUiaFindVisible(root, "Name=" . name)
     if (IsObject(el))
         return el
     win := RhUiaWindow()
     if (!IsObject(win))
         return ""
-    try return win.FindFirstBy("Name=" . name)
-    catch e
-        return ""
+    return RhUiaFindVisible(win, "Name=" . name)
 }
 
 RhUiaGetValue(aid) {
@@ -779,12 +807,15 @@ RhUiaClickFirstOrderRow() {
     if (!IsObject(root))
         return 0
 
-    try best := root.FindFirstBy("Name=Блюдо row 1")
-    catch e1
-        best := ""
+    best := RhUiaFindVisible(root, "Name=Блюдо row 1")
+    if (!IsObject(best))
+        best := RhUiaFindVisible(root, "Name=Страва row 1")
+    if (!IsObject(best))
+        best := RhUiaFindVisible(root, "Name=Dish row 1")
     if (IsObject(best)) {
         IikoRestore()
         try {
+            best.SetFocus()
             best.Click()
             Sleep, % SpDly(180)
             return 1
@@ -804,7 +835,10 @@ RhUiaClickFirstOrderRow() {
         try name := el.CurrentName
         catch e4
             name := ""
-        if (RegExMatch(name, "^Блюдо row (\d+)$", rowMatch) && rowMatch1 > 0 && rowMatch1 < bestRow) {
+        try offscreen := el.CurrentIsOffscreen
+        catch e5
+            offscreen := 0
+        if (!offscreen && RegExMatch(name, "^(?:Блюдо|Страва|Dish) row (\d+)$", rowMatch) && rowMatch1 > 0 && rowMatch1 < bestRow) {
             best := el
             bestRow := rowMatch1
         }
@@ -813,12 +847,37 @@ RhUiaClickFirstOrderRow() {
         return 0
     IikoRestore()
     try {
+        best.SetFocus()
         best.Click()
         Sleep, % SpDly(180)
         return 1
-    } catch e5 {
+    } catch e6 {
         return 0
     }
+}
+
+RhUiaFocusOrderTableRoot() {
+    root := RhUiaFindByAutomationId("treeListItems")
+    if (!IsObject(root))
+        return 0
+    IikoRestore()
+    try root.SetFocus()
+    catch e1 {
+    }
+    try rect := root.CurrentBoundingRectangle
+    catch e2
+        return 0
+    width := rect.r - rect.l
+    height := rect.b - rect.t
+    if (width <= 1 || height <= 1)
+        return 0
+    clickX := Round(rect.l + Min(120, width / 4))
+    clickY := Round(rect.t + Min(38, height / 3))
+    MouseGetPos, oldX, oldY
+    Click, %clickX%, %clickY%
+    Sleep, % SpDly(180)
+    MouseMove, %oldX%, %oldY%, 0
+    return 1
 }
 
 RhUiaPasteKitchenComment(text) {
@@ -858,13 +917,10 @@ RhUiaPasteKitchenComment(text) {
 RhFocusOrderItems(itX:="", itY:="") {
     if (RhUiaClickFirstOrderRow())
         return 1
-    if (IsObject(RhUiaFindByAutomationId("treeListItems")))
-        return 0
-    if (itX = "" || itX = 0 || itX = "ERROR")
-        return 0
-    Click, %itX%, %itY%
-    Sleep, % SpDly(180)
-    return 1
+    if (RhUiaFocusOrderTableRoot())
+        return 1
+    FileAppend, % "[" . A_Now . "] PLU_FOCUS failed: visible treeListItems not found; coordinate fallback disabled`n", %A_ScriptDir%\ahk_debug.log
+    return 0
 }
 
 RhApplyPaymentUIA(mode, changeAmount, noChangeFlag) {

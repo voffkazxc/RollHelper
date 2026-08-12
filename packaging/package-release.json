@@ -1,6 +1,7 @@
 {
-  "catalogVersion": "0.1.17",
-  "launcherVersion": "0.1.16",
-  "rollhouseVersion": "0.1.17",
+  "catalogVersion": "0.1.40",
+  "catalogBaseRelease": "0.1.39",
+  "launcherVersion": "0.1.39",
+  "rollhouseVersion": "0.1.18",
   "reportLoadVersion": "0.1.17"
 }

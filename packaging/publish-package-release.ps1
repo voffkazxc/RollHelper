@@ -17,6 +17,7 @@ $launcherVersion = [string]$request.launcherVersion
 $rollhouseVersion = [string]$request.rollhouseVersion
 $reportLoadVersion = [string]$request.reportLoadVersion
 $rollhouseReuseRelease = [string]$request.rollhouseReuseRelease
+$catalogBaseRelease = [string]$request.catalogBaseRelease
 
 foreach ($versionEntry in @(
     @{ Name = "catalogVersion"; Value = $catalogVersion },
@@ -38,6 +39,10 @@ New-Item -ItemType Directory -Force -Path $catalogRoot | Out-Null
 
 $rollhouseBuild = $null
 $rollhousePackage = $null
+if (-not [string]::IsNullOrWhiteSpace($catalogBaseRelease) -and $catalogBaseRelease -notmatch '^\d+\.\d+\.\d+$') {
+    throw "Invalid catalogBaseRelease: $catalogBaseRelease"
+}
+
 if ([string]::IsNullOrWhiteSpace($rollhouseReuseRelease)) {
     $rollhouseBuild = & (Join-Path $PSScriptRoot "build-rollhouse-mvp.ps1") `
         -Version $rollhouseVersion `
@@ -59,7 +64,7 @@ else {
     }
 
     $reuseManifestUrl = "https://github.com/$Repository/releases/download/v$rollhouseReuseRelease/release-manifest.json"
-    $reuseManifest = Invoke-WebRequest -UseBasicParsing -Uri $reuseManifestUrl | Select-Object -ExpandProperty Content | ConvertFrom-Json
+    $reuseManifest = Invoke-RestMethod -Uri $reuseManifestUrl
     $sourcePackage = @($reuseManifest.packages) | Where-Object { $_.id -eq "rollhouse" } | Select-Object -First 1
     if ($null -eq $sourcePackage) {
         throw "RollHouse package was not found in source release $rollhouseReuseRelease"
@@ -107,27 +112,39 @@ else {
     "https://github.com/$Repository/releases/download/v$launcherVersion/$launcherAsset"
 }
 
+$packages = @(
+    $rollhousePackage,
+    [ordered]@{
+        id = "rollhouse-report-load"
+        type = "module"
+        displayName = "Отчёт — нагрузка"
+        version = $reportLoadVersion
+        extends = "rollhouse"
+        requires = @(
+            [ordered]@{
+                id = "rollhouse"
+                minVersion = $rollhouseVersion
+            }
+        )
+        url = "$catalogAssetBaseUrl/$reportAssetName"
+        sha256 = [string]$reportBuild.Sha256
+    }
+)
+
+if (-not [string]::IsNullOrWhiteSpace($catalogBaseRelease)) {
+    $baseManifestUrl = "https://github.com/$Repository/releases/download/v$catalogBaseRelease/release-manifest.json"
+    $baseManifest = Invoke-RestMethod -Uri $baseManifestUrl
+    foreach ($basePackage in @($baseManifest.packages)) {
+        if ($basePackage.id -notin @("rollhouse", "rollhouse-report-load")) {
+            $packages += $basePackage
+        }
+    }
+}
+
 $manifest = [ordered]@{
     schema = 1
     release = $catalogVersion
-    packages = @(
-        $rollhousePackage,
-        [ordered]@{
-            id = "rollhouse-report-load"
-            type = "module"
-            displayName = "Отчёт — нагрузка"
-            version = $reportLoadVersion
-            extends = "rollhouse"
-            requires = @(
-                [ordered]@{
-                    id = "rollhouse"
-                    minVersion = $rollhouseVersion
-                }
-            )
-            url = "$catalogAssetBaseUrl/$reportAssetName"
-            sha256 = [string]$reportBuild.Sha256
-        }
-    )
+    packages = $packages
     launcher = [ordered]@{
         version = $launcherVersion
         url = $launcherUrl
@@ -157,6 +174,7 @@ if ($Publish) {
 
 - RollHouse: $(if ([string]::IsNullOrWhiteSpace($rollhouseReuseRelease)) { "$rollhouseVersion" } else { "$rollhouseVersion (без изменений)" })
 - Дополнение «Отчёт — нагрузка»: $reportLoadVersion
+- Остальные пакеты перенесены из каталога $catalogBaseRelease без изменений
 - Лаунчер остаётся на версии $launcherVersion
 "@ | Set-Content -LiteralPath $notesPath -Encoding UTF8
 
