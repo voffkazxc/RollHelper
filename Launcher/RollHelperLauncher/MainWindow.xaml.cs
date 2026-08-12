@@ -306,35 +306,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (_packageInstaller.IsInstalled(package) && !_packageInstaller.IsEnabled(package))
-        {
-            if (!BeginOperation($"Включение дополнения {selectedRow.DisplayName}..."))
-            {
-                return;
-            }
-
-            try
-            {
-                _packageInstaller.SetEnabled(package, true);
-                ApplyModuleChange(package, selectedRow.DisplayName);
-                SetStatus($"Дополнение «{selectedRow.DisplayName}» включено и применено");
-            }
-            catch (Exception exception)
-            {
-                ShowOperationError($"Не удалось включить {selectedRow.DisplayName}", exception);
-            }
-            finally
-            {
-                EndOperation();
-                RefreshAllStatuses();
-            }
-
-            return;
-        }
-
-        var isUpdate = _packageInstaller.HasInstalledVersion(package.Id)
-                       && !_packageInstaller.IsInstalled(package);
-        var operationName = isUpdate ? "Обновление" : "Установка";
+        var installedAtStart = _packageInstaller.IsInstalled(package);
+        var isUpdate = !installedAtStart && _packageInstaller.HasInstalledVersion(package.Id);
+        var operationName = installedAtStart ? "Включение" : isUpdate ? "Обновление" : "Установка";
         if (!BeginOperation($"{operationName} дополнения {selectedRow.DisplayName}..."))
         {
             return;
@@ -342,11 +316,10 @@ public partial class MainWindow : Window
 
         try
         {
-            var progress = new Progress<int>(value => DownloadProgress.Value = value);
-            await _packageInstaller.InstallAsync(package, progress, _operationCancellation!.Token);
-            _packageInstaller.SetEnabled(package, true);
+            await EnsureModuleInstalledAndEnabledAsync(package);
             ApplyModuleChange(package, selectedRow.DisplayName);
-            SetStatus($"Дополнение «{selectedRow.DisplayName}» {(isUpdate ? "обновлено" : "установлено")} и применено");
+            var result = installedAtStart ? "включено" : isUpdate ? "обновлено" : "установлено";
+            SetStatus($"Дополнение «{selectedRow.DisplayName}» {result} и применено");
         }
         catch (OperationCanceledException)
         {
@@ -361,6 +334,27 @@ public partial class MainWindow : Window
         {
             EndOperation();
             RefreshAllStatuses();
+        }
+    }
+
+    private async Task EnsureModuleInstalledAndEnabledAsync(ReleasePackage package)
+    {
+        if (!_packageInstaller.IsInstalled(package))
+        {
+            var progress = new Progress<int>(value => DownloadProgress.Value = value);
+            await _packageInstaller.InstallAsync(package, progress, _operationCancellation!.Token);
+        }
+
+        try
+        {
+            _packageInstaller.SetEnabled(package, true);
+        }
+        catch (InvalidOperationException) when (!_packageInstaller.IsInstalled(package))
+        {
+            LauncherLog.Warning($"Module files disappeared before enable; repairing package: {package.Id} {package.Version}");
+            var progress = new Progress<int>(value => DownloadProgress.Value = value);
+            await _packageInstaller.InstallAsync(package, progress, _operationCancellation!.Token);
+            _packageInstaller.SetEnabled(package, true);
         }
     }
 

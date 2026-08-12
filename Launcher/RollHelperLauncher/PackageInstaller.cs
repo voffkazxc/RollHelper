@@ -170,6 +170,16 @@ internal sealed class PackageInstaller
             return installDirectory;
         }
 
+        if (Directory.Exists(installDirectory))
+        {
+            LauncherLog.Warning($"Removing incomplete package directory before repair: {installDirectory}");
+            TryDeleteDirectory(installDirectory);
+            if (Directory.Exists(installDirectory))
+            {
+                throw new IOException($"Could not remove incomplete package directory: {installDirectory}");
+            }
+        }
+
         var cacheFile = Path.Combine(
             LauncherPaths.CacheDirectory,
             $"{LauncherPaths.SafePathSegment(package.Id)}-{LauncherPaths.SafePathSegment(package.Version)}-{Guid.NewGuid():N}.zip");
@@ -194,11 +204,6 @@ internal sealed class PackageInstaller
             if (packageManifest.Entrypoint is not null)
             {
                 ValidateEntrypoint(stagingDirectory, packageManifest.Entrypoint);
-            }
-
-            if (Directory.Exists(installDirectory))
-            {
-                throw new IOException($"Install directory already exists but package is incomplete: {installDirectory}");
             }
 
             Directory.Move(stagingDirectory, installDirectory);

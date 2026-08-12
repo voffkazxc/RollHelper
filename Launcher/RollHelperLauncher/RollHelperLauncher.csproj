@@ -8,7 +8,13 @@
     <Nullable>enable</Nullable>
     <AssemblyName>RollHelperLauncher</AssemblyName>
     <RootNamespace>RollHelperLauncher</RootNamespace>
-    <Version>0.1.38</Version>
+    <Version>0.1.39</Version>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>RollHelperLauncher.RepairProbe</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
 
 </Project>
