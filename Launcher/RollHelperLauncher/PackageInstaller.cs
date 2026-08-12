@@ -37,6 +37,52 @@ internal sealed class PackageInstaller
         return IsInstalled(package) && _stateStore.IsEnabled(package.Id);
     }
 
+    public string? GetRunningPackageVersion(string packageId)
+    {
+        var packageDirectory = GetPackageDirectoryPrefix(packageId);
+
+        foreach (var process in Process.GetProcesses())
+        {
+            using (process)
+            {
+                if (process.Id == Environment.ProcessId)
+                {
+                    continue;
+                }
+
+                string? executablePath;
+                try
+                {
+                    executablePath = process.MainModule?.FileName;
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(executablePath))
+                {
+                    continue;
+                }
+
+                var resolvedExecutablePath = Path.GetFullPath(executablePath);
+                if (!resolvedExecutablePath.StartsWith(packageDirectory, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var relativePath = Path.GetRelativePath(packageDirectory, resolvedExecutablePath);
+                var version = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)[0];
+                if (!string.IsNullOrWhiteSpace(version) && version is not "." and not "..")
+                {
+                    return version;
+                }
+            }
+        }
+
+        return null;
+    }
+
     public IReadOnlyList<string> GetInstalledVersions(string packageId)
     {
         var packageDirectory = Path.Combine(
@@ -238,11 +284,7 @@ internal sealed class PackageInstaller
 
     private static void StopRunningPackageProcesses(string packageId)
     {
-        var packageDirectory = Path.GetFullPath(Path.Combine(
-            LauncherPaths.PackagesDirectory,
-            LauncherPaths.SafePathSegment(packageId)))
-            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-            + Path.DirectorySeparatorChar;
+        var packageDirectory = GetPackageDirectoryPrefix(packageId);
 
         foreach (var process in Process.GetProcesses())
         {
@@ -292,6 +334,15 @@ internal sealed class PackageInstaller
                 }
             }
         }
+    }
+
+    private static string GetPackageDirectoryPrefix(string packageId)
+    {
+        return Path.GetFullPath(Path.Combine(
+            LauncherPaths.PackagesDirectory,
+            LauncherPaths.SafePathSegment(packageId)))
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
     }
 
     private static PackageManifest LoadPackageManifest(string packageDirectory)

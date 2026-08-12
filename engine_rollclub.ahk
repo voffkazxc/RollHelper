@@ -4980,8 +4980,13 @@ RcLaunchServerProcess(forceRestart := 0) {
 }
 
 UiaListClick:
-    if ((A_GuiEvent = "Normal" || A_GuiEvent = "DoubleClick") && A_EventInfo)
-        RcSelectedUiaRow := A_EventInfo
+    Gui, Settings:Default
+    Gui, ListView, UiaListView
+    _selectedRow := LV_GetNext(0, "S")
+    if (!_selectedRow)
+        _selectedRow := LV_GetNext(0, "F")
+    if (_selectedRow)
+        RcSelectedUiaRow := _selectedRow
     if (A_GuiEvent = "DoubleClick")
         GoSub, LaunchScanner
 return
@@ -5063,6 +5068,10 @@ RcGetSelectedUiaRow() {
     Gui, Settings:Default
     Gui, ListView, UiaListView
     _row := LV_GetNext(0, "S")
+    if (_row)
+        return _row
+
+    _row := LV_GetNext(0, "F")
     if (_row)
         return _row
 

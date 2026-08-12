@@ -602,11 +602,18 @@ public partial class MainWindow : Window
                 : "Доступно";
         }
 
-        return _packageInstaller.IsInstalled(package)
-            ? "Установлено"
-            : _packageInstaller.HasInstalledVersion(package.Id)
-                ? "Доступно обновление"
-                : "Доступно";
+        if (_packageInstaller.IsInstalled(package))
+        {
+            var runningVersion = _packageInstaller.GetRunningPackageVersion(package.Id);
+            return !string.IsNullOrWhiteSpace(runningVersion)
+                   && !string.Equals(runningVersion, package.Version, StringComparison.OrdinalIgnoreCase)
+                ? $"Нужен перезапуск ({runningVersion})"
+                : "Установлено";
+        }
+
+        return _packageInstaller.HasInstalledVersion(package.Id)
+            ? "Доступно обновление"
+            : "Доступно";
     }
 
     private void RefreshAllStatuses()
@@ -704,11 +711,20 @@ public partial class MainWindow : Window
             return;
         }
 
-        InstallAndRunButton.Content = _packageInstaller.IsInstalled(selectedRow.Package)
-            ? $"Запустить {selectedRow.DisplayName}"
-            : _packageInstaller.HasInstalledVersion(selectedRow.Package.Id)
+        if (_packageInstaller.IsInstalled(selectedRow.Package))
+        {
+            var runningVersion = _packageInstaller.GetRunningPackageVersion(selectedRow.Package.Id);
+            InstallAndRunButton.Content = !string.IsNullOrWhiteSpace(runningVersion)
+                                           && !string.Equals(runningVersion, selectedRow.Package.Version, StringComparison.OrdinalIgnoreCase)
+                ? $"Перезапустить {selectedRow.DisplayName}"
+                : $"Запустить {selectedRow.DisplayName}";
+        }
+        else
+        {
+            InstallAndRunButton.Content = _packageInstaller.HasInstalledVersion(selectedRow.Package.Id)
                 ? $"Обновить {selectedRow.DisplayName} и запустить"
                 : $"Установить {selectedRow.DisplayName} и запустить";
+        }
         InstallAndRunButton.IsEnabled = true;
     }
 
