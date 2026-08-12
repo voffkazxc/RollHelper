@@ -708,6 +708,7 @@ public partial class MainWindow : Window
         {
             InstallAndRunButton.Content = "Выберите программу";
             InstallAndRunButton.IsEnabled = false;
+            InstallAndRunButton.Style = (Style)FindResource("ProgramActionButtonStyle");
             return;
         }
 
@@ -718,12 +719,14 @@ public partial class MainWindow : Window
                                            && !string.Equals(runningVersion, selectedRow.Package.Version, StringComparison.OrdinalIgnoreCase)
                 ? $"Перезапустить {selectedRow.DisplayName}"
                 : $"Запустить {selectedRow.DisplayName}";
+            InstallAndRunButton.Style = (Style)FindResource("ProgramActionButtonStyle");
         }
         else
         {
             InstallAndRunButton.Content = _packageInstaller.HasInstalledVersion(selectedRow.Package.Id)
                 ? $"Обновить {selectedRow.DisplayName} и запустить"
                 : $"Установить {selectedRow.DisplayName} и запустить";
+            InstallAndRunButton.Style = (Style)FindResource("ProgramUpdateActionButtonStyle");
         }
         InstallAndRunButton.IsEnabled = true;
     }

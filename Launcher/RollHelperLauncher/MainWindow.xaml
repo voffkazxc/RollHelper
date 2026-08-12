@@ -97,6 +97,44 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <Style x:Key="HeaderPrimaryButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Padding" Value="14,7" />
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+
+        <Style x:Key="HeaderCompactButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Background" Value="#F8FAFC" />
+            <Setter Property="BorderBrush" Value="#CBD5E1" />
+            <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
+        </Style>
+
+        <Style x:Key="ProgramActionButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="MinWidth" Value="230" />
+        </Style>
+
+        <Style x:Key="ProgramUpdateActionButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ProgramActionButtonStyle}">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
     </Window.Resources>
 
     <Grid Margin="24">
@@ -133,25 +171,19 @@
             <WrapPanel Grid.Row="1"
                        Margin="0,14,0,0"
                        HorizontalAlignment="Right">
-                <Button x:Name="UpdateLauncherButton"
-                        Content="Проверить обновление лаунчера"
-                        Margin="0,0,10,0"
-                        Padding="12,7"
-                        FontSize="13"
-                        Background="{StaticResource AccentBrush}"
-                        BorderBrush="{StaticResource AccentBrush}"
-                        Foreground="White"
-                        Click="UpdateLauncherButton_Click" />
                 <Button x:Name="RefreshButton"
                         Content="Обновить список программ"
                         Margin="0,0,10,0"
-                        Padding="12,7"
-                        FontSize="13"
+                        Style="{StaticResource HeaderPrimaryButtonStyle}"
                         Click="RefreshButton_Click" />
                 <Button Content="Открыть лог"
-                        Padding="12,7"
-                        FontSize="13"
+                        Margin="0,0,10,0"
+                        Style="{StaticResource HeaderCompactButtonStyle}"
                         Click="OpenLogButton_Click" />
+                <Button x:Name="UpdateLauncherButton"
+                        Content="Проверить обновление лаунчера"
+                        Style="{StaticResource HeaderCompactButtonStyle}"
+                        Click="UpdateLauncherButton_Click" />
             </WrapPanel>
         </Grid>
 
@@ -231,11 +263,14 @@
                                             <Border.Style>
                                                 <Style TargetType="Border">
                                                     <Setter Property="Background" Value="#E0ECFF" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}" Value="True">
-                                                            <Setter Property="Background" Value="#2563EB" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
+                                                     <Style.Triggers>
+                                                         <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}" Value="True">
+                                                             <Setter Property="Background" Value="#2563EB" />
+                                                         </DataTrigger>
+                                                         <DataTrigger Binding="{Binding Status}" Value="Доступно обновление">
+                                                             <Setter Property="Background" Value="#FEF3C7" />
+                                                         </DataTrigger>
+                                                     </Style.Triggers>
                                                 </Style>
                                             </Border.Style>
                                             <TextBlock Text="{Binding Status}"
@@ -245,11 +280,14 @@
                                                 <TextBlock.Style>
                                                     <Style TargetType="TextBlock">
                                                         <Setter Property="Foreground" Value="#1D4ED8" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}" Value="True">
-                                                                <Setter Property="Foreground" Value="White" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
+                                                         <Style.Triggers>
+                                                             <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}" Value="True">
+                                                                 <Setter Property="Foreground" Value="White" />
+                                                             </DataTrigger>
+                                                             <DataTrigger Binding="{Binding Status}" Value="Доступно обновление">
+                                                                 <Setter Property="Foreground" Value="#92400E" />
+                                                             </DataTrigger>
+                                                         </Style.Triggers>
                                                     </Style>
                                                 </TextBlock.Style>
                                             </TextBlock>
@@ -382,11 +420,14 @@
                                                 <Border.Style>
                                                     <Style TargetType="Border">
                                                         <Setter Property="Background" Value="#E0ECFF" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}" Value="True">
-                                                                <Setter Property="Background" Value="#2563EB" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
+                                                             <Style.Triggers>
+                                                                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}" Value="True">
+                                                                     <Setter Property="Background" Value="#2563EB" />
+                                                                 </DataTrigger>
+                                                                 <DataTrigger Binding="{Binding Status}" Value="Доступно обновление">
+                                                                     <Setter Property="Background" Value="#FEF3C7" />
+                                                                 </DataTrigger>
+                                                             </Style.Triggers>
                                                     </Style>
                                                 </Border.Style>
                                                 <TextBlock Text="{Binding Status}"
@@ -396,11 +437,14 @@
                                                     <TextBlock.Style>
                                                         <Style TargetType="TextBlock">
                                                             <Setter Property="Foreground" Value="#1D4ED8" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}" Value="True">
-                                                                    <Setter Property="Foreground" Value="White" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
+                                                             <Style.Triggers>
+                                                                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}" Value="True">
+                                                                     <Setter Property="Foreground" Value="White" />
+                                                                 </DataTrigger>
+                                                                 <DataTrigger Binding="{Binding Status}" Value="Доступно обновление">
+                                                                     <Setter Property="Foreground" Value="#92400E" />
+                                                                 </DataTrigger>
+                                                             </Style.Triggers>
                                                         </Style>
                                                     </TextBlock.Style>
                                                 </TextBlock>
@@ -468,7 +512,7 @@
 
             <Button x:Name="InstallAndRunButton"
                     Grid.Column="2"
-                    MinWidth="230"
+                    Style="{StaticResource ProgramActionButtonStyle}"
                     Content="Выберите программу"
                     IsEnabled="False"
                     Click="InstallAndRunButton_Click" />

@@ -271,12 +271,15 @@ public static class ModuleTestNative {
         Find-ButtonByName -Root $window -Name "Обновить список программ"
         Find-ButtonByName -Root $window -Name "Открыть лог"
     )
-    for ($index = 0; $index -lt ($headerButtons.Count - 1); $index++) {
-        $left = $headerButtons[$index].Current.BoundingRectangle
-        $right = $headerButtons[$index + 1].Current.BoundingRectangle
-        $verticalOverlap = $left.Top -lt $right.Bottom -and $right.Top -lt $left.Bottom
-        if ($verticalOverlap -and $left.Right -gt $right.Left) {
-            throw "Header buttons overlap at laptop window width."
+    for ($leftIndex = 0; $leftIndex -lt $headerButtons.Count; $leftIndex++) {
+        for ($rightIndex = $leftIndex + 1; $rightIndex -lt $headerButtons.Count; $rightIndex++) {
+            $left = $headerButtons[$leftIndex].Current.BoundingRectangle
+            $right = $headerButtons[$rightIndex].Current.BoundingRectangle
+            $verticalOverlap = $left.Top -lt $right.Bottom -and $right.Top -lt $left.Bottom
+            $horizontalOverlap = $left.Left -lt $right.Right -and $right.Left -lt $left.Right
+            if ($verticalOverlap -and $horizontalOverlap) {
+                throw "Header buttons overlap at laptop window width."
+            }
         }
     }
 
