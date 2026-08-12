@@ -87,7 +87,7 @@ Report_CreateGui() {
     Gui, Report:Add, Text, x20 y278 w460 h20 vReportStatusLabel, Зчитую таблицю…
     Gui, Report:Font, s9 Norm c1F2937, Segoe UI
     Gui, Report:Add, Button, x20 y306 w109 h32 gReportRefresh, Оновити
-    Gui, Report:Add, Button, x137 y306 w109 h32 gReportManager, Для керівника
+    Gui, Report:Add, Button, x137 y306 w109 h32 gReportManager, Звіт за день
     Gui, Report:Add, Button, x254 y306 w109 h32 gReportCopy, Копіювати
     Gui, Report:Add, Button, x371 y306 w109 h32 gReportClose, Закрити
     Gui, Report:Show, w500 h358

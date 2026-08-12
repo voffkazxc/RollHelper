@@ -38,8 +38,12 @@ ModuleRegistry_RegisterExternal(moduleId, packageId) {
     global ModuleRegistry_Modules, ModuleRegistry_ExternalPackages
 
     EnvGet, _programRoot, ROLLHELPER_PROGRAM_ROOT
-    if (_programRoot = "")
-        _programRoot := A_LocalAppData . "\Programs\RollHelper"
+    if (_programRoot = "") {
+        EnvGet, _localAppData, LOCALAPPDATA
+        if (_localAppData = "")
+            _localAppData := A_AppData
+        _programRoot := _localAppData . "\Programs\RollHelper"
+    }
     _statePath := _programRoot . "\State\packages.json"
     if !FileExist(_statePath)
         return 0
