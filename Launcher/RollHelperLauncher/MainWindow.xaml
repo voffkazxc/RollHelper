@@ -50,9 +50,9 @@
                     <Setter Property="Background" Value="#F1F5F9" />
                 </Trigger>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#DBEAFE" />
-                    <Setter Property="Foreground" Value="#1E3A8A" />
-                    <Setter Property="BorderBrush" Value="#93C5FD" />
+                    <Setter Property="Background" Value="#CFE1FF" />
+                    <Setter Property="Foreground" Value="#0F172A" />
+                    <Setter Property="BorderBrush" Value="#60A5FA" />
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -66,8 +66,8 @@
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#DBEAFE" />
-                    <Setter Property="Foreground" Value="#172554" />
+                    <Setter Property="Background" Value="#CFE1FF" />
+                    <Setter Property="Foreground" Value="#0F172A" />
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -77,6 +77,11 @@
             <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}" Value="True">
+                    <Setter Property="Foreground" Value="#0F172A" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="ProgramVersionTextStyle" TargetType="TextBlock">
@@ -87,7 +92,7 @@
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}" Value="True">
-                    <Setter Property="Foreground" Value="#334155" />
+                    <Setter Property="Foreground" Value="#0F172A" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -221,13 +226,32 @@
                                         <Border Padding="9,4"
                                                 HorizontalAlignment="Center"
                                                 VerticalAlignment="Center"
-                                                Background="#E0ECFF"
                                                 CornerRadius="10">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="#E0ECFF" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}" Value="True">
+                                                            <Setter Property="Background" Value="#2563EB" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
                                             <TextBlock Text="{Binding Status}"
                                                        FontSize="12"
                                                        FontWeight="SemiBold"
-                                                       Foreground="#1D4ED8"
-                                                       TextTrimming="CharacterEllipsis" />
+                                                       TextTrimming="CharacterEllipsis">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="#1D4ED8" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}" Value="True">
+                                                                <Setter Property="Foreground" Value="White" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
                                         </Border>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
@@ -353,13 +377,32 @@
                                             <Border Padding="9,4"
                                                     HorizontalAlignment="Center"
                                                     VerticalAlignment="Center"
-                                                    Background="#E0ECFF"
                                                     CornerRadius="10">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="#E0ECFF" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}" Value="True">
+                                                                <Setter Property="Background" Value="#2563EB" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
                                                 <TextBlock Text="{Binding Status}"
                                                            FontSize="12"
                                                            FontWeight="SemiBold"
-                                                           Foreground="#1D4ED8"
-                                                           TextTrimming="CharacterEllipsis" />
+                                                           TextTrimming="CharacterEllipsis">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="#1D4ED8" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}" Value="True">
+                                                                    <Setter Property="Foreground" Value="White" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                             </Border>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
