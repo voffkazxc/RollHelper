@@ -12,8 +12,7 @@ ModuleRegistry_Init(A_ScriptDir, "rollclub", "mvp")
 ModuleRegistry_RegisterExternal("duty", "rollclub-duty")
 ModuleRegistry_RegisterExternal("zones", "rollclub-zones")
 
-if (Module_IsEnabled("duty"))
-    RcStopLegacyDutyProcess()
+RcStopLegacyDutyProcess()
 if (Module_IsEnabled("zones"))
     Menu, Tray, Add, 🌍 Зони доставки RollClub, OpenZonesModule
 RhKillDuplicateInstances()
