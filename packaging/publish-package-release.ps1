@@ -159,7 +159,7 @@ if ($Publish) {
     }
 
     $latestManifestUrl = "https://github.com/$Repository/releases/latest/download/release-manifest.json"
-    $response = Invoke-WebRequest -Uri $latestManifestUrl -Method Head
+    $response = Invoke-WebRequest -UseBasicParsing -Uri $latestManifestUrl -Method Get
     if ($response.StatusCode -ne 200) {
         throw "Published manifest is unavailable: $latestManifestUrl"
     }
