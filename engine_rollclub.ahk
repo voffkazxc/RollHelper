@@ -2506,24 +2506,25 @@ OpenSettings:
     Gui, Settings:Color, %RhC_BG%, %RhC_Panel%
 
     Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Tab3, x6 y6 w348 h610 vSettingsTab, WinAPI|PLU коди|Координати
+    Gui, Settings:Add, Tab3, x6 y6 w458 h610 vSettingsTab, WinAPI|PLU коди|Координати
 
     ; ── Вкладка 1: WinAPI scanner ───────────────────────────
     Gui, Settings:Tab, 1
     Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, x16 y36 w320 Center, ЗБЕРЕЖЕНІ WinAPI ЕЛЕМЕНТИ
+    Gui, Settings:Add, Text, x16 y36 w430 Center, WinAPI: ЗАМІНА СТАРИХ ПРИЦІЛІВ
     Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, ListView, x16 y62 w322 h190 vUiaListView gUiaListClick Grid, Назва (роль)|AutomationId / Name
+    Gui, Settings:Add, ListView, x16 y62 w430 h230 vUiaListView gUiaListClick Grid, Назва (роль)|AutomationId / Name|Коорд.
     Gui, Settings:Default
     Gui, ListView, UiaListView
-    LV_ModifyCol(1, 142)
-    LV_ModifyCol(2, 166)
+    LV_ModifyCol(1, 150)
+    LV_ModifyCol(2, 210)
+    LV_ModifyCol(3, 58)
     GoSub, LoadUiaMapToListView
     Gui, Settings:Font, s9 bold c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Button, x16 y262 w156 h32 gLaunchScanner, Додати елемент
-    Gui, Settings:Add, Button, x182 y262 w156 h32 gDeleteSelectedUiaBinding, Видалити вибране
+    Gui, Settings:Add, Button, x16 y302 w210 h32 gLaunchScanner, Замінити вибране
+    Gui, Settings:Add, Button, x236 y302 w210 h32 gDeleteSelectedUiaBinding, Видалити прив'язку
     Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
-    Gui, Settings:Add, Text, x16 y302 w322 h42, Наведіть курсор на кнопку в Syrve та натисніть ліву кнопку миші.`nВиберіть рядок і натисніть «Видалити».
+    Gui, Settings:Add, Text, x16 y342 w430 h50, Виберіть старий приціл у списку, натисніть «Замінити вибране», потім клікніть потрібний елемент у Syrve.`nПоки WinAPI порожній, працює старий координатний fallback.
 
     ; ── Вкладка 2: PLU-коди оператора ─────────────────────────
     Gui, Settings:Tab, 2
@@ -2610,8 +2611,8 @@ OpenSettings:
 
     Gui, Settings:Tab
     Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Button, w322 h35 x16 y630 gSaveSettings, Зберегти та Перезапустити
-    Gui, Settings:Show, w360 h680, Налаштування RollClub
+    Gui, Settings:Add, Button, w430 h35 x16 y630 gSaveSettings, Зберегти та Перезапустити
+    Gui, Settings:Show, w470 h680, Налаштування RollClub
 return
 
 SaveSettings:
@@ -4816,10 +4817,65 @@ return
 ; ========================================================
 ;  WINAPI SCANNER — Roll Club
 ; ========================================================
+RcUiaTargetCatalog() {
+    targets := []
+    targets.Push({role: "Коментар", x: "CommX", y: "CommY"})
+    targets.Push({role: "Карта Клієнта", x: "CardX", y: "CardY"})
+    targets.Push({role: "Кухня", x: "InfoX", y: "InfoY"})
+    targets.Push({role: "Адреса", x: "AddrX", y: "AddrY"})
+    targets.Push({role: "Час", x: "TimeX", y: "TimeY"})
+    targets.Push({role: "Табл. Страв", x: "ItemX", y: "ItemY"})
+    targets.Push({role: "Хрестик Опл.", x: "CrossX", y: "CrossY"})
+    targets.Push({role: "Поле Оплати", x: "CashX", y: "CashY"})
+    targets.Push({role: "Сума Замовлення", x: "SumX", y: "SumY"})
+    targets.Push({role: "Зона CRM (zxc)", zone: "WaitZone"})
+    targets.Push({role: "Авто-Прийом Дзв. (zxc1)", x: "CallX", y: "CallY"})
+    targets.Push({role: "Поле читання адреси", x: "AdrReadX", y: "AdrReadY"})
+    targets.Push({role: "Концепція (самовивіз)", x: "KontsX", y: "KontsY"})
+    targets.Push({role: "Подтвердить (фініш)", x: "ConfirmX", y: "ConfirmY"})
+    targets.Push({role: "Зберегти на точку", x: "SaveX", y: "SaveY"})
+    targets.Push({role: "Найти точку (кнопка iiko)", x: "NaitiX", y: "NaitiY"})
+    targets.Push({role: "Точка (поле для звірки зони)", x: "TochkaX", y: "TochkaY"})
+    targets.Push({role: "Поле Поиск (КЦ)", x: "PoiskX", y: "PoiskY"})
+    targets.Push({role: "1-й рядок списку", x: "RowX", y: "RowY"})
+    return targets
+}
+
+RcUiaCoordLabel(target) {
+    global ConfigPath
+    if (target.HasKey("zone")) {
+        IniRead, x1, %ConfigPath%, WaitZone, X1, 0
+        IniRead, y1, %ConfigPath%, WaitZone, Y1, 0
+        IniRead, x2, %ConfigPath%, WaitZone, X2, 0
+        IniRead, y2, %ConfigPath%, WaitZone, Y2, 0
+        if (x1 = 0 && y1 = 0 && x2 = 0 && y2 = 0)
+            return "—"
+        return x1 . "," . y1 . "→" . x2 . "," . y2
+    }
+
+    IniRead, xVal, %ConfigPath%, Targets, % target.x, 0
+    IniRead, yVal, %ConfigPath%, Targets, % target.y, 0
+    if (xVal = 0 && yVal = 0)
+        return "—"
+    return xVal . "," . yVal
+}
+
 LoadUiaMapToListView:
     Gui, Settings:Default
     Gui, ListView, UiaListView
     LV_Delete()
+    _seenUiaRoles := {}
+    _catalog := RcUiaTargetCatalog()
+    for _idx, _target in _catalog
+    {
+        _role := _target.role
+        IniRead, _savedId, %UIA_MAP_CONFIG%, UiaMap, %_role%, %A_Space%
+        if (_savedId = "ERROR")
+            _savedId := ""
+        _coordLabel := RcUiaCoordLabel(_target)
+        LV_Add("", _role, _savedId, _coordLabel)
+        _seenUiaRoles[_role] := 1
+    }
     IniRead, _uiaKeys, %UIA_MAP_CONFIG%, UiaMap
     if (_uiaKeys = "" || _uiaKeys = "ERROR")
         return
@@ -4832,8 +4888,8 @@ LoadUiaMapToListView:
             continue
         _name := Trim(_pair[1])
         _id := Trim(_pair[2])
-        if (_name != "" && _id != "")
-            LV_Add("", _name, _id)
+        if (_name != "" && _id != "" && !_seenUiaRoles.HasKey(_name))
+            LV_Add("", _name, _id, "інше")
     }
 return
 
@@ -4866,7 +4922,7 @@ RcLaunchServerProcess(forceRestart := 0) {
 
 UiaListClick:
     if (A_GuiEvent = "DoubleClick")
-        GoSub, DeleteSelectedUiaBinding
+        GoSub, LaunchScanner
 return
 
 DeleteSelectedUiaBinding:
@@ -4879,6 +4935,10 @@ DeleteSelectedUiaBinding:
     }
     LV_GetText(_delName, _row, 1)
     LV_GetText(_delValue, _row, 2)
+    if (_delValue = "") {
+        MsgBox, 48, WinAPI Сканер, У ролі "%_delName%" ще немає WinAPI-прив'язки.
+        return
+    }
     Gui, Settings:+OwnDialogs +Disabled
     MsgBox, 292, Видалення WinAPI елемента, Видалити прив'язку?`n`nРоль: %_delName%`nID: %_delValue%
     Gui, Settings:-Disabled
@@ -4895,9 +4955,22 @@ DeleteSelectedUiaBinding:
 return
 
 LaunchScanner:
+    Gui, Settings:Default
+    Gui, ListView, UiaListView
+    _row := LV_GetNext(0, "S")
+    if (!_row) {
+        MsgBox, 48, WinAPI Сканер, Спочатку виберіть старий приціл у списку, який потрібно замінити.
+        return
+    }
+    LV_GetText(_targetRole, _row, 1)
+    LV_GetText(_oldValue, _row, 2)
+    if (_targetRole = "") {
+        MsgBox, 48, WinAPI Сканер, Не вдалося прочитати роль вибраного рядка.
+        return
+    }
     Gui, Settings:Hide
     Sleep, 200
-    MsgBox, 4160, WinAPI Сканер, Наведіть курсор на потрібну кнопку в Syrve та натисніть ліву кнопку миші.
+    MsgBox, 4160, WinAPI Сканер, Замінюємо роль:`n%_targetRole%`n`nНаведіть курсор на потрібний елемент у Syrve та натисніть ліву кнопку миші.
     KeyWait, LButton, Down
     MouseGetPos, _mx, _my, _mHwnd
     try {
@@ -4919,11 +4992,8 @@ LaunchScanner:
             GoSub, OpenSettings
             return
         }
-        InputBox, _newName, Збереження WinAPI елемента, Знайдено: %_saveVal%`n`nВведіть назву ролі (наприклад, КнопкаПодзвонити):,,,,,,,,
-        if (ErrorLevel = 0 && _newName != "") {
-            IniWrite, %_saveVal%, %UIA_MAP_CONFIG%, UiaMap, %_newName%
-            MsgBox, 64, Збережено, Елемент "%_newName%" збережено.
-        }
+        IniWrite, %_saveVal%, %UIA_MAP_CONFIG%, UiaMap, %_targetRole%
+        MsgBox, 64, Збережено, Роль "%_targetRole%" тепер прив'язана через WinAPI.`n`n%_saveVal%
     } catch _ex {
         MsgBox, 48, Помилка UIA, Не вдалося зчитати елемент:`n%_ex%
     }
