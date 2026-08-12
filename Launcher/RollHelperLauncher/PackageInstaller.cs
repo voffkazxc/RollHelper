@@ -192,6 +192,8 @@ internal sealed class PackageInstaller
         LauncherLog.Info($"Entrypoint: {entrypointPath}");
         LauncherLog.Info($"Working directory: {workingDirectory}");
 
+        StopRunningPackageProcesses(package.Id);
+
         var startInfo = new ProcessStartInfo
         {
             FileName = entrypointPath,
@@ -232,6 +234,64 @@ internal sealed class PackageInstaller
         };
 
         return Launch(installedPackage);
+    }
+
+    private static void StopRunningPackageProcesses(string packageId)
+    {
+        var packageDirectory = Path.GetFullPath(Path.Combine(
+            LauncherPaths.PackagesDirectory,
+            LauncherPaths.SafePathSegment(packageId)))
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+
+        foreach (var process in Process.GetProcesses())
+        {
+            using (process)
+            {
+                if (process.Id == Environment.ProcessId)
+                {
+                    continue;
+                }
+
+                string? executablePath;
+                try
+                {
+                    executablePath = process.MainModule?.FileName;
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(executablePath))
+                {
+                    continue;
+                }
+
+                var resolvedExecutablePath = Path.GetFullPath(executablePath);
+                if (!resolvedExecutablePath.StartsWith(packageDirectory, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    LauncherLog.Info($"Stopping previous package process. Package={packageId}, PID={process.Id}");
+                    process.Kill(entireProcessTree: true);
+                    if (!process.WaitForExit(5000))
+                    {
+                        throw new TimeoutException($"Process did not exit within five seconds. PID={process.Id}");
+                    }
+                }
+                catch (Exception exception)
+                {
+                    LauncherLog.Error($"Could not stop the previous package process. Package={packageId}, PID={process.Id}", exception);
+                    throw new InvalidOperationException(
+                        $"Close the running {packageId} program and try again.",
+                        exception);
+                }
+            }
+        }
     }
 
     private static PackageManifest LoadPackageManifest(string packageDirectory)
