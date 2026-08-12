@@ -72,6 +72,14 @@ try
         throw new InvalidOperationException("Missing-state scenario was not created correctly.");
     }
 
+    if (!installer.ReconcileInstalledState(package)
+        || stateStore.Get(package.Id) is not { Enabled: false } reconciledState
+        || !string.Equals(reconciledState.Version, package.Version, StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException("Launcher startup did not reconcile installed module state.");
+    }
+
+    stateStore.Remove(package.Id);
     await installer.InstallAsync(package, progress: null, CancellationToken.None);
     installer.SetEnabled(package, true);
     if (!installer.IsEnabled(package)

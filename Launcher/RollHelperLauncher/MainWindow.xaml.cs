@@ -208,6 +208,10 @@ public partial class MainWindow : Window
 
             _manifestPackages.Clear();
             _manifestPackages.AddRange(manifest.Packages);
+            foreach (var package in _manifestPackages)
+            {
+                _packageInstaller.ReconcileInstalledState(package);
+            }
             _programs.Clear();
 
             foreach (var package in _manifestPackages

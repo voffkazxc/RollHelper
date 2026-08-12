@@ -22,7 +22,14 @@ internal sealed class ManifestClient : IDisposable
     {
         LauncherLog.Info($"Downloading release manifest: {manifestUri}");
 
-        using var response = await _httpClient.GetAsync(manifestUri, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Get, manifestUri);
+        request.Headers.CacheControl = new CacheControlHeaderValue
+        {
+            NoCache = true,
+            NoStore = true,
+            MaxAge = TimeSpan.Zero
+        };
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);

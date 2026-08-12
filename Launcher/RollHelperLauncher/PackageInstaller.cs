@@ -37,6 +37,28 @@ internal sealed class PackageInstaller
         return IsInstalled(package) && _stateStore.IsEnabled(package.Id);
     }
 
+    public bool ReconcileInstalledState(ReleasePackage package)
+    {
+        if (!IsInstalled(package))
+        {
+            return false;
+        }
+
+        var installedState = _stateStore.Get(package.Id);
+        if (installedState is not null
+            && string.Equals(installedState.Version, package.Version, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var enabled = installedState?.Enabled
+            ?? !string.Equals(package.Type, "module", StringComparison.OrdinalIgnoreCase);
+        _stateStore.MarkInstalled(package.Id, package.Version, enabled);
+        LauncherLog.Warning(
+            $"Reconciled installed package state: {package.Id} {package.Version}, enabled={enabled}");
+        return true;
+    }
+
     public string? GetRunningPackageVersion(string packageId)
     {
         var packageDirectory = GetPackageDirectoryPrefix(packageId);
