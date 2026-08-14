@@ -1,6 +1,41 @@
 """RollClub duty reader preserved from the pre-launcher implementation."""
 
 
+def _read_cell(control):
+    """Read a delivery-grid cell without depending on the mutable bridge module."""
+    name = ""
+    try:
+        name = (control.Name or "").strip()
+    except Exception:
+        pass
+
+    column = name.split(" row ")[0].strip() if " row " in name else name
+
+    def read_value(candidate):
+        for getter in (
+            lambda item: item.GetValuePattern().Value,
+            lambda item: item.GetLegacyIAccessiblePattern().Value,
+        ):
+            try:
+                value = getter(candidate)
+                if value and str(value).strip():
+                    return str(value).strip()
+            except Exception:
+                pass
+        return ""
+
+    value = read_value(control)
+    if not value:
+        try:
+            for child in control.GetChildren():
+                value = read_value(child)
+                if value:
+                    break
+        except Exception:
+            pass
+    return column, value
+
+
 def read_kc_list(bridge, brand="rollclub"):
     """Read visible RollClub delivery rows using the original cached UIA flow."""
     import time
@@ -89,6 +124,7 @@ def read_kc_list(bridge, brand="rollclub"):
     callback_count = 0
     no_post_count = 0
     cancelled_count = 0
+    cell_error_count = 0
 
     try:
         for row in data_panel.GetChildren():
@@ -102,10 +138,10 @@ def read_kc_list(bridge, brand="rollclub"):
                     column = name.split(" row ")[0].strip() if " row " in name else name
                     if column not in needed_columns:
                         continue
-                    _, value = bridge._kc_cell(cell)
+                    _, value = _read_cell(cell)
                     values[column] = value
             except Exception:
-                pass
+                cell_error_count += 1
 
             delivery = {
                 "no": values.get("№", ""),
@@ -136,25 +172,29 @@ def read_kc_list(bridge, brand="rollclub"):
 
     reason = ""
     if take is None:
-        reason = (
-            "всього %d: зайнято %d, передзвонити %d, без Пост %d, відмінені %d"
-            % (
-                len(rows),
-                busy_count,
-                callback_count,
-                no_post_count,
-                cancelled_count,
+        if rows and not any(row["no"] for row in rows):
+            reason = "рядки знайдені, але значення клітинок не прочитані"
+        else:
+            reason = (
+                "всього %d: зайнято %d, передзвонити %d, без Пост %d, відмінені %d"
+                % (
+                    len(rows),
+                    busy_count,
+                    callback_count,
+                    no_post_count,
+                    cancelled_count,
+                )
             )
-        )
 
     bridge._log(
-        "KC-LIST LEGACY timing s: cached=%d find=%.2f read_rows=%.2f TOTAL=%.2f rows=%d"
+        "KC-LIST LEGACY timing s: cached=%d find=%.2f read_rows=%.2f TOTAL=%.2f rows=%d cell_errors=%d"
         % (
             cached,
             grid_ready_at - started_at,
             time.perf_counter() - grid_ready_at,
             time.perf_counter() - started_at,
             len(rows),
+            cell_error_count,
         )
     )
     return {
