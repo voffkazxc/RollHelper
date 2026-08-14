@@ -68,6 +68,7 @@ if ($RebuildDuty) {
 } else {
     throw "Source manifest has no rollclub-duty package. Use -RebuildDuty for the first release."
 }
+$dutyPackage.displayName = "Дежурство заказов (F4)"
 
 if ($RebuildZones) {
     $zonesBuild = & (Join-Path $PSScriptRoot "build-rollclub-zones-module.ps1") `
@@ -91,6 +92,7 @@ if ($RebuildZones) {
 } else {
     throw "Source manifest has no rollclub-zones package. Use -RebuildZones for the first release."
 }
+$zonesPackage.displayName = "Зони доставки RollClub"
 
 $packages = @()
 foreach ($package in @($sourceManifest.packages)) {
@@ -125,11 +127,10 @@ if ($Publish) {
 Оновлено RollClub MVP без змін RollHouse та його доповнень.
 
 - RollClub: $RollClubVersion
-- WinAPI-прив'язки зберігаються між оновленнями пакета
-- виправлено вибір, заміну та видалення елементів у WinAPI-сканері
-- тимчасові числові ID позначаються попередженням і не створюються повторно
-- через WinAPI підключено першу страву, видалення оплати, пошук точки та фінішні кнопки
-- застарілі ролі CRM і автоприйому дзвінків прибрано зі списку
+- повернуто еталонний кешований пошук замовлень F4 з версії до лаунчера
+- після першого пошуку список читається з кешу без повторного обходу всього дерева Syrve
+- RollClub завжди запускає сервер зі свого встановленого пакета
+- модуль F4 більше не створює другий процес AHK і не конкурує за гарячу клавішу
 - RollHouse, його доповнення та лаунчер без змін
 "@ | Set-Content -LiteralPath $notesPath -Encoding UTF8
 

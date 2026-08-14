@@ -99,6 +99,17 @@ foreach ($fileName in $serverFiles) {
 }
 Copy-Item -LiteralPath (Join-Path $sourceServer "static") -Destination $serverRoot -Recurse
 
+# RollClub duty keeps the proven pre-launcher UIA reader. It is intentionally
+# brand-local so changes for RollHouse cannot alter F4 behaviour again.
+Copy-Item -LiteralPath (Join-Path $repoRoot "brands\rollclub\server\rollclub_kc_legacy.py") -Destination $serverRoot
+$serverAppPath = Join-Path $serverRoot "app.py"
+$serverAppText = [IO.File]::ReadAllText($serverAppPath, [Text.Encoding]::UTF8)
+if ($serverAppText -notmatch "import rollclub_kc_legacy as _rollclub_kc") {
+    $serverAppText = $serverAppText -replace "import telegram as _tg", "import telegram as _tg`r`nimport rollclub_kc_legacy as _rollclub_kc"
+}
+$serverAppText = $serverAppText -replace "_bridge\.read_kc_list\(brand=brand\)", "_rollclub_kc.read_kc_list(_bridge, brand=brand)"
+[IO.File]::WriteAllText($serverAppPath, $serverAppText, [Text.Encoding]::UTF8)
+
 $syncScriptPath = Join-Path $serverRoot "sync_rollclub_kitchens.py"
 $syncScriptText = [IO.File]::ReadAllText($syncScriptPath, [Text.Encoding]::UTF8)
 if ($syncScriptText -notmatch "ROLLHELPER_ROLLCLUB_USERDATA") {
@@ -138,6 +149,8 @@ $startScript = @"
 @echo off
 setlocal
 cd /d "%~dp0"
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":5000 " ^| findstr LISTENING') do taskkill /PID %%a /F >nul 2>&1
+timeout /t 1 /nobreak >nul
 start "RollClub Server" /min "%~dp0runtime\python\pythonw.exe" "%~dp0server\app.py"
 start "RollClub" "%~dp0RollHelper\AutoHotkeyU64.exe" "%~dp0RollHelper\engine_rollclub.ahk"
 endlocal
