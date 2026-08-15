@@ -23,7 +23,7 @@ $displayNames = @{
     "rollhouse" = "RollHouse"
     "rollhouse-report-load" = "Отчёт — нагрузка"
     "rollclub" = "RollClub"
-    "rollclub-duty" = "Дежурство заказов (F4)"
+    "rollclub-duty" = "Дежурство заказов (Ctrl+F4)"
 }
 
 foreach ($package in @($manifest.packages)) {

@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+import re
 import unittest
 
 
@@ -118,6 +119,13 @@ class RollClubDutyCacheTests(unittest.TestCase):
 
         positions = [source.index(marker, source.index("; opened -> read")) for marker in markers]
         self.assertEqual(positions, sorted(positions))
+
+    def test_duty_uses_ctrl_f4_and_plain_f4_is_free(self):
+        engine_path = MODULE_PATH.parents[3] / "engine_rollclub.ahk"
+        source = engine_path.read_text(encoding="utf-8-sig")
+
+        self.assertRegex(source, r"(?m)^\^F4::\s*$")
+        self.assertIsNone(re.search(r"(?m)^F4::\s*$", source))
 
 
 if __name__ == "__main__":

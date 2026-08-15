@@ -54,7 +54,7 @@ if ($RebuildDuty) {
     $dutyPackage = [ordered]@{
         id = "rollclub-duty"
         type = "module"
-        displayName = "Дежурство заказов (F4)"
+        displayName = "Дежурство заказов (Ctrl+F4)"
         version = $DutyVersion
         extends = "rollclub"
         requires = @(
@@ -68,7 +68,7 @@ if ($RebuildDuty) {
 } else {
     throw "Source manifest has no rollclub-duty package. Use -RebuildDuty for the first release."
 }
-$dutyPackage.displayName = "Дежурство заказов (F4)"
+$dutyPackage.displayName = "Дежурство заказов (Ctrl+F4)"
 
 if ($RebuildZones) {
     $zonesBuild = & (Join-Path $PSScriptRoot "build-rollclub-zones-module.ps1") `

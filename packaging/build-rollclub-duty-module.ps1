@@ -29,7 +29,7 @@ Get-ChildItem -LiteralPath $packageRoot -Filter "*.ahk" | ForEach-Object {
 $packageDescription = @{
     schema = 1
     id = "rollclub-duty"
-    displayName = "Дежурство заказов (F4)"
+    displayName = "Дежурство заказов (Ctrl+F4)"
     version = $Version
     entrypoint = @{
         file = "rollclub_duty.ahk"

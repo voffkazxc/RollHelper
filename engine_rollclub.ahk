@@ -60,8 +60,9 @@ else
 ; ========================================================
 ; АВТОСТВОРЕННЯ КОНФІГУ якщо немає
 ; ========================================================
-ConfigPath := A_ScriptDir "\brands\rollclub\RkConfig.ini"
-global UIA_MAP_CONFIG := RcPrepareUiaMapConfig(ConfigPath)
+PackageConfigPath := A_ScriptDir "\brands\rollclub\RkConfig.ini"
+ConfigPath := RcPrepareMainConfig(PackageConfigPath)
+global UIA_MAP_CONFIG := RcPrepareUiaMapConfig(PackageConfigPath)
 rcLogPath  := A_ScriptDir "\siv_debug.log"
 
 if !FileExist(ConfigPath) {
@@ -286,6 +287,11 @@ global kcLastNo    := ""  ; останній помічений № (щоб не
 global kcPaused    := 0   ; пауза монітора: чекаємо Ctrl+Enter оператора
 global RcZonesOk   := 0   ; 1 = KML завантажено
 global RcZonesDataStamp := ""
+global RcZoneBoundaryWarnMeters := 100
+global RcLastZoneBoundaryMeters := -1
+global RcLastZoneUncertain := 0
+global RcLastGeocodeApprox := 0
+global RcLastZoneOverlap := ""
 
 ; ========================================================
 ; ГАРЯЧІ КЛАВІШІ
@@ -301,7 +307,7 @@ if (RcZonesModuleEnabled)
 
 return
 
-F4::
+^F4::
     if (!Module_IsEnabled("duty"))
         return
     GoSub, KcDutyToggle
@@ -692,9 +698,89 @@ RcUserDataDir() {
     return dir
 }
 
+RcPrepareMainConfig(packageConfig) {
+    userConfig := RcUserDataDir() . "\RkConfig.ini"
+    if (!FileExist(userConfig) || RcMainConfigScore(userConfig) = 0) {
+        if FileExist(userConfig) {
+            brokenBackup := userConfig . ".broken-" . A_Now . ".bak"
+            FileCopy, %userConfig%, %brokenBackup%, 1
+        }
+        bestConfig := RcFindBestMainConfig(packageConfig)
+        if (bestConfig != "")
+            FileCopy, %bestConfig%, %userConfig%, 1
+        else
+            FileAppend,, %userConfig%, UTF-16
+    }
+    RcMergeMainConfigDefaults(packageConfig, userConfig)
+    return userConfig
+}
+
+RcFindBestMainConfig(packageConfig) {
+    bestConfig := ""
+    bestScore := -1
+    bestTime := 0
+    versionsRoot := A_ScriptDir . "\..\.."
+    pattern := versionsRoot . "\*\RollHelper\brands\rollclub\RkConfig.ini"
+    Loop, Files, %pattern%, F
+    {
+        score := RcMainConfigScore(A_LoopFileFullPath)
+        FileGetTime, modified, %A_LoopFileFullPath%, M
+        if (score > bestScore || (score = bestScore && modified > bestTime)) {
+            bestScore := score
+            bestTime := modified
+            bestConfig := A_LoopFileFullPath
+        }
+    }
+    packageScore := RcMainConfigScore(packageConfig)
+    if (packageScore > bestScore)
+        bestConfig := packageConfig
+    return bestScore > 0 || packageScore > 0 ? bestConfig : ""
+}
+
+RcMainConfigScore(configPath) {
+    if !FileExist(configPath)
+        return 0
+    checks := [["Targets", "CommX"], ["Targets", "CommY"], ["Targets", "InfoX"], ["Targets", "AddrX"], ["Targets", "ItemX"], ["PLU", "SticksNorm"], ["PLU", "SticksEdu"], ["PLU_SIV", "Soy"], ["Hotkeys", "Main"]]
+    score := 0
+    for _, pair in checks {
+        sectionName := pair[1]
+        keyName := pair[2]
+        IniRead, value, %configPath%, %sectionName%, %keyName%, __MISSING__
+        if (value != "__MISSING__" && value != "ERROR" && value != "")
+            score++
+    }
+    return score
+}
+
+RcMergeMainConfigDefaults(packageConfig, userConfig) {
+    if !FileExist(packageConfig)
+        return
+    sections := ["Targets", "Sticks", "SIV", "PLU", "PLU_SIV", "Hotkeys", "WaitZone", "Window", "TargetsRel", "Calib", "Payment", "UI", "Main", "Features"]
+    for _, sectionName in sections {
+        IniRead, sectionText, %packageConfig%, %sectionName%
+        if (sectionText = "" || sectionText = "ERROR")
+            continue
+        Loop, Parse, sectionText, `n, `r
+        {
+            line := A_LoopField
+            separator := InStr(line, "=")
+            if (!separator)
+                continue
+            keyName := Trim(SubStr(line, 1, separator - 1))
+            defaultValue := SubStr(line, separator + 1)
+            if (keyName = "")
+                continue
+            IniRead, currentValue, %userConfig%, %sectionName%, %keyName%, __MISSING__
+            if (currentValue = "__MISSING__" || currentValue = "ERROR")
+                IniWrite, %defaultValue%, %userConfig%, %sectionName%, %keyName%
+        }
+    }
+}
+
 RcPrepareUiaMapConfig(packageConfig) {
     userConfig := RcUserDataDir() . "\RkUiaMap.ini"
-    if FileExist(userConfig) {
+    IniRead, legacyImported, %userConfig%, Migration, LegacyImported, 0
+    if (FileExist(userConfig) && (RcIniSectionEntryCount(userConfig, "UiaMap") > 0 || legacyImported = 1)) {
         RcCleanupUiaMap(userConfig)
         return userConfig
     }
@@ -718,6 +804,7 @@ RcPrepareUiaMapConfig(packageConfig) {
         RcCopyIniSection(bestConfig, userConfig, "UiaMap")
         RcCopyIniSection(bestConfig, userConfig, "UiaHidden")
     }
+    IniWrite, 1, %userConfig%, Migration, LegacyImported
     RcCleanupUiaMap(userConfig)
     return userConfig
 }
@@ -2307,7 +2394,7 @@ return
 
 KcDutyToggle:
     OpCoord_Event("DutyScanning", "toggle", "KcDutyToggle", "was_dutyOn=" . dutyOn . ";punchBusy=" . rhPunchBusy . ";inDutyTake=" . _inDutyTake)
-    ; F4 з доповнення «Дежурство заказов»: бере перше вільне замовлення і зупиняється.
+    ; Ctrl+F4 з доповнення «Дежурство заказов»: бере перше вільне замовлення і зупиняється.
     FileAppend, % "[" . A_Now . "] F4-TOGGLE (was dutyOn=" . dutyOn . ")`n", %A_ScriptDir%\parse_debug.log
     if (rhPunchBusy || _inDutyTake)
     {
@@ -2316,7 +2403,7 @@ KcDutyToggle:
         SetTimer, KcDutyTick, Off
         SetTimer, KcMonitor, Off
         FileAppend, % "[" . A_Now . "] F4 BLOCKED — punchBusy=" . rhPunchBusy . " inTake=" . _inDutyTake . "`n", %A_ScriptDir%\parse_debug.log
-        ToolTip, F4 заблоковано: йде пробиття
+        ToolTip, Ctrl+F4 заблоковано: йде пробиття
         SetTimer, RemoveToolTip, -1500
         return
     }
@@ -2330,7 +2417,7 @@ KcDutyToggle:
     {
         kcStop := 0
         kcTook := 0
-        ToolTip, ⏳ Дежурю по заказах... (F4 — стоп)
+        ToolTip, ⏳ Дежурю по заказах... (Ctrl+F4 — стоп)
         SetTimer, KcDutyTick, 1500
     }
     else
@@ -2427,7 +2514,7 @@ KcMonitor:
     SetTitleMatchMode, 2
     if !WinExist("Syrve Office")
     {
-        ToolTip, F4: вікно РК (Syrve Office) не знайдено — відкрий Доставки
+        ToolTip, Ctrl+F4: вікно РК (Syrve Office) не знайдено — відкрий Доставки
         SetTimer, RemoveToolTip, -6000
         kcBusy := 0
         return
@@ -2447,16 +2534,16 @@ KcMonitor:
     if (kcStop)
     {
         kcBusy := 0
-        ToolTip, Стоп (F4)
+        ToolTip, Стоп (Ctrl+F4)
         SetTimer, RemoveToolTip, -1500
         return
     }
     ; 2) список свіжий — тепер питаємо сервер (+ серверний таймінг у bridge.log)
-    ToolTip, F4: питаю сервер про годний заказ...
+    ToolTip, Ctrl+F4: питаю сервер про годний заказ...
     listResp := RhGet("/api/iiko/kc-list", 12000)
     if InStr(listResp, "ACTIVE_ORDER_CARD")
     {
-        ToolTip, F4: активна карточка — переходжу на Доставки...
+        ToolTip, Ctrl+F4: активна карточка — переходжу на Доставки...
         Send, {Esc}
         Sleep, 180
         Send, ^{Tab}
@@ -2466,7 +2553,7 @@ KcMonitor:
     if InStr(listResp, "ACTIVE_ORDER_CARD")
     {
         kcBusy := 0
-        ToolTip, F4: досі карточка заказа — відкрий вкладку Доставки
+        ToolTip, Ctrl+F4: досі карточка заказа — відкрий вкладку Доставки
         SetTimer, RemoveToolTip, -6000
         return
     }
@@ -2474,7 +2561,7 @@ KcMonitor:
     if (kcStop)
     {
         kcBusy := 0
-        ToolTip, Стоп (F4) — заказ не чіпаю
+        ToolTip, Стоп (Ctrl+F4) — заказ не чіпаю
         SetTimer, RemoveToolTip, -1500
         return
     }
@@ -2487,12 +2574,12 @@ KcMonitor:
         _reason := ""
         RegExMatch(listResp, "reason""\s*:\s*""([^""]*)", _rM)
         _reason := _rM1
-        ToolTip, % "F4: нема вільних для взяття`n" . _reason
+        ToolTip, % "Ctrl+F4: нема вільних для взяття`n" . _reason
         SetTimer, RemoveToolTip, -8000
         kcBusy := 0
         return
     }
-    ToolTip, F4: беру заказ №%takeNo%...
+    ToolTip, Ctrl+F4: беру заказ №%takeNo%...
     ; 3) тільки зараз можна чіпати поле Поиск: сервер підтвердив, що активний список Доставки.
     ; --- capture: Poisk -> open first row ---
     if (poiskX != 0)
@@ -2514,7 +2601,7 @@ KcMonitor:
     _cnt := _cM1
     if (_cnt != "1" || !InStr(_chk, takeNo))
     {
-        ToolTip, % "F4: список не звузився до №" . takeNo . " — НЕ пробиваю (не на Доставках?)"
+        ToolTip, % "Ctrl+F4: список не звузився до №" . takeNo . " — НЕ пробиваю (не на Доставках?)"
         SetTimer, RemoveToolTip, -5000
         kcBusy := 0
         return
@@ -2524,7 +2611,7 @@ KcMonitor:
     if (kcStop)
     {
         kcBusy := 0
-        ToolTip, Стоп (F4) — заказ не відкриваю
+        ToolTip, Стоп (Ctrl+F4) — заказ не відкриваю
         SetTimer, RemoveToolTip, -1500
         return
     }
@@ -2566,7 +2653,7 @@ KcMonitor:
     if (kcStop)
     {
         kcBusy := 0
-        ToolTip, Стоп (F4) — не пробиваю
+        ToolTip, Стоп (Ctrl+F4) — не пробиваю
         SetTimer, RemoveToolTip, -1500
         return
     }
@@ -2700,8 +2787,8 @@ OpenSettings:
     Gui, Settings:Add, Button, w290 x10  y+5 gSetNaitiTarget,  Найти точку (кнопка iiko)
     Gui, Settings:Add, Button, w290 x10  y+5 gSetTochkaTarget, Точка (поле для звірки зони)
     if (Module_IsEnabled("duty")) {
-        Gui, Settings:Add, Button, w140 x10  y+5 gSetPoiskTarget,  F4: Пошук доставок
-        Gui, Settings:Add, Button, w140 x+10 yp  gSetRowTarget,    F4: Перший рядок
+        Gui, Settings:Add, Button, w140 x10  y+5 gSetPoiskTarget,  Ctrl+F4: Пошук
+        Gui, Settings:Add, Button, w140 x+10 yp  gSetRowTarget,    Ctrl+F4: Рядок
     }
 
     Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
@@ -2743,21 +2830,21 @@ return
 SaveSettings:
     Gui, Settings:Submit
     uiThemeSave := InStr(NewUiTheme, "Dark") ? "dark" : "light"
-    IniWrite, %uiThemeSave%, RkConfig.ini, UI, Theme
+    IniWrite, %uiThemeSave%, %ConfigPath%, UI, Theme
 
     CHECK_POINT_ENABLED := NewCheckPoint
-    IniWrite, %NewCheckPoint%, RkConfig.ini, Main, CheckPoint
-    IniWrite, %NewSticksNorm%, RkConfig.ini, PLU, SticksNorm
-    IniWrite, %NewSticksEdu%,  RkConfig.ini, PLU, SticksEdu
-    IniWrite, %NewUtensils%,   RkConfig.ini, PLU, Utensils
-    IniWrite, %NewPluFork%,    RkConfig.ini, PLU, Fork
-    IniWrite, %NewPluKnife%,   RkConfig.ini, PLU, Knife
-    IniWrite, %NewPluSoy%,     RkConfig.ini, PLU_SIV, Soy
-    IniWrite, %NewPluGinger%,  RkConfig.ini, PLU_SIV, Ginger
-    IniWrite, %NewPluWasabi%,  RkConfig.ini, PLU_SIV, Wasabi
-    IniWrite, %NewHkMain%,   RkConfig.ini, Hotkeys, Main
-    IniWrite, %NewHkSiv%,    RkConfig.ini, Hotkeys, Siv
-    IniWrite, %NewHkFinish%, RkConfig.ini, Hotkeys, Finish
+    IniWrite, %NewCheckPoint%, %ConfigPath%, Main, CheckPoint
+    IniWrite, %NewSticksNorm%, %ConfigPath%, PLU, SticksNorm
+    IniWrite, %NewSticksEdu%,  %ConfigPath%, PLU, SticksEdu
+    IniWrite, %NewUtensils%,   %ConfigPath%, PLU, Utensils
+    IniWrite, %NewPluFork%,    %ConfigPath%, PLU, Fork
+    IniWrite, %NewPluKnife%,   %ConfigPath%, PLU, Knife
+    IniWrite, %NewPluSoy%,     %ConfigPath%, PLU_SIV, Soy
+    IniWrite, %NewPluGinger%,  %ConfigPath%, PLU_SIV, Ginger
+    IniWrite, %NewPluWasabi%,  %ConfigPath%, PLU_SIV, Wasabi
+    IniWrite, %NewHkMain%,   %ConfigPath%, Hotkeys, Main
+    IniWrite, %NewHkSiv%,    %ConfigPath%, Hotkeys, Siv
+    IniWrite, %NewHkFinish%, %ConfigPath%, Hotkeys, Finish
     MsgBox, 64, Збережено, Налаштування збережено! Перезапуск..., 2
     Reload
 return
@@ -2776,8 +2863,8 @@ SetCommTarget:
     MsgBox, 4160, Налаштування, Клікни в поле КОМЕНТАР.
     KeyWait, LButton, Down
     MouseGetPos, commX, commY
-    IniWrite, %commX%, RkConfig.ini, Targets, CommX
-    IniWrite, %commY%, RkConfig.ini, Targets, CommY
+    IniWrite, %commX%, %ConfigPath%, Targets, CommX
+    IniWrite, %commY%, %ConfigPath%, Targets, CommY
     Gui, Settings:Show
 return
 SetCardTarget:
@@ -2786,8 +2873,8 @@ SetCardTarget:
     MsgBox, 4160, Налаштування, Клікни в поле КАРТА КЛІЄНТА.
     KeyWait, LButton, Down
     MouseGetPos, cardX, cardY
-    IniWrite, %cardX%, RkConfig.ini, Targets, CardX
-    IniWrite, %cardY%, RkConfig.ini, Targets, CardY
+    IniWrite, %cardX%, %ConfigPath%, Targets, CardX
+    IniWrite, %cardY%, %ConfigPath%, Targets, CardY
     Gui, Settings:Show
 return
 SetInfoTarget:
@@ -2796,8 +2883,8 @@ SetInfoTarget:
     MsgBox, 4160, Налаштування - КУХНЯ, КУХНЯ = комірка "Комментарий" у РЯДКУ СТРАВИ (стовпець Комментарий навпроти блюда).`n`nНЕ став на "Улица" і НЕ на "Информация о клиенте" - туди не можна (вулиця зітреться, кухня буде порожня).`n`nКлікни в ту комірку коментаря страви.
     KeyWait, LButton, Down
     MouseGetPos, infoX, infoY
-    IniWrite, %infoX%, RkConfig.ini, Targets, InfoX
-    IniWrite, %infoY%, RkConfig.ini, Targets, InfoY
+    IniWrite, %infoX%, %ConfigPath%, Targets, InfoX
+    IniWrite, %infoY%, %ConfigPath%, Targets, InfoY
     Gui, Settings:Show
 return
 SetAddrTarget:
@@ -2806,8 +2893,8 @@ SetAddrTarget:
     MsgBox, 4160, Налаштування - АДРЕСА, АДРЕСА = поле "Примечание к адресу" (блок Доставка праворуч, під Районом).`n`nКлікни туди.
     KeyWait, LButton, Down
     MouseGetPos, addrX, addrY
-    IniWrite, %addrX%, RkConfig.ini, Targets, AddrX
-    IniWrite, %addrY%, RkConfig.ini, Targets, AddrY
+    IniWrite, %addrX%, %ConfigPath%, Targets, AddrX
+    IniWrite, %addrY%, %ConfigPath%, Targets, AddrY
     Gui, Settings:Show
 return
 SetTimeTarget:
@@ -2816,8 +2903,8 @@ SetTimeTarget:
     MsgBox, 4160, Налаштування, Клікни в ПОЛЕ ЧАСУ.
     KeyWait, LButton, Down
     MouseGetPos, timeX, timeY
-    IniWrite, %timeX%, RkConfig.ini, Targets, TimeX
-    IniWrite, %timeY%, RkConfig.ini, Targets, TimeY
+    IniWrite, %timeX%, %ConfigPath%, Targets, TimeX
+    IniWrite, %timeY%, %ConfigPath%, Targets, TimeY
     Gui, Settings:Show
 return
 SetItemTarget:
@@ -2826,8 +2913,8 @@ SetItemTarget:
     MsgBox, 4160, Налаштування, Клікни в ТАБЛИЦЮ СТРАВ.
     KeyWait, LButton, Down
     MouseGetPos, itemX, itemY
-    IniWrite, %itemX%, RkConfig.ini, Targets, ItemX
-    IniWrite, %itemY%, RkConfig.ini, Targets, ItemY
+    IniWrite, %itemX%, %ConfigPath%, Targets, ItemX
+    IniWrite, %itemY%, %ConfigPath%, Targets, ItemY
     Gui, Settings:Show
 return
 SetCrossTarget:
@@ -2836,8 +2923,8 @@ SetCrossTarget:
     MsgBox, 4160, Налаштування, Клікни на ХРЕСТИК оплати.
     KeyWait, LButton, Down
     MouseGetPos, crossX, crossY
-    IniWrite, %crossX%, RkConfig.ini, Targets, CrossX
-    IniWrite, %crossY%, RkConfig.ini, Targets, CrossY
+    IniWrite, %crossX%, %ConfigPath%, Targets, CrossX
+    IniWrite, %crossY%, %ConfigPath%, Targets, CrossY
     Gui, Settings:Show
 return
     total := A_Hour*60 + A_Min + CalcType
@@ -2852,8 +2939,8 @@ SetCashTarget:
     MsgBox, 4160, Налаштування, Клікни в ПОЛЕ ОПЛАТИ.
     KeyWait, LButton, Down
     MouseGetPos, cashX, cashY
-    IniWrite, %cashX%, RkConfig.ini, Targets, CashX
-    IniWrite, %cashY%, RkConfig.ini, Targets, CashY
+    IniWrite, %cashX%, %ConfigPath%, Targets, CashX
+    IniWrite, %cashY%, %ConfigPath%, Targets, CashY
     Gui, Settings:Show
 return
 SetSumTarget:
@@ -2862,8 +2949,8 @@ SetSumTarget:
     MsgBox, 4160, Налаштування, Клікни в поле СУМИ.
     KeyWait, LButton, Down
     MouseGetPos, sumX, sumY
-    IniWrite, %sumX%, RkConfig.ini, Targets, SumX
-    IniWrite, %sumY%, RkConfig.ini, Targets, SumY
+    IniWrite, %sumX%, %ConfigPath%, Targets, SumX
+    IniWrite, %sumY%, %ConfigPath%, Targets, SumY
     Gui, Settings:Show
 return
 CalibrateWaitZoneFromSettings:
@@ -2878,8 +2965,8 @@ SetCallTarget:
     MsgBox, 4160, Налаштування, Клікни в ОБЛАСТЬ ДЗВІНКА (Приціл для zxc1.png).
     KeyWait, LButton, Down
     MouseGetPos, callX, callY
-    IniWrite, %callX%, RkConfig.ini, Targets, CallX
-    IniWrite, %callY%, RkConfig.ini, Targets, CallY
+    IniWrite, %callX%, %ConfigPath%, Targets, CallX
+    IniWrite, %callY%, %ConfigPath%, Targets, CallY
     Gui, Settings:Show
 return
 SetAdrReadTarget:
@@ -2888,8 +2975,8 @@ SetAdrReadTarget:
     MsgBox, 4160, Налаштування, Клікни в поле, де відображається АДРЕСА заказу (звідки скрипт буде ЧИТАТИ адресу для детекту міста).
     KeyWait, LButton, Down
     MouseGetPos, adrReadX, adrReadY
-    IniWrite, %adrReadX%, RkConfig.ini, Targets, AdrReadX
-    IniWrite, %adrReadY%, RkConfig.ini, Targets, AdrReadY
+    IniWrite, %adrReadX%, %ConfigPath%, Targets, AdrReadX
+    IniWrite, %adrReadY%, %ConfigPath%, Targets, AdrReadY
     Gui, Settings:Show
 return
 SetKontsTarget:
@@ -2898,8 +2985,8 @@ SetKontsTarget:
     MsgBox, 4160, Налаштування, Клікни в поле КОНЦЕПЦІЯ в iiko (для самовивозів Садовий проїзд).
     KeyWait, LButton, Down
     MouseGetPos, kontsX, kontsY
-    IniWrite, %kontsX%, RkConfig.ini, Targets, KontsX
-    IniWrite, %kontsY%, RkConfig.ini, Targets, KontsY
+    IniWrite, %kontsX%, %ConfigPath%, Targets, KontsX
+    IniWrite, %kontsY%, %ConfigPath%, Targets, KontsY
     Gui, Settings:Show
 return
 
@@ -2909,8 +2996,8 @@ SetConfirmTarget:
     MsgBox, 4160, Налаштування, Клікни в кнопку "Подтвердить" (унизу зліва вікна заказу iiko).
     KeyWait, LButton, Down
     MouseGetPos, confirmX, confirmY
-    IniWrite, %confirmX%, RkConfig.ini, Targets, ConfirmX
-    IniWrite, %confirmY%, RkConfig.ini, Targets, ConfirmY
+    IniWrite, %confirmX%, %ConfigPath%, Targets, ConfirmX
+    IniWrite, %confirmY%, %ConfigPath%, Targets, ConfirmY
     Gui, Settings:Show
 return
 
@@ -2920,8 +3007,8 @@ SetSaveTarget:
     MsgBox, 4160, Налаштування, Клікни в кнопку "Сохранить на точку" (унизу справа вікна заказу iiko).
     KeyWait, LButton, Down
     MouseGetPos, saveX, saveY
-    IniWrite, %saveX%, RkConfig.ini, Targets, SaveX
-    IniWrite, %saveY%, RkConfig.ini, Targets, SaveY
+    IniWrite, %saveX%, %ConfigPath%, Targets, SaveX
+    IniWrite, %saveY%, %ConfigPath%, Targets, SaveY
     Gui, Settings:Show
 return
 
@@ -2931,8 +3018,8 @@ SetNaitiTarget:
     MsgBox, 4160, Налаштування, Клікни в кнопку "Найти точку" (справа у блоці Доставка iiko).
     KeyWait, LButton, Down
     MouseGetPos, naitiX, naitiY
-    IniWrite, %naitiX%, RkConfig.ini, Targets, NaitiX
-    IniWrite, %naitiY%, RkConfig.ini, Targets, NaitiY
+    IniWrite, %naitiX%, %ConfigPath%, Targets, NaitiX
+    IniWrite, %naitiY%, %ConfigPath%, Targets, NaitiY
     Gui, Settings:Show
 return
 
@@ -2942,8 +3029,8 @@ SetTochkaTarget:
     MsgBox, 4160, Налаштування - ТОЧКА, ТОЧКА = поле "Точка*" (зверху форми, під Концепцією; те, що iiko заповнює після "Найти точку").`n`nКлікни в це поле.
     KeyWait, LButton, Down
     MouseGetPos, tochkaX, tochkaY
-    IniWrite, %tochkaX%, RkConfig.ini, Targets, TochkaX
-    IniWrite, %tochkaY%, RkConfig.ini, Targets, TochkaY
+    IniWrite, %tochkaX%, %ConfigPath%, Targets, TochkaX
+    IniWrite, %tochkaY%, %ConfigPath%, Targets, TochkaY
     Gui, Settings:Show
 return
 
@@ -2953,8 +3040,8 @@ SetPoiskTarget:
     MsgBox, 4160, Nalashtuvannya, Click in the "Poisk" field (top of Dostavki list in iiko).
     KeyWait, LButton, Down
     MouseGetPos, poiskX, poiskY
-    IniWrite, %poiskX%, RkConfig.ini, Targets, PoiskX
-    IniWrite, %poiskY%, RkConfig.ini, Targets, PoiskY
+    IniWrite, %poiskX%, %ConfigPath%, Targets, PoiskX
+    IniWrite, %poiskY%, %ConfigPath%, Targets, PoiskY
     Gui, Settings:Show
 return
 
@@ -2964,8 +3051,8 @@ SetRowTarget:
     MsgBox, 4160, Nalashtuvannya, Click on the FIRST row of the Dostavki list in iiko.
     KeyWait, LButton, Down
     MouseGetPos, rowX, rowY
-    IniWrite, %rowX%, RkConfig.ini, Targets, RowX
-    IniWrite, %rowY%, RkConfig.ini, Targets, RowY
+    IniWrite, %rowX%, %ConfigPath%, Targets, RowX
+    IniWrite, %rowY%, %ConfigPath%, Targets, RowY
     Gui, Settings:Show
 return
 
@@ -4112,7 +4199,12 @@ return
 ; ── Таймер: запускається після показу вікна, оновлює MapSearch ──
 RcCheckZone:
     global rawAddress, hasPickup, RcZones, RcZonesOk, detectedCity, RcCurrentKitchen, extractedTimeAuto
+    global RcZoneBoundaryWarnMeters, RcLastZoneBoundaryMeters, RcLastZoneUncertain, RcLastGeocodeApprox, RcLastZoneOverlap
     SetTimer, RcCheckZone, Off
+    RcLastZoneBoundaryMeters := -1
+    RcLastZoneUncertain := 0
+    RcLastGeocodeApprox := 0
+    RcLastZoneOverlap := ""
     if (!RcRefreshZonesModuleState()) {
         GuiControl, Roll:, MapSearch, Зони: встановіть доповнення
         GuiControl, Roll:, KitchenStatusText,
@@ -4168,6 +4260,7 @@ RcCheckZone:
                     return
                 }
                 resp := resp3
+                RcLastGeocodeApprox := 1
             } else {
                 GuiControl, Roll:, MapSearch, Адресу не знайдено
                 return
@@ -4183,6 +4276,9 @@ RcCheckZone:
         RcLoadKml(kmlPath)
     if (RcZonesOk && RcZones.MaxIndex() > 0) {
         zone := RcFindZone(lng, lat)
+        RcLastZoneBoundaryMeters := RcDistanceToZoneBoundaryMeters(lng, lat, zone)
+        RcLastZoneOverlap := RcFindOverlappingZone(lng, lat, zone)
+        RcLastZoneUncertain := (RcLastGeocodeApprox || RcLastZoneOverlap != "" || (RcLastZoneBoundaryMeters >= 0 && RcLastZoneBoundaryMeters <= RcZoneBoundaryWarnMeters)) ? 1 : 0
         global RcCurrentDeliveryType, RcZoneMap, RcCurrentZoneMapped, lastZoneName
         lastZoneName := zone
         RcCurrentDeliveryType := ""
@@ -4242,6 +4338,18 @@ RcCheckZone:
             if (kAlertBeep)
                 SoundBeep, 600, 250
             result := zone
+            if (RcLastZoneUncertain) {
+                if (RcLastGeocodeApprox)
+                    result := "⚠ Адрес без точного дома: " . zone
+                else if (RcLastZoneOverlap != "")
+                    result := "⚠ Перетин зон: " . zone . " / " . RcLastZoneOverlap
+                else
+                    result := "⚠ Межа зон " . Round(RcLastZoneBoundaryMeters) . " м: " . zone
+                if (kAlertText != "")
+                    kAlertText .= "   "
+                kAlertText .= "ПЕРЕВІРТЕ ТОЧКУ В SYRVE"
+                FileAppend, % "[" A_Now "] ZONE_UNCERTAIN address=[" addr "] zone=[" zone "] overlap=[" RcLastZoneOverlap "] edge_m=" Round(RcLastZoneBoundaryMeters) " approximate=" RcLastGeocodeApprox "`n", %A_ScriptDir%\parse_debug.log
+            }
             RcLastZone := zone
             GuiControl, Roll:, MapSearch, %result%
             mappedZone := RcKitchenFromKmlZone(RcLastZone)
@@ -4250,9 +4358,12 @@ RcCheckZone:
                 zType := mappedZone.Type
             _deliveryMin := RcGetEffectiveTime(RcCurrentKitchen.Name, zType, false, cRaw, fRaw, minFar)
             GuiControl, Roll:, RhCalcDeliveryBtn, % "ДОСТ +" . _deliveryMin
-            if (extractedTimeAuto && !hasPickup)
+            if (extractedTimeAuto && !hasPickup && !RcLastZoneUncertain)
                 RcSetReadyByMinutes(_deliveryMin)
-            RhRegColor(hZoneBox, RhB_Green, RhB_White)
+            if (RcLastZoneUncertain)
+                RhRegColor(hZoneBox, RhB_TintAmber, RhB_Text)
+            else
+                RhRegColor(hZoneBox, RhB_Green, RhB_White)
             DllCall("InvalidateRect", "Ptr", hZoneBox, "Ptr", 0, "Int", 1)
             GuiControl, Roll:, KitchenStatusText, %kAlertText%
         } else {
@@ -4623,6 +4734,65 @@ RcInPolygon(lng, lat, coords) {
         j := i
     }
     return inside
+}
+
+RcDistanceToSegmentMeters(lng, lat, lng1, lat1, lng2, lat2) {
+    rad := 0.0174532925199433
+    scaleX := 111320 * Cos(lat * rad)
+    scaleY := 110540
+    ax := (lng1 - lng) * scaleX
+    ay := (lat1 - lat) * scaleY
+    bx := (lng2 - lng) * scaleX
+    by := (lat2 - lat) * scaleY
+    dx := bx - ax
+    dy := by - ay
+    denom := dx * dx + dy * dy
+    if (denom <= 0)
+        return Sqrt(ax * ax + ay * ay)
+    t := -(ax * dx + ay * dy) / denom
+    if (t < 0)
+        t := 0
+    else if (t > 1)
+        t := 1
+    px := ax + t * dx
+    py := ay + t * dy
+    return Sqrt(px * px + py * py)
+}
+
+RcDistanceToZoneBoundaryMeters(lng, lat, zoneName) {
+    global RcZones
+    if (zoneName = "")
+        return -1
+    for _, zone in RcZones {
+        if (zone.name != zoneName)
+            continue
+        coords := zone.coords
+        n := coords.MaxIndex()
+        if (n < 2)
+            return -1
+        best := -1
+        j := n
+        Loop % n {
+            i := A_Index
+            dist := RcDistanceToSegmentMeters(lng, lat, coords[j][1], coords[j][2], coords[i][1], coords[i][2])
+            if (best < 0 || dist < best)
+                best := dist
+            j := i
+        }
+        return best
+    }
+    return -1
+}
+
+RcFindOverlappingZone(lng, lat, selectedZoneName) {
+    global RcZones
+    for _, zone in RcZones {
+        if (zone.name = selectedZoneName)
+            continue
+        if RcInPolygon(lng, lat, zone.coords)
+            return zone.name
+    }
+    return ""
 }
 
 RcFindZone(lng, lat) {
@@ -4996,8 +5166,8 @@ RcUiaTargetCatalog() {
     targets.Push({role: "Найти точку (кнопка iiko)", label: "Знайти точку", x: "NaitiX", y: "NaitiY"})
     targets.Push({role: "Точка (поле для звірки зони)", label: "Поле «Точка»", x: "TochkaX", y: "TochkaY"})
     if (Module_IsEnabled("duty")) {
-        targets.Push({role: "Поле Поиск (КЦ)", label: "F4: Пошук доставок", x: "PoiskX", y: "PoiskY"})
-        targets.Push({role: "1-й рядок списку", label: "F4: Перший рядок", x: "RowX", y: "RowY"})
+        targets.Push({role: "Поле Поиск (КЦ)", label: "Ctrl+F4: Пошук доставок", x: "PoiskX", y: "PoiskY"})
+        targets.Push({role: "1-й рядок списку", label: "Ctrl+F4: Перший рядок", x: "RowX", y: "RowY"})
     }
     return targets
 }

@@ -37,6 +37,27 @@ class RollClubZoneVerificationTests(unittest.TestCase):
         for file_name in ("zones.kml", "zones_map.ini", "RkKitchens.ini"):
             self.assertTrue((data_dir / file_name).is_file(), file_name)
 
+    def test_boundary_addresses_are_marked_uncertain(self):
+        self.assertIn("RcDistanceToZoneBoundaryMeters", self.source)
+        self.assertIn("RcZoneBoundaryWarnMeters := 100", self.source)
+        self.assertIn("⚠ Межа зон", self.source)
+        self.assertIn("ПЕРЕВІРТЕ ТОЧКУ В SYRVE", self.source)
+
+    def test_overlapping_kml_polygons_are_not_silently_accepted(self):
+        self.assertIn("RcFindOverlappingZone", self.source)
+        self.assertIn("⚠ Перетин зон", self.source)
+        self.assertIn("ZONE_UNCERTAIN", self.source)
+
+    def test_uncertain_zone_does_not_change_ready_time_automatically(self):
+        self.assertIn(
+            "if (extractedTimeAuto && !hasPickup && !RcLastZoneUncertain)",
+            self.source,
+        )
+
+    def test_street_only_geocoder_fallback_is_not_treated_as_exact(self):
+        self.assertIn("RcLastGeocodeApprox := 1", self.source)
+        self.assertIn("⚠ Адрес без точного дома", self.source)
+
 
 if __name__ == "__main__":
     unittest.main()

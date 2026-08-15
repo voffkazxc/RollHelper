@@ -49,12 +49,25 @@ foreach ($zoneFile in @(
     }
 }
 
-$cleanConfig = git -C $repoRoot show HEAD:brands/rollclub/RkConfig.ini
-if ($LASTEXITCODE -ne 0) {
+$packageConfig = Join-Path $rollHelperRoot "brands\rollclub\RkConfig.ini"
+$gitConfig = [System.Diagnostics.ProcessStartInfo]::new()
+$gitConfig.FileName = "git"
+$gitConfig.UseShellExecute = $false
+$gitConfig.RedirectStandardOutput = $true
+$gitConfig.RedirectStandardError = $true
+[void]$gitConfig.ArgumentList.Add("-C")
+[void]$gitConfig.ArgumentList.Add($repoRoot)
+[void]$gitConfig.ArgumentList.Add("show")
+[void]$gitConfig.ArgumentList.Add("HEAD:brands/rollclub/RkConfig.ini")
+$gitProcess = [System.Diagnostics.Process]::Start($gitConfig)
+$configStream = [System.IO.File]::Create($packageConfig)
+$gitProcess.StandardOutput.BaseStream.CopyTo($configStream)
+$configStream.Dispose()
+$gitError = $gitProcess.StandardError.ReadToEnd()
+$gitProcess.WaitForExit()
+if ($gitProcess.ExitCode -ne 0) {
     throw "Cannot read the committed RollClub configuration"
 }
-$cleanConfig | Set-Content -LiteralPath (Join-Path $rollHelperRoot "brands\rollclub\RkConfig.ini") -Encoding Unicode
-$packageConfig = Join-Path $rollHelperRoot "brands\rollclub\RkConfig.ini"
 $configText = [IO.File]::ReadAllText($packageConfig, [Text.Encoding]::Unicode)
 $configText = [regex]::Replace(
     $configText,

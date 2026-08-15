@@ -42,7 +42,7 @@
 - Главный файл: `engine_rollclub.ahk`.
 - Использует AutoHotkey v1.1.
 - Подключает `lib/IikoUI.ahk`, который подключает `lib/IikoDriver.ahk`, а тот — `lib/UIA_Interface.ahk`.
-- Рабочая конфигурация бренда: `brands/rollclub/RkConfig.ini`.
+- Шаблон конфигурации бренда: `brands/rollclub/RkConfig.ini`; рабочая конфигурация оператора хранится в `%LOCALAPPDATA%\Programs\RollHelper\UserData\rollclub\RkConfig.ini`.
 - Запускает или контролирует тот же локальный HTTP-сервер на `127.0.0.1:5000`.
 - В рабочий файл напрямую подключён `test_uia_hotkeys.ahk`, то есть тестовые UIA/OCR-хоткеи сейчас физически являются частью production-процесса RollClub.
 
@@ -80,7 +80,7 @@ flowchart TD
     Server --> DB["../data/rollhouse.db"]
     Server --> BrandConfigs["RollHelper/brands/*"]
 
-    RC --> RCDuty["module rollclub-duty: F4"]
+    RC --> RCDuty["module rollclub-duty: Ctrl+F4"]
 
     RH --> Calls["tools/call_listener/*"]
     Calls --> PyAudio["Python + audio/ASR packages + models"]
@@ -215,7 +215,7 @@ flowchart TD
 ### Отдельные опциональные части RollClub
 
 - синхронизация кухонь из Google Sheets;
-- дежурство по заказам: отдельное дополнение `rollclub-duty`, горячая клавиша F4;
+- дежурство по заказам: отдельное дополнение `rollclub-duty`, горячая клавиша `Ctrl+F4`;
 - диагностический сбор UIA-дерева;
 - OCR состава заказа;
 - тестовые Ctrl+F2…Ctrl+F10.
@@ -236,7 +236,7 @@ flowchart TD
   "entrypoint": "module.ahk",
   "enabledByDefault": false,
   "requires": ["core.iiko", "core.server_client"],
-  "hotkeys": ["F4"]
+  "hotkeys": ["Ctrl+F4"]
 }
 ```
 
@@ -259,7 +259,7 @@ flowchart TD
 - `ReadOpenedOrder()`;
 - `OnDutyStopped(reason)`.
 
-Модуль не имеет права включаться сам. Повторное нажатие `F4` выключает его немедленно. После открытия заказа модуль возвращается в `Idle` и не запускается снова без оператора.
+Модуль не имеет права включаться сам. Повторное нажатие `Ctrl+F4` выключает его немедленно. После открытия заказа модуль возвращается в `Idle` и не запускается снова без оператора.
 
 ### `modules/rollhouse-report-load`
 
