@@ -127,6 +127,16 @@ class RollClubDutyCacheTests(unittest.TestCase):
         self.assertRegex(source, r"(?m)^\^F4::\s*$")
         self.assertIsNone(re.search(r"(?m)^F4::\s*$", source))
 
+    def test_operator_conflict_check_ignores_unrelated_windows_dialogs(self):
+        engine_path = MODULE_PATH.parents[3] / "engine_rollclub.ahk"
+        source = engine_path.read_text(encoding="utf-8-sig")
+        start = source.index("RcFindOperatorConflictDialog()")
+        monitor = source[start : source.index("#IfWinActive Rollclub PRO", start)]
+
+        self.assertIn("dialogProcess = \"BackOffice.exe\"", monitor)
+        self.assertIn("DUTY_OPERATOR_CONFLICT", monitor)
+        self.assertNotIn('if (!_busy && WinExist("ahk_class #32770"))', monitor)
+
 
 if __name__ == "__main__":
     unittest.main()

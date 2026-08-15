@@ -63,6 +63,7 @@ else
 PackageConfigPath := A_ScriptDir "\brands\rollclub\RkConfig.ini"
 ConfigPath := RcPrepareMainConfig(PackageConfigPath)
 global UIA_MAP_CONFIG := RcPrepareUiaMapConfig(PackageConfigPath)
+RcSeedKnownUiaMap(UIA_MAP_CONFIG)
 rcLogPath  := A_ScriptDir "\siv_debug.log"
 
 if !FileExist(ConfigPath) {
@@ -2480,6 +2481,23 @@ KcTakeOnce:
     GoSub, KcMonitor
 return
 
+RcFindOperatorConflictDialog() {
+    WinGet, dialogList, List, ahk_class #32770
+    Loop, %dialogList%
+    {
+        dialogHwnd := dialogList%A_Index%
+        WinGetTitle, dialogTitle, ahk_id %dialogHwnd%
+        WinGetText, dialogText, ahk_id %dialogHwnd%
+        WinGet, dialogProcess, ProcessName, ahk_id %dialogHwnd%
+        dialogHaystack := dialogTitle . "`n" . dialogText
+        if RegExMatch(dialogHaystack, "is)(доставка|замовлення|заказ).{0,240}(обрабатыва|обробля|оператор)")
+            return dialogHwnd
+        if (dialogProcess = "BackOffice.exe" && RegExMatch(dialogTitle, "i)^(Подтверждение|Підтвердження)$"))
+            return dialogHwnd
+    }
+    return 0
+}
+
 KcMonitor:
     FileAppend, % "[" . A_Now . "] KcMON enter dutyOn=" . dutyOn . " kcForce=" . kcForce . " autoMode=" . autoMode . " AUTO=" . AUTO_KC_ENABLED . " kcBusy=" . kcBusy . " inTake=" . _inDutyTake . "`n", %A_ScriptDir%\parse_debug.log
     if (rhPunchBusy || _inDutyTake)
@@ -2624,22 +2642,21 @@ KcMonitor:
     }
     ; --- ЗАХИСТ: діалог "Подтверждение: Доставка обрабатывается оператором ... продолжить?" ---
     ;    З'являється НЕ миттєво після кліку — ЧЕКАЄМО його до 2с. Є → Нет (Esc) і ПРОПУСКАЄМО.
-    SetTitleMatchMode, 2
-    _busy := 0
-    WinWait, Подтверждение,, 2
-    if (!ErrorLevel)
-        _busy := 1
-    if (!_busy && WinExist("ahk_class #32770"))
-        _busy := 1
-    if (!_busy && WinExist("Підтвердження"))
-        _busy := 1
-    if (!_busy && WinExist("", "обрабат"))
-        _busy := 1
-    if (!_busy && WinExist("", "обробля"))
-        _busy := 1
-    SetTitleMatchMode, 1
-    if (_busy)
+    _busyHwnd := 0
+    _busyDeadline := A_TickCount + 2000
+    while (A_TickCount < _busyDeadline)
     {
+        _busyHwnd := RcFindOperatorConflictDialog()
+        if (_busyHwnd)
+            break
+        Sleep, 80
+    }
+    if (_busyHwnd)
+    {
+        WinGetTitle, _busyTitle, ahk_id %_busyHwnd%
+        WinGetText, _busyText, ahk_id %_busyHwnd%
+        FileAppend, % "[" . A_Now . "] DUTY_OPERATOR_CONFLICT hwnd=" . _busyHwnd . " title=[" . _busyTitle . "] text=[" . RegExReplace(_busyText, "[\r\n]+", " ") . "]`n", %A_ScriptDir%\parse_debug.log
+        WinActivate, ahk_id %_busyHwnd%
         Send, {Esc}
         Sleep, 250
         Send, {Esc}
@@ -2736,7 +2753,8 @@ OpenSettings:
     Gui, Settings:Add, Button, x236 y302 w210 h32 gDeleteSelectedUiaBinding, Видалити зі списку
     Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
     Gui, Settings:Add, Text, x16 y342 w430 h50, Виберіть елемент, натисніть «Замінити вибране», потім клікніть потрібну комірку або кнопку Syrve.`n⚠ означає тимчасову прив'язку — її бажано замінити. Старі координати залишаються запасним варіантом.
-    Gui, Settings:Add, Button, x16 y394 w430 h26 gRestoreHiddenUiaTargets, Повернути приховані елементи
+    Gui, Settings:Add, Button, x16 y394 w430 h28 gAutoDiscoverUiaTargets, Автоматично знайти стабільні WinAPI елементи
+    Gui, Settings:Add, Button, x16 y430 w430 h26 gRestoreHiddenUiaTargets, Повернути приховані елементи
 
     ; ── Вкладка 2: PLU-коди оператора ─────────────────────────
     Gui, Settings:Tab, 2
@@ -4217,8 +4235,13 @@ RcCheckZone:
         GuiControl, Roll:, KitchenStatusText,
         return
     }
-    addr := RegExReplace(addr, "i)[,\s]+(эт|поверх|кв|квартира|под|під|п|к|парадна)\.?\s*\d+.*$", "")
-    addr := RegExReplace(addr, "i)^(Днепр|Дніпро|Харьков|Харків|Одесса|Одеса|Киев|Київ|Львов|Львів|Винница|Вінниця|Рівне|Ровно)[,\s]+", "")
+    addr := RegExReplace(addr, "i)[,\s]+(эт|поверх|кв|квартира|под|під|п|к|парадна)(?:\.?\s*/\s*(?:офис|офіс))?\.?\s*\d+.*$", "")
+    addr := RegExReplace(addr, "i)^\s*(?:м|г)\.?\s+", "")
+    if (detectedCity != "")
+        addr := RegExReplace(addr, "i)^(Днепр|Дніпро|Харьков|Харків|Одесса|Одеса|Киев|Київ|Львов|Львів|Винница|Вінниця|Рівне|Ровно)[,\s]+", "")
+    addr := RegExReplace(addr, "i)(^|[,\s])(?:вул(?:иця)?|ул(?:ица)?)\.?\s+", "$1")
+    addr := RegExReplace(addr, "i)(^|[,\s])(?:вул(?:иця)?|ул(?:ица)?)\.?\s+", "$1")
+    addr := RegExReplace(addr, "i)(^|[,\s])(?:буд(?:инок)?|дом|дім)\.?\s*", "$1")
     addr := RegExReplace(addr, "\s*\(.*?\)\s*", " ")
     addr := RegExReplace(addr, "i)Тополь[\-\s]*(\d)", "Тополя-$1")
     addr := RegExReplace(addr, "i)Победа[\-\s]*(\d)", "Перемога-$1")
@@ -5221,6 +5244,58 @@ RcBuildUiaSelector(automationId, elementName) {
     return ""
 }
 
+RcKnownUiaSelector(role) {
+    if (role = "Коментар")
+        return "memoEditDeliveryComment"
+    if (role = "Карта Клієнта")
+        return "textEditCustomerCardNumber"
+    if (role = "Адреса")
+        return "memoEditDeliveryAddressComment"
+    if (role = "Час")
+        return "timeEditDeliveryTime"
+    if (role = "Табл. Страв")
+        return "treeListItems"
+    if (role = "Хрестик Опл.")
+        return "buttonDeletePaymentItem"
+    if (role = "Поле Оплати")
+        return "gridPaymentItems"
+    if (role = "Сума Замовлення")
+        return "labelOrderSum"
+    if (role = "Поле читання адреси")
+        return "gridLookUpEditStreetAddress"
+    if (role = "Концепція (самовивіз)")
+        return "restoCompletionConception"
+    if (role = "Подтвердить (фініш)")
+        return "buttonDeliveryConfirmation"
+    if (role = "Зберегти на точку")
+        return "buttonSaveAndClose"
+    if (role = "Найти точку (кнопка iiko)")
+        return "buttonAssignDeliveryTerminal"
+    if (role = "Точка (поле для звірки зони)")
+        return "lookUpEditDeliveryTerminal"
+    return ""
+}
+
+RcSeedKnownUiaMap(configPath, force := 0) {
+    changed := 0
+    catalog := RcUiaTargetCatalog()
+    for _, target in catalog {
+        role := target.role
+        selector := RcKnownUiaSelector(role)
+        if (selector = "")
+            continue
+        IniRead, current, %configPath%, UiaMap, %role%, %A_Space%
+        if (current = "ERROR")
+            current := ""
+        if (force || current = "" || RcUiaSelectorIsRisky(current)) {
+            IniDelete, %configPath%, UiaHidden, %role%
+            IniWrite, %selector%, %configPath%, UiaMap, %role%
+            changed++
+        }
+    }
+    return changed
+}
+
 LoadUiaMapToListView:
     RcSelectedUiaRow := 0
     Gui, Settings:Default
@@ -5340,6 +5415,12 @@ RestoreHiddenUiaTargets:
     MsgBox, 64, WinAPI Сканер, Приховані елементи повернуто до списку.
 return
 
+AutoDiscoverUiaTargets:
+    _autoMapped := RcSeedKnownUiaMap(UIA_MAP_CONFIG, 1)
+    GoSub, LoadUiaMapToListView
+    MsgBox, 64, WinAPI Сканер, Збережено стабільні WinAPI-прив'язки: %_autoMapped%.`n`nРучний вибір потрібен лише для динамічних комірок, у яких Syrve не має постійного AutomationId.
+return
+
 LaunchScanner:
     _row := RcGetSelectedUiaRow()
     if (!_row) {
@@ -5353,6 +5434,14 @@ LaunchScanner:
     LV_GetText(_oldValue, _row, 2)
     if (_targetRole = "") {
         MsgBox, 48, WinAPI Сканер, Не вдалося прочитати роль вибраного рядка.
+        return
+    }
+    _knownSelector := RcKnownUiaSelector(_targetRole)
+    if (_knownSelector != "") {
+        IniDelete, %UIA_MAP_CONFIG%, UiaHidden, %_targetRole%
+        IniWrite, %_knownSelector%, %UIA_MAP_CONFIG%, UiaMap, %_targetRole%
+        MsgBox, 64, Збережено, Елемент "%_targetName%" прив'язаний через стабільний WinAPI ID.`n`n%_knownSelector%
+        GoSub, LoadUiaMapToListView
         return
     }
     Gui, Settings:Hide
