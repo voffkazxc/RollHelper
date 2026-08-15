@@ -58,6 +58,22 @@ class RollClubZoneVerificationTests(unittest.TestCase):
         self.assertIn("RcLastGeocodeApprox := 1", self.source)
         self.assertIn("⚠ Адрес без точного дома", self.source)
 
+    def test_geocoder_never_accepts_another_city(self):
+        self.assertIn("RcTryGeocodeResponse(resp, detectedCity, lat, lng)", self.source)
+        self.assertIn("RcGeocodeResponseHasCity(resp, expectedCity)", self.source)
+        self.assertIn(
+            'fallbackQuery := (detectedCity != "") ? (detectedCity . ", " . addr) : addr',
+            self.source,
+        )
+
+    def test_new_address_clears_previous_zone_before_lookup(self):
+        start = self.source.index("\nRcCheckZone:")
+        end = self.source.index("\n    if (!RcRefreshZonesModuleState())", start)
+        reset_section = self.source[start:end]
+        self.assertIn('RcLastZone := ""', reset_section)
+        self.assertIn('RcCurrentKitchen := ""', reset_section)
+        self.assertIn('lastZoneName := ""', reset_section)
+
 
 if __name__ == "__main__":
     unittest.main()

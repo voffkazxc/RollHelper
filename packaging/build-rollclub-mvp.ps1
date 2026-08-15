@@ -115,6 +115,7 @@ Copy-Item -LiteralPath (Join-Path $sourceServer "static") -Destination $serverRo
 # RollClub duty keeps the proven pre-launcher UIA reader. It is intentionally
 # brand-local so changes for RollHouse cannot alter F4 behaviour again.
 Copy-Item -LiteralPath (Join-Path $repoRoot "brands\rollclub\server\rollclub_kc_legacy.py") -Destination $serverRoot
+Copy-Item -LiteralPath (Join-Path $repoRoot "brands\rollclub\server\rollclub_point_dialogs.py") -Destination $serverRoot
 $serverAppPath = Join-Path $serverRoot "app.py"
 $serverAppText = [IO.File]::ReadAllText($serverAppPath, [Text.Encoding]::UTF8)
 if ($serverAppText -notmatch "import rollclub_kc_legacy as _rollclub_kc") {
@@ -122,6 +123,20 @@ if ($serverAppText -notmatch "import rollclub_kc_legacy as _rollclub_kc") {
 }
 $serverAppText = $serverAppText -replace "_bridge\.read_kc_list\(brand=brand\)", "_rollclub_kc.read_kc_list(_bridge, brand=brand)"
 [IO.File]::WriteAllText($serverAppPath, $serverAppText, [Text.Encoding]::UTF8)
+
+$iikoBridgePath = Join-Path $serverRoot "iiko_bridge.py"
+$iikoBridgeText = [IO.File]::ReadAllText($iikoBridgePath, [Text.Encoding]::UTF8)
+if ($iikoBridgeText -notmatch "import rollclub_point_dialogs as _rollclub_point_dialogs") {
+    $iikoBridgeText = "import rollclub_point_dialogs as _rollclub_point_dialogs`r`n" + $iikoBridgeText
+}
+$iikoBridgeText = $iikoBridgeText.Replace(
+    'if pname in ["Сумма заказа", "Внимание"]:',
+    'if _rollclub_point_dialogs.is_known_find_point_dialog(p):'
+)
+if ($iikoBridgeText -notmatch "_rollclub_point_dialogs\.is_known_find_point_dialog\(p\)") {
+    throw "Cannot install RollClub find-point dialog handler"
+}
+[IO.File]::WriteAllText($iikoBridgePath, $iikoBridgeText, [Text.Encoding]::UTF8)
 
 $syncScriptPath = Join-Path $serverRoot "sync_rollclub_kitchens.py"
 $syncScriptText = [IO.File]::ReadAllText($syncScriptPath, [Text.Encoding]::UTF8)

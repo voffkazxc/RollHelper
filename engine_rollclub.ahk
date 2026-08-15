@@ -4218,11 +4218,17 @@ return
 RcCheckZone:
     global rawAddress, hasPickup, RcZones, RcZonesOk, detectedCity, RcCurrentKitchen, extractedTimeAuto
     global RcZoneBoundaryWarnMeters, RcLastZoneBoundaryMeters, RcLastZoneUncertain, RcLastGeocodeApprox, RcLastZoneOverlap
+    global RcLastZone, RcCurrentZoneMapped, RcCurrentDeliveryType, lastZoneName
     SetTimer, RcCheckZone, Off
     RcLastZoneBoundaryMeters := -1
     RcLastZoneUncertain := 0
     RcLastGeocodeApprox := 0
     RcLastZoneOverlap := ""
+    RcLastZone := ""
+    RcCurrentKitchen := ""
+    RcCurrentZoneMapped := 0
+    RcCurrentDeliveryType := ""
+    lastZoneName := ""
     if (!RcRefreshZonesModuleState()) {
         GuiControl, Roll:, MapSearch, Зони: встановіть доповнення
         GuiControl, Roll:, KitchenStatusText,
@@ -4267,18 +4273,23 @@ RcCheckZone:
         GuiControl, Roll:, MapSearch, Мережа недоступна
         return
     }
-    if (!RegExMatch(resp, """lat"":""([^""]+)""", mLat) || !RegExMatch(resp, """lon"":""([^""]+)""", mLon)) {
-        resp2 := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&q=" . RcUriEncode(addr), 6000)
-        if (!RegExMatch(resp2, """lat"":""([^""]+)""", mLat) || !RegExMatch(resp2, """lon"":""([^""]+)""", mLon)) {
+    lat := ""
+    lng := ""
+    if (!RcTryGeocodeResponse(resp, detectedCity, lat, lng)) {
+        fallbackQuery := (detectedCity != "") ? (detectedCity . ", " . addr) : addr
+        resp2 := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&q=" . RcUriEncode(fallbackQuery), 6000)
+        if (!RcTryGeocodeResponse(resp2, detectedCity, lat, lng)) {
             if (InStr(addr, ",")) {
                 addrNoHouse := Trim(RegExReplace(addr, ",[^,]+$", ""))
                 resp3 := ""
                 if (detectedCity != "") {
                     resp3 := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&city=" . RcUriEncode(detectedCity) . "&street=" . RcUriEncode(addrNoHouse), 6000)
-                }
-                if (resp3 = "" || (!RegExMatch(resp3, """lat"":""([^""]+)""", mLat) || !RegExMatch(resp3, """lon"":""([^""]+)""", mLon)))
+                    if (!RcTryGeocodeResponse(resp3, detectedCity, lat, lng))
+                        resp3 := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&q=" . RcUriEncode(detectedCity . ", " . addrNoHouse), 6000)
+                } else {
                     resp3 := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&q=" . RcUriEncode(addrNoHouse), 6000)
-                if (!RegExMatch(resp3, """lat"":""([^""]+)""", mLat) || !RegExMatch(resp3, """lon"":""([^""]+)""", mLon)) {
+                }
+                if (!RcTryGeocodeResponse(resp3, detectedCity, lat, lng)) {
                     GuiControl, Roll:, MapSearch, Адресу не знайдено
                     return
                 }
@@ -4292,8 +4303,6 @@ RcCheckZone:
             resp := resp2
         }
     }
-    lat := mLat1 + 0
-    lng := mLon1 + 0
     kmlPath := RcReadableRollclubDataPath("zones.kml")
     if (!RcZonesOk && FileExist(kmlPath))
         RcLoadKml(kmlPath)
@@ -4757,6 +4766,48 @@ RcInPolygon(lng, lat, coords) {
         j := i
     }
     return inside
+}
+
+RcTryGeocodeResponse(resp, expectedCity, ByRef lat, ByRef lng) {
+    if (resp = "")
+        return 0
+    if (!RegExMatch(resp, """lat"":""([^""]+)""", mLat) || !RegExMatch(resp, """lon"":""([^""]+)""", mLon))
+        return 0
+    if (expectedCity != "" && !RcGeocodeResponseHasCity(resp, expectedCity))
+        return 0
+    lat := mLat1 + 0
+    lng := mLon1 + 0
+    displayName := ""
+    if (RegExMatch(resp, """display_name"":""([^""]*)""", mDisplay))
+        displayName := mDisplay1
+    FileAppend, % "[" A_Now "] GEOCODE city=[" expectedCity "] result=[" displayName "] lat=" lat " lon=" lng "`n", %A_ScriptDir%\parse_debug.log
+    return 1
+}
+
+RcGeocodeResponseHasCity(resp, city) {
+    StringLower, haystack, resp
+    StringLower, needle, city
+    aliases := needle
+    if (needle = "днепр" || needle = "дніпро")
+        aliases := "днепр|дніпро"
+    else if (needle = "харьков" || needle = "харків")
+        aliases := "харьков|харків"
+    else if (needle = "одесса" || needle = "одеса")
+        aliases := "одесса|одеса"
+    else if (needle = "киев" || needle = "київ")
+        aliases := "киев|київ"
+    else if (needle = "львов" || needle = "львів")
+        aliases := "львов|львів"
+    else if (needle = "винница" || needle = "вінниця")
+        aliases := "винница|вінниця"
+    else if (needle = "ровно" || needle = "рівне")
+        aliases := "ровно|рівне"
+    else if (needle = "ивано-франковск" || needle = "івано-франківськ" || needle = "франківськ")
+        aliases := "ивано-франковск|івано-франківськ|франківськ"
+    Loop, Parse, aliases, |
+        if InStr(haystack, A_LoopField)
+            return 1
+    return 0
 }
 
 RcDistanceToSegmentMeters(lng, lat, lng1, lat1, lng2, lat2) {
