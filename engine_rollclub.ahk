@@ -2166,7 +2166,7 @@ DrawRollclub:
 
     if (rawAddress != "" && !hasPickup)
         SetTimer, RcCheckZone, -450
-    ; Звірка точки відбувається при натисканні Внести (GoSub RcCheckZone на початку ApplyRollclub)
+    ; Звірка точки відбувається при натисканні Внести (GoSub RcVerifyPoint на початку ApplyRollclub)
 return
 ; ========================================================
 ; TOGGLE ГІФТИ ТА КЕШ
@@ -3486,12 +3486,12 @@ ApplyRollclub:
     SetTimer, KcMonitor, Off
     FileAppend, % "[" . A_Now . "] APPLY_LOCK on`n", %A_ScriptDir%\parse_debug.log
     GoSub, KcStopDuty          ; ручне пробиття (Enter) → дежурство стоп + вікно "оператор працює"
-    SetTimer, RcCheckZone, Off   ; скасувати старий таймер (якщо був)
+    SetTimer, RcVerifyPoint, Off   ; скасувати старий таймер (якщо був)
     Gui, Roll:Submit, NoHide
     Gui, Roll:Destroy
     ; Звірка точки — синхронно, ДО решти кліків (тільки доставка, тільки якщо увімкнено)
     if (!hasPickup && CHECK_POINT_ENABLED && naitiX != 0 && tochkaX != 0)
-        GoSub, RcCheckZone
+        GoSub, RcVerifyPoint
 
     ; ==== DEBUG: лог запису ====
     FormatTime, _wT,, yyyy-MM-dd HH:mm:ss
@@ -4351,8 +4351,9 @@ RcBlkNorm(s) {
     return s
 }
 
-; === RcCheckZone:
-    SetTimer, RcCheckZone, Off
+; === RcVerifyPoint: натиснути «Найти точку», прочитати поле «Точка» і звірити з KML-зоною. ===
+RcVerifyPoint:
+    SetTimer, RcVerifyPoint, Off
     if (!CHECK_POINT_ENABLED || hasPickup || naitiX = 0 || tochkaX = 0) {
         return
     }
