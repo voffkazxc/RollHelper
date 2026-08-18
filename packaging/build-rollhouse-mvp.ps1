@@ -102,6 +102,9 @@ $serverFiles = @(
 foreach ($fileName in $serverFiles) {
     Copy-Item -LiteralPath (Join-Path $sourceServer $fileName) -Destination (Join-Path $serverRoot $fileName)
 }
+# The shared UIA bridge imports this dialog helper. RollHouse does not use the
+# RollClub duty workflow, but the server still must be able to import the bridge.
+Copy-Item -LiteralPath (Join-Path $repoRoot "brands\rollclub\server\rollclub_point_dialogs.py") -Destination $serverRoot
 Copy-Item -LiteralPath (Join-Path $sourceServer "static") -Destination $serverRoot -Recurse
 New-Item -ItemType Directory -Force -Path (Join-Path $serverRoot "diagnostics") | Out-Null
 
@@ -124,6 +127,17 @@ $pythonPathLines = Get-Content -LiteralPath $pythonPathFile | ForEach-Object {
 $pythonPathLines += "Lib\site-packages"
 $pythonPathLines += "..\..\server"
 $pythonPathLines | Set-Content -LiteralPath $pythonPathFile -Encoding ASCII
+
+Push-Location $serverRoot
+try {
+    & (Join-Path $pythonRoot "python.exe") -c "import iiko_bridge"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Packaged RollHouse server cannot import iiko_bridge"
+    }
+}
+finally {
+    Pop-Location
+}
 
 $startScript = @"
 @echo off
