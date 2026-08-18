@@ -204,6 +204,9 @@ $packageDescription = @{
         file = "start_rollclub.bat"
         workingDirectory = "."
     }
+    runtime = @{
+        primaryExecutable = "RollHelper\AutoHotkeyU64.exe"
+    }
 }
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [IO.File]::WriteAllText((Join-Path $packageRoot "package.json"), ($packageDescription | ConvertTo-Json -Depth 4), $utf8NoBom)

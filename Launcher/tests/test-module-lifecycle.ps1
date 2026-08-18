@@ -389,6 +389,7 @@ public static class ModuleTestNative {
         }
     }
 
+    Select-NamedItem -Root $window -Name "Test Module"
     $installModuleButton = Find-ButtonByName -Root $window -Name "Установить"
     for ($attempt = 0; $attempt -lt 40 -and -not $installModuleButton.Current.IsEnabled; $attempt++) {
         Start-Sleep -Milliseconds 150

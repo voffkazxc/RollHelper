@@ -66,6 +66,7 @@ internal sealed class PackageManifest
     public required string Version { get; init; }
     public string? DisplayName { get; init; }
     public PackageEntrypoint? Entrypoint { get; init; }
+    public PackageRuntime? Runtime { get; init; }
 }
 
 internal sealed class PackageEntrypoint
@@ -73,4 +74,9 @@ internal sealed class PackageEntrypoint
     public required string File { get; init; }
     public string? Arguments { get; init; }
     public string? WorkingDirectory { get; init; }
+}
+
+internal sealed class PackageRuntime
+{
+    public string? PrimaryExecutable { get; init; }
 }

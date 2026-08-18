@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Diagnostics;
 using RollHelperLauncher;
 
 var testRoot = Path.Combine(Path.GetTempPath(), $"RollHelperPackageRepair-{Guid.NewGuid():N}");
@@ -88,7 +89,9 @@ try
         throw new InvalidOperationException("Installed module files did not rebuild missing package state.");
     }
 
-    Console.WriteLine("Package repair test passed.");
+    await VerifyPrimaryProcessTrackingAsync(installer, stateStore);
+
+    Console.WriteLine("Package repair and process tracking tests passed.");
 }
 finally
 {
@@ -99,6 +102,80 @@ finally
     catch
     {
     }
+}
+
+static async Task VerifyPrimaryProcessTrackingAsync(PackageInstaller installer, PackageStateStore stateStore)
+{
+    const string packageId = "test-brand";
+    const string version = "1.0.0";
+    var packageDirectory = LauncherPaths.GetPackageVersionDirectory(packageId, version);
+    Directory.CreateDirectory(packageDirectory);
+
+    var pingExecutable = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.System),
+        "PING.EXE");
+    var primaryExecutable = Path.Combine(packageDirectory, "primary.exe");
+    var backgroundExecutable = Path.Combine(packageDirectory, "background.exe");
+    File.Copy(pingExecutable, primaryExecutable);
+    File.Copy(pingExecutable, backgroundExecutable);
+    await File.WriteAllTextAsync(
+        Path.Combine(packageDirectory, "package.json"),
+        """
+        {
+          "schema": 1,
+          "id": "test-brand",
+          "version": "1.0.0",
+          "displayName": "Test Brand",
+          "entrypoint": {
+            "file": "primary.exe",
+            "arguments": "127.0.0.1 -n 30",
+            "workingDirectory": "."
+          },
+          "runtime": {
+            "primaryExecutable": "primary.exe"
+          }
+        }
+        """);
+    stateStore.MarkInstalled(packageId, version);
+
+    using var background = StartProbeProcess(backgroundExecutable);
+    await Task.Delay(250);
+    if (installer.GetRunningPackageVersion(packageId) is not null)
+    {
+        throw new InvalidOperationException("Background package process was mistaken for the primary program.");
+    }
+
+    using var primary = StartProbeProcess(primaryExecutable);
+    await Task.Delay(250);
+    if (!string.Equals(installer.GetRunningPackageVersion(packageId), version, StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException("Primary package process was not detected.");
+    }
+
+    primary.Kill(entireProcessTree: true);
+    await primary.WaitForExitAsync();
+    if (installer.GetRunningPackageVersion(packageId) is not null)
+    {
+        throw new InvalidOperationException("Package remained running after the primary process exited.");
+    }
+
+    installer.StopPackage(packageId);
+    await background.WaitForExitAsync();
+    if (!background.HasExited)
+    {
+        throw new InvalidOperationException("Stopping the package did not stop its background process.");
+    }
+}
+
+static Process StartProbeProcess(string executablePath)
+{
+    return Process.Start(new ProcessStartInfo
+    {
+        FileName = executablePath,
+        Arguments = "127.0.0.1 -n 30",
+        UseShellExecute = false,
+        CreateNoWindow = true
+    }) ?? throw new InvalidOperationException($"Could not start test process: {executablePath}");
 }
 
 static async Task ServeOnceAsync(TcpListener listener, byte[] payload)

@@ -62,6 +62,7 @@ internal sealed class PackageInstaller
     public string? GetRunningPackageVersion(string packageId)
     {
         var packageDirectory = GetPackageDirectoryPrefix(packageId);
+        var primaryExecutables = GetPrimaryExecutables(packageId);
 
         foreach (var process in Process.GetProcesses())
         {
@@ -88,6 +89,18 @@ internal sealed class PackageInstaller
                 }
 
                 var resolvedExecutablePath = Path.GetFullPath(executablePath);
+                if (primaryExecutables.Count > 0)
+                {
+                    var match = primaryExecutables.FirstOrDefault(item =>
+                        string.Equals(item.ExecutablePath, resolvedExecutablePath, StringComparison.OrdinalIgnoreCase));
+                    if (match is not null)
+                    {
+                        return match.Version;
+                    }
+
+                    continue;
+                }
+
                 if (!resolvedExecutablePath.StartsWith(packageDirectory, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
@@ -103,6 +116,11 @@ internal sealed class PackageInstaller
         }
 
         return null;
+    }
+
+    public void StopPackage(string packageId)
+    {
+        StopRunningPackageProcesses(packageId);
     }
 
     public IReadOnlyList<string> GetInstalledVersions(string packageId)
@@ -242,6 +260,7 @@ internal sealed class PackageInstaller
             {
                 ValidateEntrypoint(stagingDirectory, packageManifest.Entrypoint);
             }
+            ValidateRuntime(stagingDirectory, packageManifest.Runtime);
 
             Directory.Move(stagingDirectory, installDirectory);
             _stateStore.MarkInstalled(package.Id, package.Version);
@@ -387,6 +406,40 @@ internal sealed class PackageInstaller
             + Path.DirectorySeparatorChar;
     }
 
+    private static IReadOnlyList<PrimaryExecutableIdentity> GetPrimaryExecutables(string packageId)
+    {
+        var packageDirectory = Path.Combine(
+            LauncherPaths.PackagesDirectory,
+            LauncherPaths.SafePathSegment(packageId));
+        if (!Directory.Exists(packageDirectory))
+        {
+            return [];
+        }
+
+        var identities = new List<PrimaryExecutableIdentity>();
+        foreach (var versionDirectory in Directory.EnumerateDirectories(packageDirectory))
+        {
+            try
+            {
+                var manifest = LoadPackageManifest(versionDirectory);
+                if (string.IsNullOrWhiteSpace(manifest.Runtime?.PrimaryExecutable))
+                {
+                    continue;
+                }
+
+                var executablePath = ResolveInsideDirectory(versionDirectory, manifest.Runtime.PrimaryExecutable);
+                identities.Add(new PrimaryExecutableIdentity(manifest.Version, executablePath));
+            }
+            catch (Exception exception)
+            {
+                LauncherLog.Warning(
+                    $"Could not read package runtime identity. Package={packageId}, directory={versionDirectory}, error={exception.Message}");
+            }
+        }
+
+        return identities;
+    }
+
     private static PackageManifest LoadPackageManifest(string packageDirectory)
     {
         var manifestPath = Path.Combine(packageDirectory, "package.json");
@@ -438,6 +491,28 @@ internal sealed class PackageInstaller
             }
         }
     }
+
+    private static void ValidateRuntime(string packageDirectory, PackageRuntime? runtime)
+    {
+        if (runtime is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(runtime.PrimaryExecutable))
+        {
+            throw new InvalidDataException("Package runtime.primaryExecutable is empty.");
+        }
+
+        var executablePath = ResolveInsideDirectory(packageDirectory, runtime.PrimaryExecutable);
+        if (!File.Exists(executablePath))
+        {
+            throw new InvalidDataException(
+                $"Package primary executable not found: {runtime.PrimaryExecutable}");
+        }
+    }
+
+    private sealed record PrimaryExecutableIdentity(string Version, string ExecutablePath);
 
     private bool IsRequirementSatisfied(PackageRequirement requirement)
     {

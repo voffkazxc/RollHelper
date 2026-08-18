@@ -144,6 +144,9 @@ $packageDescription = @{
         file = "start_rollhouse.bat"
         workingDirectory = "."
     }
+    runtime = @{
+        primaryExecutable = "RollHelper\AutoHotkeyU64.exe"
+    }
 }
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $packageJson = $packageDescription | ConvertTo-Json -Depth 4

@@ -8,8 +8,14 @@
     <Nullable>enable</Nullable>
     <AssemblyName>RollHelperLauncher</AssemblyName>
     <RootNamespace>RollHelperLauncher</RootNamespace>
-    <Version>0.1.42</Version>
+    <Version>0.1.66</Version>
+    <ApplicationIcon>Assets\RollHelperLogo.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\RollHelperLogo.png" />
+    <Resource Include="Assets\RollHelperLogo.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">

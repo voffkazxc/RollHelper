@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace RollHelperLauncher;
 
@@ -18,6 +19,7 @@ public partial class MainWindow : Window
     private readonly LauncherUiSettingsStore _uiSettingsStore = new();
     private readonly PackageInstaller _packageInstaller;
     private readonly LauncherUpdater _launcherUpdater;
+    private readonly DispatcherTimer _processStatusTimer;
     private CancellationTokenSource? _operationCancellation;
     private LauncherRelease? _launcherUpdate;
     private bool _modulesPanelOpened;
@@ -29,15 +31,25 @@ public partial class MainWindow : Window
 
         _packageInstaller = new PackageInstaller(_manifestClient, _packageStateStore);
         _launcherUpdater = new LauncherUpdater(_manifestClient);
+        _processStatusTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(1)
+        };
+        _processStatusTimer.Tick += (_, _) => RefreshRunningProgramStatuses();
         _ = LauncherConfig.Load();
         ProgramsGrid.ItemsSource = _programs;
         ModulesGrid.ItemsSource = _modules;
         LauncherVersionText.Text = $"• версия {_launcherUpdater.CurrentVersion}";
         ApplyUiSettings(_uiSettingsStore.Load());
 
-        Loaded += async (_, _) => await RefreshManifestAsync();
+        Loaded += async (_, _) =>
+        {
+            await RefreshManifestAsync();
+            _processStatusTimer.Start();
+        };
         Closed += (_, _) =>
         {
+            _processStatusTimer.Stop();
             SaveUiSettings();
             _operationCancellation?.Cancel();
             _manifestClient.Dispose();
@@ -263,6 +275,32 @@ public partial class MainWindow : Window
         }
 
         var package = selectedRow.Package;
+        var runningVersion = _packageInstaller.GetRunningPackageVersion(package.Id);
+        if (!string.IsNullOrWhiteSpace(runningVersion))
+        {
+            if (!BeginOperation($"Остановка {selectedRow.DisplayName}..."))
+            {
+                return;
+            }
+
+            try
+            {
+                _packageInstaller.StopPackage(package.Id);
+                SetStatus($"{selectedRow.DisplayName} остановлено");
+            }
+            catch (Exception exception)
+            {
+                ShowOperationError($"Не удалось остановить {selectedRow.DisplayName}", exception);
+            }
+            finally
+            {
+                EndOperation();
+                RefreshAllStatuses();
+            }
+
+            return;
+        }
+
         if (!BeginOperation($"Подготовка {selectedRow.DisplayName}..."))
         {
             return;
@@ -273,6 +311,18 @@ public partial class MainWindow : Window
             var progress = new Progress<int>(value => DownloadProgress.Value = value);
             SetStatus($"Скачивание и установка {selectedRow.DisplayName}...");
             await _packageInstaller.InstallAsync(package, progress, _operationCancellation!.Token);
+
+            foreach (var otherProgram in _programs.Where(row =>
+                         !string.Equals(row.Package.Id, package.Id, StringComparison.OrdinalIgnoreCase)))
+            {
+                if (string.IsNullOrWhiteSpace(_packageInstaller.GetRunningPackageVersion(otherProgram.Package.Id)))
+                {
+                    continue;
+                }
+
+                SetStatus($"Остановка {otherProgram.DisplayName}...");
+                _packageInstaller.StopPackage(otherProgram.Package.Id);
+            }
 
             SetStatus($"Запуск {selectedRow.DisplayName}...");
             _packageInstaller.Launch(package);
@@ -589,8 +639,12 @@ public partial class MainWindow : Window
         if (_packageInstaller.IsInstalled(package))
         {
             var runningVersion = _packageInstaller.GetRunningPackageVersion(package.Id);
+            if (string.Equals(runningVersion, package.Version, StringComparison.OrdinalIgnoreCase))
+            {
+                return "Запущено";
+            }
+
             return !string.IsNullOrWhiteSpace(runningVersion)
-                   && !string.Equals(runningVersion, package.Version, StringComparison.OrdinalIgnoreCase)
                 ? $"Нужен перезапуск ({runningVersion})"
                 : "Установлено";
         }
@@ -619,6 +673,34 @@ public partial class MainWindow : Window
         ModulesGrid.Items.Refresh();
         UpdateProgramActionButton();
         UpdateModuleActionButtons();
+    }
+
+    private void RefreshRunningProgramStatuses()
+    {
+        if (_operationCancellation is not null || _programs.Count == 0)
+        {
+            return;
+        }
+
+        var changed = false;
+        foreach (var row in _programs)
+        {
+            var status = GetPackageStatus(row.Package);
+            if (string.Equals(row.Status, status, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            row.Status = status;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            ProgramsGrid.Items.Refresh();
+        }
+
+        UpdateProgramActionButton();
     }
 
     private void ApplyModuleChange(ReleasePackage modulePackage, string moduleDisplayName)
@@ -699,10 +781,22 @@ public partial class MainWindow : Window
         if (_packageInstaller.IsInstalled(selectedRow.Package))
         {
             var runningVersion = _packageInstaller.GetRunningPackageVersion(selectedRow.Package.Id);
+            if (string.Equals(runningVersion, selectedRow.Package.Version, StringComparison.OrdinalIgnoreCase))
+            {
+                InstallAndRunButton.Content = $"Остановить {selectedRow.DisplayName}";
+                InstallAndRunButton.IsEnabled = true;
+                InstallAndRunButton.Style = (Style)FindResource("ProgramStopActionButtonStyle");
+                return;
+            }
+
+            var anotherProgramIsRunning = _programs.Any(row =>
+                !string.Equals(row.Package.Id, selectedRow.Package.Id, StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(_packageInstaller.GetRunningPackageVersion(row.Package.Id)));
             InstallAndRunButton.Content = !string.IsNullOrWhiteSpace(runningVersion)
-                                           && !string.Equals(runningVersion, selectedRow.Package.Version, StringComparison.OrdinalIgnoreCase)
                 ? $"Перезапустить {selectedRow.DisplayName}"
-                : $"Запустить {selectedRow.DisplayName}";
+                : anotherProgramIsRunning
+                    ? $"Переключиться на {selectedRow.DisplayName}"
+                    : $"Запустить {selectedRow.DisplayName}";
             InstallAndRunButton.Style = (Style)FindResource("ProgramActionButtonStyle");
         }
         else

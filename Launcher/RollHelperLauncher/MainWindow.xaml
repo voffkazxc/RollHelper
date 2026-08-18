@@ -6,6 +6,7 @@
         Height="640"
         MinWidth="720"
         MinHeight="520"
+        Icon="Assets/RollHelperLogo.ico"
         WindowStartupLocation="CenterScreen"
         PreviewKeyDown="MainWindow_PreviewKeyDown"
         Background="{StaticResource WindowBackgroundBrush}">
@@ -135,6 +136,13 @@
             <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
             <Setter Property="Foreground" Value="White" />
         </Style>
+        <Style x:Key="ProgramStopActionButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ProgramActionButtonStyle}">
+            <Setter Property="Background" Value="#B42318" />
+            <Setter Property="BorderBrush" Value="#B42318" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
     </Window.Resources>
 
     <Grid Margin="24">
@@ -152,19 +160,31 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <StackPanel>
-                <TextBlock Text="RollHelper Launcher"
-                           FontSize="28"
-                           FontWeight="SemiBold" />
-                <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
-                    <TextBlock Text="Программы и дополнения RollHelper"
-                               FontSize="14"
-                               Foreground="{StaticResource SecondaryTextBrush}" />
-                    <TextBlock x:Name="LauncherVersionText"
-                               Margin="8,0,0,0"
-                               FontSize="14"
-                               TextTrimming="CharacterEllipsis"
-                               Foreground="{StaticResource SecondaryTextBrush}" />
+            <StackPanel Orientation="Horizontal">
+                <Border Width="54"
+                        Height="54"
+                        Padding="8"
+                        Background="#EFF6FF"
+                        CornerRadius="12">
+                    <Image Source="Assets/RollHelperLogo.png"
+                           Stretch="Uniform"
+                           SnapsToDevicePixels="True" />
+                </Border>
+                <StackPanel Margin="14,0,0,0"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="RollHelper Launcher"
+                               FontSize="28"
+                               FontWeight="SemiBold" />
+                    <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
+                        <TextBlock Text="Программы и дополнения RollHelper"
+                                   FontSize="14"
+                                   Foreground="{StaticResource SecondaryTextBrush}" />
+                        <TextBlock x:Name="LauncherVersionText"
+                                   Margin="8,0,0,0"
+                                   FontSize="14"
+                                   TextTrimming="CharacterEllipsis"
+                                   Foreground="{StaticResource SecondaryTextBrush}" />
+                    </StackPanel>
                 </StackPanel>
             </StackPanel>
 
