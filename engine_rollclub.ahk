@@ -4624,7 +4624,7 @@ RcPickupVerifyPoint:
         SoundPlay, %A_ScriptDir%\beep_ok.wav
         SetTimer, RemoveToolTip, -3000
     } else {
-        _msg := "⚠ САМОВИВІЗ РІЗНИТЬСЯ!`nExpected: " . expectedKey . "`nActual:  " . actualKey
+        _msg := "⚠ САМОВИВІЗ РІЗНИТЬСЯ!`nExpected: " . expectedKey . "`nActual:  " . actualKey . "`n[Точка: " . iikoPoint . "]"
         ToolTip, %_msg%
         SoundPlay, %A_ScriptDir%\beep_err.wav
         Sleep, 550
