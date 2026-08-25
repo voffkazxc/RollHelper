@@ -17,6 +17,7 @@ $launcherAssetName = "RollHelperLauncher-win-x64-$Version.zip"
 $launcherAssetPath = Join-Path $releaseRoot $launcherAssetName
 $launcherProject = Join-Path $repoRoot "Launcher\RollHelperLauncher\RollHelperLauncher.csproj"
 $manifestPath = Join-Path $releaseRoot "release-manifest.json"
+$operatorGuidesPath = Join-Path $PSScriptRoot "operator-guides.json"
 
 if (-not (Test-Path -LiteralPath $PackagesManifestPath -PathType Leaf)) {
     throw "Packages manifest not found: $PackagesManifestPath"
@@ -48,6 +49,7 @@ Compress-Archive `
     -Force
 
 $sourceManifest = Get-Content -LiteralPath $PackagesManifestPath -Raw | ConvertFrom-Json
+$operatorGuides = Get-Content -LiteralPath $operatorGuidesPath -Raw | ConvertFrom-Json
 $packageBaseUri = [Uri]($PackageAssetBaseUrl.TrimEnd('/') + '/')
 $packages = foreach ($package in @($sourceManifest.packages)) {
     $copy = [ordered]@{}
@@ -65,6 +67,11 @@ $packages = foreach ($package in @($sourceManifest.packages)) {
     }
     else {
         throw "Package '$($package.id)' has neither url nor asset."
+    }
+
+    $guideProperty = $operatorGuides.guides.PSObject.Properties[$package.id]
+    if ($null -ne $guideProperty) {
+        $copy.guide = $guideProperty.Value
     }
 
     [pscustomobject]$copy

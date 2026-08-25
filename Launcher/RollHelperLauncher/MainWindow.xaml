@@ -350,6 +350,8 @@
                         <RowDefinition Height="*" />
                         <RowDefinition Height="12" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="12" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <Grid>
@@ -484,7 +486,41 @@
                                    Foreground="{StaticResource SecondaryTextBrush}" />
                     </Grid>
 
-                    <Grid Grid.Row="4">
+                    <Border x:Name="ModuleGuidePanel"
+                            Grid.Row="4"
+                            Padding="12"
+                            Background="#F8FAFC"
+                            BorderBrush="#DDE3EA"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            MaxHeight="180"
+                            Visibility="Collapsed">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel>
+                                <TextBlock Text="Как пользоваться"
+                                           FontWeight="SemiBold"
+                                           Foreground="#0F172A" />
+                                <TextBlock x:Name="ModuleGuideSummaryText"
+                                           Margin="0,4,0,0"
+                                           TextWrapping="Wrap"
+                                           Foreground="{StaticResource SecondaryTextBrush}" />
+                                <TextBlock x:Name="ModuleGuideModeText"
+                                           Margin="0,7,0,0"
+                                           FontWeight="SemiBold"
+                                           TextWrapping="Wrap" />
+                                <TextBlock x:Name="ModuleGuideStepsText"
+                                           Margin="0,5,0,0"
+                                           TextWrapping="Wrap" />
+                                <TextBlock x:Name="ModuleGuideNotesText"
+                                           Margin="0,6,0,0"
+                                           TextWrapping="Wrap"
+                                           Foreground="{StaticResource SecondaryTextBrush}" />
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+
+                    <Grid Grid.Row="6">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="8" />

@@ -180,6 +180,12 @@ try {
                 requires = @(
                     [ordered]@{ id = "test-brand"; minVersion = "1.0.0" }
                 )
+                guide = [ordered]@{
+                    summary = "Тестовая инструкция для оператора."
+                    mode = "вручную"
+                    hotkeys = @("Ctrl+F9")
+                    steps = @("Откройте тестовый заказ.", "Нажмите Ctrl+F9.")
+                }
                 asset = "test-module.zip"
                 sha256 = (Get-FileHash -LiteralPath $moduleAsset -Algorithm SHA256).Hash.ToLowerInvariant()
             }
@@ -390,6 +396,7 @@ public static class ModuleTestNative {
     }
 
     Select-NamedItem -Root $window -Name "Test Module"
+    Find-ElementByName -Root $window -Name "Как пользоваться" | Out-Null
     $installModuleButton = Find-ButtonByName -Root $window -Name "Установить"
     for ($attempt = 0; $attempt -lt 40 -and -not $installModuleButton.Current.IsEnabled; $attempt++) {
         Start-Sleep -Milliseconds 150

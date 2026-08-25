@@ -46,11 +46,21 @@ internal sealed class ReleasePackage
     public string? Asset { get; init; }
     public string? Sha256 { get; init; }
     public long? Size { get; init; }
+    public PackageGuide? Guide { get; init; }
 
     [JsonIgnore]
     public Uri? DownloadUri { get; set; }
 
     public override string ToString() => DisplayName ?? Id;
+}
+
+internal sealed class PackageGuide
+{
+    public string? Summary { get; init; }
+    public string? Mode { get; init; }
+    public List<string> Hotkeys { get; init; } = [];
+    public List<string> Steps { get; init; } = [];
+    public List<string> Notes { get; init; } = [];
 }
 
 internal sealed class PackageRequirement
@@ -65,6 +75,7 @@ internal sealed class PackageManifest
     public required string Id { get; init; }
     public required string Version { get; init; }
     public string? DisplayName { get; init; }
+    public PackageGuide? Guide { get; init; }
     public PackageEntrypoint? Entrypoint { get; init; }
     public PackageRuntime? Runtime { get; init; }
 }

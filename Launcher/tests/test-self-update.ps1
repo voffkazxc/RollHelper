@@ -58,6 +58,11 @@ try {
         -WindowStyle Hidden `
         -PassThru
 
+    $manifestPath = Join-Path $ReleaseRoot "release-manifest.json"
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    $manifest.launcher.url = "http://127.0.0.1:$port/$($manifest.launcher.asset)"
+    [IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json -Depth 20), (New-Object Text.UTF8Encoding($false)))
+
     $config = @{ manifestUrl = "http://127.0.0.1:$port/release-manifest.json" } | ConvertTo-Json
     $utf8NoBom = New-Object Text.UTF8Encoding($false)
     [IO.File]::WriteAllText((Join-Path $installRoot "launcher.config.json"), $config, $utf8NoBom)

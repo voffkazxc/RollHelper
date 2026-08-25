@@ -161,6 +161,7 @@ public partial class MainWindow : Window
 
     private void ModulesGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        UpdateModuleGuide();
         UpdateModuleActionButtons();
         UpdateSelectionStatus();
     }
@@ -521,6 +522,7 @@ public partial class MainWindow : Window
             ModulesHintText.Text = "Сначала выберите программу слева";
             ModulesEmptyText.Text = "Выберите программу, чтобы увидеть дополнения";
             ModulesEmptyText.Visibility = Visibility.Visible;
+            HideModuleGuide();
             UpdateModuleActionButtons();
             return;
         }
@@ -540,7 +542,34 @@ public partial class MainWindow : Window
         ModulesEmptyText.Text = "Для этой программы пока нет дополнений";
         ModulesEmptyText.Visibility = _modules.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         ModulesGrid.SelectedIndex = -1;
+        HideModuleGuide();
         UpdateModuleActionButtons();
+    }
+
+    private void UpdateModuleGuide()
+    {
+        if (ModulesGrid.SelectedItem is not PackageRow selectedRow || selectedRow.Package.Guide is not PackageGuide guide)
+        {
+            HideModuleGuide();
+            return;
+        }
+
+        ModuleGuideSummaryText.Text = guide.Summary ?? "Описание для этого дополнения пока не опубликовано.";
+        var mode = string.IsNullOrWhiteSpace(guide.Mode) ? "" : $"Режим: {guide.Mode}";
+        var hotkeys = guide.Hotkeys.Count == 0 ? "" : $"Запуск: {string.Join(" • ", guide.Hotkeys)}";
+        ModuleGuideModeText.Text = string.Join("\n", new[] { mode, hotkeys }.Where(text => !string.IsNullOrWhiteSpace(text)));
+        ModuleGuideStepsText.Text = string.Join("\n", guide.Steps.Select((step, index) => $"{index + 1}. {step}"));
+        ModuleGuideNotesText.Text = string.Join("\n", guide.Notes);
+        ModuleGuidePanel.Visibility = Visibility.Visible;
+    }
+
+    private void HideModuleGuide()
+    {
+        ModuleGuidePanel.Visibility = Visibility.Collapsed;
+        ModuleGuideSummaryText.Text = string.Empty;
+        ModuleGuideModeText.Text = string.Empty;
+        ModuleGuideStepsText.Text = string.Empty;
+        ModuleGuideNotesText.Text = string.Empty;
     }
 
     private void SetModulesPanelVisibility(bool visible)
