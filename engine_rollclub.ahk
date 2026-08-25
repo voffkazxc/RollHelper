@@ -11,6 +11,7 @@ OpCoord_Init("rollclub", A_ScriptDir)
 ModuleRegistry_Init(A_ScriptDir, "rollclub", "mvp")
 ModuleRegistry_RegisterExternal("duty", "rollclub-duty")
 ModuleRegistry_RegisterExternal("zones", "rollclub-zones")
+ModuleRegistry_RegisterExternal("refund", "rollclub-refund")
 
 RcStopLegacyDutyProcess()
 if (Module_IsEnabled("zones"))
@@ -312,6 +313,12 @@ return
     if (!Module_IsEnabled("duty"))
         return
     GoSub, KcDutyToggle
+return
+
+^F5::
+    ModuleRegistry_RefreshExternal("refund", "rollclub-refund")
+    if (!ModuleRegistry_RunExternal("refund"))
+        MsgBox, 48, Повернення коштів, Доповнення «Повернення коштів» не встановлено або вимкнено в лаунчері.
 return
 
 RollFocusWatcher:
