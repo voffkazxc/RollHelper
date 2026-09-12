@@ -178,6 +178,13 @@ def read_kc_list(bridge, brand="rollclub"):
                     callback_count += 1
                 else:
                     take = delivery
+                    try:
+                        rect = getattr(row, "BoundingRectangle", None)
+                        if rect and rect.width() > 20 and rect.height() > 8:
+                            take["click_x"] = int(rect.left + min(80, rect.width() // 2))
+                            take["click_y"] = int(rect.ycenter())
+                    except Exception:
+                        pass
     except Exception as error:
         return {"ok": False, "error": "read rows: %s" % error}
 

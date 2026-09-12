@@ -174,11 +174,42 @@ class RollClubDutyCacheTests(unittest.TestCase):
 
         result = MODULE.read_kc_list(bridge)
 
+    def test_row_click_coordinates_returned_for_direct_opening(self):
+        class MockRect:
+            def __init__(self, left, top, right, bottom):
+                self.left = left
+                self.top = top
+                self.right = right
+                self.bottom = bottom
+            def width(self):
+                return self.right - self.left
+            def height(self):
+                return self.bottom - self.top
+            def xcenter(self):
+                return (self.left + self.right) // 2
+            def ycenter(self):
+                return (self.top + self.bottom) // 2
+
+        bridge = Bridge()
+        row_cells = [
+            Control("№ row 1", value="741899"),
+            Control("Коментар row 1", value="Пост Доставка"),
+            Control("Оператор row 1", value=""),
+            Control("Статус row 1", value="Не підтверджена"),
+        ]
+        target_row = Control("Рядок 1", children=row_cells)
+        target_row.BoundingRectangle = MockRect(100, 200, 500, 240)
+        bridge.panel = Control("Панель даних", children=[target_row])
+        bridge.grid = Control("gridDeliveries", children=[bridge.panel])
+
+        result = MODULE.read_kc_list(bridge)
+
         self.assertTrue(result["ok"])
-        self.assertEqual(result["take_no"], 741899)
-        self.assertEqual(result["count"], 2)
+        self.assertEqual(result["take"]["click_x"], 180)  # 100 + 80
+        self.assertEqual(result["take"]["click_y"], 220)  # (200 + 240) // 2
 
 
 if __name__ == "__main__":
     unittest.main()
+
 

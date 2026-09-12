@@ -2605,47 +2605,72 @@ KcMonitor:
         return
     }
     ToolTip, Ctrl+F4: беру заказ №%takeNo%...
-    ; 3) тільки зараз можна чіпати поле Поиск: сервер підтвердив, що активний список Доставки.
-    ; --- capture: Poisk -> open first row ---
-    if (poiskX != 0)
+    clickX := 0
+    clickY := 0
+    RegExMatch(listResp, """click_x""\s*:\s*(\d+)", _cxM)
+    clickX := _cxM1 + 0
+    RegExMatch(listResp, """click_y""\s*:\s*(\d+)", _cyM)
+    clickY := _cyM1 + 0
+
+    if (clickX > 0 && clickY > 0)
     {
-        Click, %poiskX%, %poiskY%
-        Sleep, 200
-        Send, ^a
-        Sleep, 50
-        Send, {Delete}          ; примусово стерти старий № перед вводом (інакше SendInput дописує → задвоєний фільтр → список порожній → холостий круг)
-        Sleep, 80
-        SendInput, %takeNo%
-        Sleep, 800
-    }
-    ; --- ПЕРЕВІРКА перед пробиттям: список має звузитись РІВНО до нашого № ---
-    ; якщо ні (ми не на Доставках / фільтр не спрацював) — НЕ пробиваємо, пропускаємо цей круг.
-    _chk := RhGet("/api/iiko/kc-list", 6000)
-    _cnt := ""
-    RegExMatch(_chk, "count""\s*:\s*(\d+)", _cM)
-    _cnt := _cM1
-    if (_cnt != "1" || !InStr(_chk, takeNo))
-    {
-        ToolTip, % "Ctrl+F4: список не звузився до №" . takeNo . " — НЕ пробиваю (не на Доставках?)"
-        SetTimer, RemoveToolTip, -5000
-        kcBusy := 0
-        return
-    }
-    ToolTip                     ; прибрати підказку — вона перекривала рядок, клік потрапляв у неї
-    Sleep, 60
-    if (kcStop)
-    {
-        kcBusy := 0
-        ToolTip, Стоп (Ctrl+F4) — заказ не відкриваю
-        SetTimer, RemoveToolTip, -1500
-        return
-    }
-    if (rowX != 0)
-    {
-        Click, %rowX%, %rowY%
+        ToolTip, % "Ctrl+F4: відкриваю заказ №" . takeNo . "..."
+        if (kcStop)
+        {
+            kcBusy := 0
+            ToolTip, Стоп (Ctrl+F4) — заказ не відкриваю
+            SetTimer, RemoveToolTip, -1500
+            return
+        }
+        _oldCoord := A_CoordModeMouse
+        CoordMode, Mouse, Screen
+        Click, %clickX%, %clickY%
         Sleep, 120
-        Click, %rowX%, %rowY%
+        Click, %clickX%, %clickY%
+        CoordMode, Mouse, %_oldCoord%
         Sleep, 700
+    }
+    else
+    {
+        ; Фолбек через Поиск та RowX, якщо екранні координати рядка не отримано
+        if (poiskX != 0)
+        {
+            Click, %poiskX%, %poiskY%
+            Sleep, 200
+            Send, ^a
+            Sleep, 50
+            Send, {Delete}          ; примусово стерти старий № перед вводом (інакше SendInput дописує → задвоєний фільтр → список порожній → холостий круг)
+            Sleep, 80
+            SendInput, %takeNo%
+            Sleep, 800
+            _chk := RhGet("/api/iiko/kc-list", 6000)
+            _cnt := ""
+            RegExMatch(_chk, "count""\s*:\s*(\d+)", _cM)
+            _cnt := _cM1
+            if (_cnt != "1" || !InStr(_chk, takeNo))
+            {
+                ToolTip, % "Ctrl+F4: список не звузився до №" . takeNo . " — НЕ пробиваю (не на Доставках?)"
+                SetTimer, RemoveToolTip, -5000
+                kcBusy := 0
+                return
+            }
+        }
+        ToolTip                     ; прибрати підказку — вона перекривала рядок, клік потрапляв у неї
+        Sleep, 60
+        if (kcStop)
+        {
+            kcBusy := 0
+            ToolTip, Стоп (Ctrl+F4) — заказ не відкриваю
+            SetTimer, RemoveToolTip, -1500
+            return
+        }
+        if (rowX != 0)
+        {
+            Click, %rowX%, %rowY%
+            Sleep, 120
+            Click, %rowX%, %rowY%
+            Sleep, 700
+        }
     }
     ; --- ЗАХИСТ: діалог "Подтверждение: Доставка обрабатывается оператором ... продолжить?" ---
     ;    З'являється НЕ миттєво після кліку — ЧЕКАЄМО його до 2с. Є → Нет (Esc) і ПРОПУСКАЄМО.
