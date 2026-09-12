@@ -173,8 +173,11 @@ class RollClubDutyCacheTests(unittest.TestCase):
         bridge.grid = Control("gridDeliveries", children=[bridge.panel])
 
         result = MODULE.read_kc_list(bridge)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["take_no"], 741899)
+        self.assertEqual(result["count"], 1)  # early break stops on first eligible order
 
-    def test_row_click_coordinates_returned_for_direct_opening(self):
+    def test_filter_and_row_coordinates_calculated_from_no_cell(self):
         class MockRect:
             def __init__(self, left, top, right, bottom):
                 self.left = left
@@ -191,22 +194,29 @@ class RollClubDutyCacheTests(unittest.TestCase):
                 return (self.top + self.bottom) // 2
 
         bridge = Bridge()
+        no_cell = Control("№ row 1", value="741899")
+        no_cell.BoundingRectangle = MockRect(50, 200, 150, 240)
         row_cells = [
-            Control("№ row 1", value="741899"),
+            no_cell,
             Control("Коментар row 1", value="Пост Доставка"),
             Control("Оператор row 1", value=""),
             Control("Статус row 1", value="Не підтверджена"),
         ]
         target_row = Control("Рядок 1", children=row_cells)
-        target_row.BoundingRectangle = MockRect(100, 200, 500, 240)
+        target_row.BoundingRectangle = MockRect(0, 200, 800, 240)
         bridge.panel = Control("Панель даних", children=[target_row])
         bridge.grid = Control("gridDeliveries", children=[bridge.panel])
 
         result = MODULE.read_kc_list(bridge)
 
         self.assertTrue(result["ok"])
-        self.assertEqual(result["take"]["click_x"], 180)  # 100 + 80
-        self.assertEqual(result["take"]["click_y"], 220)  # (200 + 240) // 2
+        self.assertEqual(result["take_no"], 741899)
+        self.assertEqual(result["first_row_x"], 100)
+        self.assertEqual(result["first_row_y"], 220)
+        self.assertEqual(result["filter_x"], 100)
+        self.assertEqual(result["filter_y"], 180)
+        self.assertEqual(result["take"]["click_x"], 100)
+        self.assertEqual(result["take"]["click_y"], 220)
 
 
 if __name__ == "__main__":

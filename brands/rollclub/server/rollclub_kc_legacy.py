@@ -131,13 +131,39 @@ def read_kc_list(bridge, brand="rollclub"):
     no_post_count = 0
     cancelled_count = 0
     cell_error_count = 0
+    filter_x = 0
+    filter_y = 0
+    first_row_x = 0
+    first_row_y = 0
 
     try:
-        for row in data_panel.GetChildren():
+        children = data_panel.GetChildren()
+    except Exception as error:
+        return {"ok": False, "error": "get data_panel children: %s" % error}
+
+    for row in children:
+        try:
             row_name = (row.Name or "").strip()
+            row_name_lower = row_name.lower()
+            if "фильтр" in row_name_lower or "фільтр" in row_name_lower or "filter" in row_name_lower:
+                try:
+                    for cell in row.GetChildren():
+                        cname = (cell.Name or "").lower()
+                        if cname.startswith("№") or " №" in cname or "№ " in cname:
+                            crect = getattr(cell, "BoundingRectangle", None)
+                            if crect and crect.width() > 10 and crect.height() > 5:
+                                filter_x = int(crect.xcenter())
+                                filter_y = int(crect.ycenter())
+                                break
+                except Exception:
+                    pass
+                continue
+
             if not (row_name.startswith("Строка") or row_name.startswith("Рядок") or row_name.startswith("Row")):
                 continue
+
             values = {}
+            cell_no_rect = None
             try:
                 for cell in row.GetChildren():
                     name = cell.Name or ""
@@ -147,12 +173,35 @@ def read_kc_list(bridge, brand="rollclub"):
                             idx = column.lower().find(sep)
                             column = column[:idx].strip()
                             break
+                    if column == "№":
+                        crect = getattr(cell, "BoundingRectangle", None)
+                        if crect and crect.width() > 10 and crect.height() > 5:
+                            cell_no_rect = crect
                     if column not in needed_columns:
                         continue
                     _, value = _read_cell(cell)
                     values[column] = value
             except Exception:
                 cell_error_count += 1
+
+            if first_row_x == 0:
+                if cell_no_rect:
+                    first_row_x = int(cell_no_rect.xcenter())
+                    first_row_y = int(cell_no_rect.ycenter())
+                    if filter_x == 0:
+                        filter_x = first_row_x
+                        filter_y = int(cell_no_rect.top - max(8, cell_no_rect.height() // 2))
+                else:
+                    try:
+                        rrect = getattr(row, "BoundingRectangle", None)
+                        if rrect and rrect.width() > 20 and rrect.height() > 8:
+                            first_row_x = int(rrect.left + min(60, rrect.width() // 4))
+                            first_row_y = int(rrect.ycenter())
+                            if filter_x == 0:
+                                filter_x = first_row_x
+                                filter_y = int(rrect.top - max(8, rrect.height() // 2))
+                    except Exception:
+                        pass
 
             delivery = {
                 "no": values.get("№", ""),
@@ -161,8 +210,6 @@ def read_kc_list(bridge, brand="rollclub"):
                 "status": values.get("Статус", ""),
             }
             rows.append(delivery)
-            if take is not None:
-                continue
 
             status = (delivery["status"] or "").lower()
             if "тмен" in status or "касов" in status or "ancel" in status:
@@ -178,15 +225,15 @@ def read_kc_list(bridge, brand="rollclub"):
                     callback_count += 1
                 else:
                     take = delivery
-                    try:
-                        rect = getattr(row, "BoundingRectangle", None)
-                        if rect and rect.width() > 20 and rect.height() > 8:
-                            take["click_x"] = int(rect.left + min(80, rect.width() // 2))
-                            take["click_y"] = int(rect.ycenter())
-                    except Exception:
-                        pass
-    except Exception as error:
-        return {"ok": False, "error": "read rows: %s" % error}
+                    if cell_no_rect:
+                        take["click_x"] = int(cell_no_rect.xcenter())
+                        take["click_y"] = int(cell_no_rect.ycenter())
+                    elif first_row_x > 0:
+                        take["click_x"] = first_row_x
+                        take["click_y"] = first_row_y
+                    break
+        except Exception:
+            continue
 
     reason = ""
     if take is None:
@@ -226,4 +273,8 @@ def read_kc_list(bridge, brand="rollclub"):
             if take and str(take["no"]).strip().isdigit()
             else 0
         ),
+        "filter_x": filter_x,
+        "filter_y": filter_y,
+        "first_row_x": first_row_x,
+        "first_row_y": first_row_y,
     }

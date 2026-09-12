@@ -2605,72 +2605,96 @@ KcMonitor:
         return
     }
     ToolTip, Ctrl+F4: беру заказ №%takeNo%...
-    clickX := 0
-    clickY := 0
-    RegExMatch(listResp, """click_x""\s*:\s*(\d+)", _cxM)
-    clickX := _cxM1 + 0
-    RegExMatch(listResp, """click_y""\s*:\s*(\d+)", _cyM)
-    clickY := _cyM1 + 0
+    ; 1) Визначаємо координати поля фільтра (Поиск) та першого рядка
+    filterX := 0
+    filterY := 0
+    firstRowX := 0
+    firstRowY := 0
+    RegExMatch(listResp, """filter_x""\s*:\s*(\d+)", _fxM)
+    filterX := _fxM1 + 0
+    RegExMatch(listResp, """filter_y""\s*:\s*(\d+)", _fyM)
+    filterY := _fyM1 + 0
+    RegExMatch(listResp, """first_row_x""\s*:\s*(\d+)", _rxM)
+    firstRowX := _rxM1 + 0
+    RegExMatch(listResp, """first_row_y""\s*:\s*(\d+)", _ryM)
+    firstRowY := _ryM1 + 0
 
-    if (clickX > 0 && clickY > 0)
+    ; 2) Клік у поле автофільтра (Поиск) та введення номера замовлення
+    if (filterX > 0 && filterY > 0)
     {
-        ToolTip, % "Ctrl+F4: відкриваю заказ №" . takeNo . "..."
-        if (kcStop)
-        {
-            kcBusy := 0
-            ToolTip, Стоп (Ctrl+F4) — заказ не відкриваю
-            SetTimer, RemoveToolTip, -1500
-            return
-        }
         _oldCoord := A_CoordModeMouse
         CoordMode, Mouse, Screen
-        Click, %clickX%, %clickY%
+        Click, %filterX%, %filterY%
+        CoordMode, Mouse, %_oldCoord%
+        Sleep, 150
+        Send, ^a
+        Sleep, 50
+        Send, {Delete}
+        Sleep, 80
+        SendInput, %takeNo%
+        Sleep, 800
+    }
+    else if (poiskX != 0)
+    {
+        Click, %poiskX%, %poiskY%
+        Sleep, 200
+        Send, ^a
+        Sleep, 50
+        Send, {Delete}          ; примусово стерти старий № перед вводом (інакше SendInput дописує → задвоєний фільтр → список порожній → холостий круг)
+        Sleep, 80
+        SendInput, %takeNo%
+        Sleep, 800
+    }
+
+    ; 3) ПЕРЕВІРКА перед пробиттям: список має звузитись РІВНО до нашого №
+    ; якщо ні (ми не на Доставках / фільтр не спрацював) — НЕ пробиваємо, пропускаємо цей круг.
+    _chk := RhGet("/api/iiko/kc-list", 6000)
+    _cnt := ""
+    RegExMatch(_chk, "count""\s*:\s*(\d+)", _cM)
+    _cnt := _cM1
+    if (_cnt != "1" || !InStr(_chk, takeNo))
+    {
+        ToolTip, % "Ctrl+F4: список не звузився до №" . takeNo . " — НЕ пробиваю (не на Доставках?)"
+        SetTimer, RemoveToolTip, -5000
+        kcBusy := 0
+        return
+    }
+
+    ; Якщо після звуження отримано актуальні координати першого рядка — оновлюємо
+    RegExMatch(_chk, """first_row_x""\s*:\s*(\d+)", _rxM2)
+    if (_rxM21 + 0 > 0)
+        firstRowX := _rxM21 + 0
+    RegExMatch(_chk, """first_row_y""\s*:\s*(\d+)", _ryM2)
+    if (_ryM21 + 0 > 0)
+        firstRowY := _ryM21 + 0
+
+    ToolTip                     ; прибрати підказку — вона перекривала рядок, клік потрапляв у неї
+    Sleep, 60
+    if (kcStop)
+    {
+        kcBusy := 0
+        ToolTip, Стоп (Ctrl+F4) — заказ не відкриваю
+        SetTimer, RemoveToolTip, -1500
+        return
+    }
+
+    ; 4) Подвійний клік по першому рядку (відкриття картки замовлення)
+    if (firstRowX > 0 && firstRowY > 0)
+    {
+        _oldCoord := A_CoordModeMouse
+        CoordMode, Mouse, Screen
+        Click, %firstRowX%, %firstRowY%
         Sleep, 120
-        Click, %clickX%, %clickY%
+        Click, %firstRowX%, %firstRowY%
         CoordMode, Mouse, %_oldCoord%
         Sleep, 700
     }
-    else
+    else if (rowX != 0)
     {
-        ; Фолбек через Поиск та RowX, якщо екранні координати рядка не отримано
-        if (poiskX != 0)
-        {
-            Click, %poiskX%, %poiskY%
-            Sleep, 200
-            Send, ^a
-            Sleep, 50
-            Send, {Delete}          ; примусово стерти старий № перед вводом (інакше SendInput дописує → задвоєний фільтр → список порожній → холостий круг)
-            Sleep, 80
-            SendInput, %takeNo%
-            Sleep, 800
-            _chk := RhGet("/api/iiko/kc-list", 6000)
-            _cnt := ""
-            RegExMatch(_chk, "count""\s*:\s*(\d+)", _cM)
-            _cnt := _cM1
-            if (_cnt != "1" || !InStr(_chk, takeNo))
-            {
-                ToolTip, % "Ctrl+F4: список не звузився до №" . takeNo . " — НЕ пробиваю (не на Доставках?)"
-                SetTimer, RemoveToolTip, -5000
-                kcBusy := 0
-                return
-            }
-        }
-        ToolTip                     ; прибрати підказку — вона перекривала рядок, клік потрапляв у неї
-        Sleep, 60
-        if (kcStop)
-        {
-            kcBusy := 0
-            ToolTip, Стоп (Ctrl+F4) — заказ не відкриваю
-            SetTimer, RemoveToolTip, -1500
-            return
-        }
-        if (rowX != 0)
-        {
-            Click, %rowX%, %rowY%
-            Sleep, 120
-            Click, %rowX%, %rowY%
-            Sleep, 700
-        }
+        Click, %rowX%, %rowY%
+        Sleep, 120
+        Click, %rowX%, %rowY%
+        Sleep, 700
     }
     ; --- ЗАХИСТ: діалог "Подтверждение: Доставка обрабатывается оператором ... продолжить?" ---
     ;    З'являється НЕ миттєво після кліку — ЧЕКАЄМО його до 2с. Є → Нет (Esc) і ПРОПУСКАЄМО.
