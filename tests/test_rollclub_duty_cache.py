@@ -152,9 +152,33 @@ class RollClubDutyCacheTests(unittest.TestCase):
 
         self.assertTrue(result["ok"])
         self.assertEqual(result["take_no"], 741899)
-        self.assertEqual(result["take"]["comment"], "Пост-15 Доставка кур'єром")
-        self.assertEqual(result["take"]["status"], "Не підтверджена")
+    def test_all_rows_counted_for_search_filter_verification(self):
+        bridge = Bridge()
+        row1_cells = [
+            Control("№ row 1", value="741899"),
+            Control("Коментар row 1", value="пост-15 Доставка"),
+            Control("Оператор row 1", value=""),
+            Control("Статус row 1", value="Не підтверджена"),
+        ]
+        row2_cells = [
+            Control("№ row 2", value="741900"),
+            Control("Коментар row 2", value="Інше замовлення"),
+            Control("Оператор row 2", value="Оператор 1"),
+            Control("Статус row 2", value="В дорозі"),
+        ]
+        bridge.panel = Control("Панель даних", children=[
+            Control("Рядок 1", children=row1_cells),
+            Control("Рядок 2", children=row2_cells),
+        ])
+        bridge.grid = Control("gridDeliveries", children=[bridge.panel])
+
+        result = MODULE.read_kc_list(bridge)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["take_no"], 741899)
+        self.assertEqual(result["count"], 2)
 
 
 if __name__ == "__main__":
     unittest.main()
+

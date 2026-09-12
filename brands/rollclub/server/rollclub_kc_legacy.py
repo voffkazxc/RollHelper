@@ -164,20 +164,20 @@ def read_kc_list(bridge, brand="rollclub"):
             if take is not None:
                 continue
 
-            status = delivery["status"] or ""
+            status = (delivery["status"] or "").lower()
             if "тмен" in status or "касов" in status or "ancel" in status:
                 cancelled_count += 1
             elif (delivery["operator"] or "").strip():
                 busy_count += 1
             else:
                 comment = delivery["comment"] or ""
-                if "Пост" not in comment:
+                comment_lower = comment.lower()
+                if "пост" not in comment_lower and "post" not in comment_lower:
                     no_post_count += 1
-                elif "Передзвонити" in comment or "Перезвонить" in comment:
+                elif "передзвонити" in comment_lower or "перезвонить" in comment_lower:
                     callback_count += 1
                 else:
                     take = delivery
-                    break
     except Exception as error:
         return {"ok": False, "error": "read rows: %s" % error}
 
