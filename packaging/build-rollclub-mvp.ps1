@@ -55,10 +55,7 @@ $gitConfig.FileName = "git"
 $gitConfig.UseShellExecute = $false
 $gitConfig.RedirectStandardOutput = $true
 $gitConfig.RedirectStandardError = $true
-[void]$gitConfig.ArgumentList.Add("-C")
-[void]$gitConfig.ArgumentList.Add($repoRoot)
-[void]$gitConfig.ArgumentList.Add("show")
-[void]$gitConfig.ArgumentList.Add("HEAD:brands/rollclub/RkConfig.ini")
+$gitConfig.Arguments = "-C `"$repoRoot`" show HEAD:brands/rollclub/RkConfig.ini"
 $gitProcess = [System.Diagnostics.Process]::Start($gitConfig)
 $configStream = [System.IO.File]::Create($packageConfig)
 $gitProcess.StandardOutput.BaseStream.CopyTo($configStream)

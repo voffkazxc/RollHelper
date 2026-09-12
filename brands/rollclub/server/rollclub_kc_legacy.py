@@ -9,7 +9,12 @@ def _read_cell(control):
     except Exception:
         pass
 
-    column = name.split(" row ")[0].strip() if " row " in name else name
+    column = name
+    for sep in (" row ", " рядок ", " строка "):
+        if sep in column.lower():
+            idx = column.lower().find(sep)
+            column = column[:idx].strip()
+            break
 
     def read_value(candidate):
         for getter in (
@@ -107,7 +112,8 @@ def read_kc_list(bridge, brand="rollclub"):
             }
         try:
             for child in grid.GetChildren():
-                if (child.Name or "").strip() == "Панель данных":
+                cname = (child.Name or "").strip()
+                if cname in ("Панель данных", "Панель даних", "Data Panel") or ("Панель" in cname and ("дан" in cname or "данн" in cname)):
                     data_panel = child
                     break
         except Exception:
@@ -117,7 +123,7 @@ def read_kc_list(bridge, brand="rollclub"):
         bridge._kc_panel_cache = data_panel
 
     grid_ready_at = time.perf_counter()
-    needed_columns = ("№", "Комментарий", "Оператор", "Статус")
+    needed_columns = ("№", "Комментарий", "Коментар", "Оператор", "Статус")
     rows = []
     take = None
     busy_count = 0
@@ -129,13 +135,18 @@ def read_kc_list(bridge, brand="rollclub"):
     try:
         for row in data_panel.GetChildren():
             row_name = (row.Name or "").strip()
-            if not row_name.startswith("Строка"):
+            if not (row_name.startswith("Строка") or row_name.startswith("Рядок") or row_name.startswith("Row")):
                 continue
             values = {}
             try:
                 for cell in row.GetChildren():
                     name = cell.Name or ""
-                    column = name.split(" row ")[0].strip() if " row " in name else name
+                    column = name
+                    for sep in (" row ", " рядок ", " строка "):
+                        if sep in column.lower():
+                            idx = column.lower().find(sep)
+                            column = column[:idx].strip()
+                            break
                     if column not in needed_columns:
                         continue
                     _, value = _read_cell(cell)
@@ -145,7 +156,7 @@ def read_kc_list(bridge, brand="rollclub"):
 
             delivery = {
                 "no": values.get("№", ""),
-                "comment": values.get("Комментарий", ""),
+                "comment": values.get("Комментарий") or values.get("Коментар") or "",
                 "operator": values.get("Оператор", ""),
                 "status": values.get("Статус", ""),
             }
@@ -154,7 +165,7 @@ def read_kc_list(bridge, brand="rollclub"):
                 continue
 
             status = delivery["status"] or ""
-            if "тмен" in status or "касов" in status:
+            if "тмен" in status or "касов" in status or "ancel" in status:
                 cancelled_count += 1
             elif (delivery["operator"] or "").strip():
                 busy_count += 1

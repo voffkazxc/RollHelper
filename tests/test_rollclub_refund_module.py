@@ -4,7 +4,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE = (ROOT / "modules" / "rollclub-refund" / "refund.ahk").read_text(encoding="utf-8-sig")
-BRIDGE = (ROOT.parent / "server" / "iiko_bridge.py").read_text(encoding="utf-8")
 ENGINE = (ROOT / "engine_rollclub.ahk").read_text(encoding="utf-8-sig")
 
 
@@ -21,16 +20,21 @@ class RollClubRefundModuleTests(unittest.TestCase):
         )
         self.assertIn('ModuleRegistry_RunExternal("refund")', ENGINE)
 
-    def test_server_returns_history_and_exact_amount_in_existing_scan(self):
-        self.assertIn("'memoEditDeliveryHistory',", BRIDGE)
-        self.assertIn("'sum_raw':          sum_raw", BRIDGE)
-        self.assertIn("'history':          val('memoEditDeliveryHistory')", BRIDGE)
-        self.assertIn("'source_label':     val('labelDeliveryNumber')", BRIDGE)
-
-    def test_module_skips_second_uia_scan_when_server_data_is_complete(self):
-        self.assertIn('Refund_JsonString(_json, "history")', MODULE)
-        self.assertIn('Refund_JsonString(_json, "sum_raw")', MODULE)
-        self.assertIn('(!_serverOk || _history = "" || _amountText = "") ? Refund_ReadUiaSnapshot() : ""', MODULE)
+    def test_module_reads_only_direct_uia_fields(self):
+        self.assertIn("Refund_ReadDirectSnapshot(_timing)", MODULE)
+        self.assertNotIn('FindAllBy("TrueCondition")', MODULE)
+        read_order = MODULE.split("Refund_ReadOrder(ByRef errorText)", 1)[1].split(
+            "Refund_ReadDirectSnapshot(ByRef timing", 1
+        )[0]
+        self.assertNotIn("Refund_ReadServerSnapshot()", read_order)
+        for automation_id in [
+            "textEditName",
+            "memoEditDeliveryComment",
+            "memoEditDeliveryHistory",
+            "labelOrderSum",
+            "labelDeliveryNumber",
+        ]:
+            self.assertIn(automation_id, MODULE)
 
     def test_operator_flow_has_one_primary_action(self):
         self.assertIn("Default gRefundBuildCopy, Сформувати та скопіювати", MODULE)

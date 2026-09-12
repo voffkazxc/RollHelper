@@ -137,6 +137,24 @@ class RollClubDutyCacheTests(unittest.TestCase):
         self.assertIn("DUTY_OPERATOR_CONFLICT", monitor)
         self.assertNotIn('if (!_busy && WinExist("ahk_class #32770"))', monitor)
 
+    def test_ukrainian_syrve_localization_is_supported(self):
+        bridge = Bridge()
+        ua_cells = [
+            Control("№ row 1", value="741899"),
+            Control("Коментар row 1", value="Пост-15 Доставка кур'єром"),
+            Control("Оператор row 1", value=""),
+            Control("Статус row 1", value="Не підтверджена"),
+        ]
+        bridge.panel = Control("Панель даних", children=[Control("Рядок 1", children=ua_cells)])
+        bridge.grid = Control("gridDeliveries", children=[bridge.panel])
+
+        result = MODULE.read_kc_list(bridge)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["take_no"], 741899)
+        self.assertEqual(result["take"]["comment"], "Пост-15 Доставка кур'єром")
+        self.assertEqual(result["take"]["status"], "Не підтверджена")
+
 
 if __name__ == "__main__":
     unittest.main()

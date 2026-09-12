@@ -42,6 +42,134 @@ IikoUI_OpenRegionsMap() {
     return IikoDriver_ClickElement("buttonDeliveryRegionsMap")
 }
 
+; 7. Прийняти вхідний PBX-дзвінок.
+IikoUI_GetPbxAcceptButton(onlyEnabled := false) {
+    iikoWin := IikoDriver_GetWindow()
+    if (!iikoWin)
+        return ""
+
+    buttonQueries := ["AutomationId=btnPbxCallAccept", "Name=Принять", "Name=Прийняти"]
+    fallbackButton := ""
+    for _, buttonQuery in buttonQueries {
+        try {
+            candidates := iikoWin.FindAllBy(buttonQuery)
+        } catch e {
+            IikoDriver_Log("PBX_ACCEPT_FIND_ERROR query='" . buttonQuery . "': " . e.Message, "WARN")
+            continue
+        }
+
+        if (!IsObject(candidates) || !candidates.MaxIndex())
+            continue
+
+        Loop, % candidates.MaxIndex() {
+            button := candidates[A_Index]
+            try {
+                rect := button.CurrentBoundingRectangle
+                nativeHwnd := button.CurrentNativeWindowHandle
+                if (button.CurrentIsOffscreen || rect.w <= 0 || rect.h <= 0 || !nativeHwnd)
+                    continue
+
+                if (button.CurrentIsEnabled)
+                    return button
+
+                if (!onlyEnabled && !IsObject(fallbackButton))
+                    fallbackButton := button
+            } catch e {
+                continue
+            }
+        }
+    }
+
+    return fallbackButton
+}
+
+IikoUI_IsElementEnabled(element) {
+    if (!IsObject(element))
+        return 0
+
+    try {
+        return element.CurrentIsEnabled ? 1 : 0
+    } catch e {
+        return -1
+    }
+}
+
+IikoUI_GetElementHwnd(element) {
+    if (!IsObject(element))
+        return 0
+
+    try {
+        nativeHwnd := element.CurrentNativeWindowHandle
+        if (nativeHwnd && DllCall("IsWindow", "Ptr", nativeHwnd))
+            return nativeHwnd
+    } catch e {
+        return 0
+    }
+
+    return 0
+}
+
+IikoUI_IsHwndEnabled(nativeHwnd) {
+    if (!nativeHwnd)
+        return 0
+    if (!DllCall("IsWindow", "Ptr", nativeHwnd))
+        return -1
+    return DllCall("IsWindowEnabled", "Ptr", nativeHwnd) ? 1 : 0
+}
+
+IikoUI_AcceptPbxCall(button := "") {
+    if (!IsObject(button))
+        button := IikoUI_GetPbxAcceptButton()
+    if (!IsObject(button))
+        return false
+
+    try {
+        if (!button.CurrentIsEnabled)
+            return false
+
+        if (button.Click()) {
+            IikoDriver_Log("NATIVE_SUCCESS: PBX accept invoked through UIA pattern")
+            return true
+        }
+
+        nativeHwnd := button.CurrentNativeWindowHandle
+        if (!nativeHwnd) {
+            IikoDriver_Log("PBX_ACCEPT_CLICK_ERROR: NativeWindowHandle is empty", "ERROR")
+            return false
+        }
+
+        VarSetCapacity(clientRect, 16, 0)
+        if (!DllCall("GetClientRect", "Ptr", nativeHwnd, "Ptr", &clientRect)) {
+            IikoDriver_Log("PBX_ACCEPT_CLICK_ERROR: GetClientRect failed for HWND=" . nativeHwnd, "ERROR")
+            return false
+        }
+
+        clientWidth := NumGet(clientRect, 8, "Int")
+        clientHeight := NumGet(clientRect, 12, "Int")
+        if (clientWidth <= 0 || clientHeight <= 0) {
+            IikoDriver_Log("PBX_ACCEPT_CLICK_ERROR: invalid client rectangle for HWND=" . nativeHwnd, "ERROR")
+            return false
+        }
+
+        clientX := Floor(clientWidth / 2)
+        clientY := Floor(clientHeight / 2)
+        clickPoint := (clientY << 16) | (clientX & 0xFFFF)
+        downQueued := DllCall("PostMessage", "Ptr", nativeHwnd, "UInt", 0x201, "Ptr", 1, "Ptr", clickPoint)
+        Sleep, 25
+        upQueued := DllCall("PostMessage", "Ptr", nativeHwnd, "UInt", 0x202, "Ptr", 0, "Ptr", clickPoint)
+        if (!downQueued || !upQueued) {
+            IikoDriver_Log("PBX_ACCEPT_CLICK_ERROR: mouse messages failed for HWND=" . nativeHwnd, "ERROR")
+            return false
+        }
+
+        IikoDriver_Log("NATIVE_SUCCESS: PBX accept clicked by HWND=" . nativeHwnd . " point=" . clientX . "," . clientY)
+        return true
+    } catch e {
+        IikoDriver_Log("PBX_ACCEPT_CLICK_ERROR: " . e.Message, "ERROR")
+        return false
+    }
+}
+
 ; 7. Нажать "Без сдачи"
 IikoUI_NoChange() {
     global cashX, cashY
