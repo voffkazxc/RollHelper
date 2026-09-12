@@ -1,4 +1,4 @@
-#Requires AutoHotkey v1.1
+﻿#Requires AutoHotkey v1.1
 #NoEnv
 #SingleInstance Force
 SetWorkingDir %A_ScriptDir%\brands\rollclub   ; дані Roll Club (конфіг, промо, кухні, img)
@@ -247,7 +247,8 @@ global KnownPromos := {}
 GoSub, LoadPromoBase
 
 ; --- База кухонь / зон ---
-global RcZonesModuleEnabled := Module_IsEnabled("zones")
+global RcZonesModuleEnabled := 0
+RcRefreshZonesModuleState()
 global KitchensPath  := RcReadableRollclubDataPath("RkKitchens.ini")
 global PresetsPath   := RcReadableRollclubDataPath("RkPresets.txt")
 global Kitchens := []          ; масив об'єктів {Name, City, Address, ...}
@@ -895,7 +896,8 @@ RcRefreshZonesModuleState() {
 
     wasEnabled := RcZonesModuleEnabled ? 1 : 0
     ModuleRegistry_RefreshExternal("zones", "rollclub-zones")
-    RcZonesModuleEnabled := Module_IsEnabled("zones")
+    kmlPath := RcReadableRollclubDataPath("zones.kml")
+    RcZonesModuleEnabled := Module_IsEnabled("zones") || FileExist(kmlPath)
     KitchensPath := RcReadableRollclubDataPath("RkKitchens.ini")
     PresetsPath := RcReadableRollclubDataPath("RkPresets.txt")
     if (RcZonesModuleEnabled && !wasEnabled)
@@ -1207,7 +1209,7 @@ DetectKitchenStatus:
         return
     ; визначаємо місто (порядок важливий: довші назви спершу)
     ; \b у PCRE не працює для кирилиці — використовуємо власні межі через look-around
-    cityList := ["Біла Церква","Івано-Франківськ","Франківськ","Дніпро","Днепр","Харків","Одеса","Львів","Київ","Рівне","Ровно","Вінниця","ІФ"]
+    cityList := ["Белая Церковь","Біла Церква","Ивано-Франковск","Івано-Франківськ","Франківськ","Дніпро","Днепр","Харьков","Харків","Одесса","Одеса","Львов","Львів","Киев","Київ","Рівне","Ровно","Винница","Вінниця","ІФ"]
     for _, c in cityList {
         pat := "i)(?<![а-яА-ЯіїєґІЇЄҐёЁ])" . c . "(?![а-яА-ЯіїєґІЇЄҐёЁ])"
         if RegExMatch(searchText, pat) {
@@ -1216,12 +1218,24 @@ DetectKitchenStatus:
         }
     }
     ; нормалізація аліасів
-    if (detectedCity == "Франківськ" || detectedCity == "ІФ")
+    if (detectedCity == "Франківськ" || detectedCity == "ІФ" || detectedCity == "Ивано-Франковск")
         detectedCity := "Івано-Франківськ"
     if (detectedCity == "Ровно")
         detectedCity := "Рівне"
     if (detectedCity == "Днепр")
         detectedCity := "Дніпро"
+    if (detectedCity == "Харьков")
+        detectedCity := "Харків"
+    if (detectedCity == "Одесса")
+        detectedCity := "Одеса"
+    if (detectedCity == "Львов")
+        detectedCity := "Львів"
+    if (detectedCity == "Киев")
+        detectedCity := "Київ"
+    if (detectedCity == "Винница")
+        detectedCity := "Вінниця"
+    if (detectedCity == "Белая Церковь")
+        detectedCity := "Біла Церква"
 
     if (hasPickup)
         citySource := " (самовивіз)"
@@ -2938,7 +2952,7 @@ OpenSettings:
     if (Module_IsEnabled("zones"))
         Gui, Settings:Add, Button, x10 y+10 w290 h28 gOpenZonesModule, Відкрити доповнення зон
     else
-        Gui, Settings:Add, Text, x10 y+10 w290 h34 c%RhC_Muted%, Зони винесені в окреме доповнення.`nУстановіть «Зони доставки RollClub» у лаунчері.
+        Gui, Settings:Add, Button, x10 y+10 w290 h28 gRcLoadKmlFile, Завантажити KML-файл зон
 
     Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
     Gui, Settings:Add, Text, w300 Center x10 y+15, ГАРЯЧІ КЛАВІШІ
@@ -3201,8 +3215,8 @@ return
 ; РЕДАКТОР СТАТУСІВ КУХОНЬ
 ; ========================================================
 OpenKitchensEditor:
-    if (!Module_IsEnabled("zones")) {
-        MsgBox, 48, Зони доставки, Кухні та зони винесені в окреме доповнення.`nУстановіть «Зони доставки RollClub» у лаунчері.
+    if (!RcRefreshZonesModuleState()) {
+        MsgBox, 48, Зони доставки, Не вдалося завантажити базу кухонь або зони доставки.
         return
     }
     GoSub, LoadKitchens          ; перечитати з диска
@@ -4357,16 +4371,24 @@ RcCheckZone:
     addr := RegExReplace(addr, "i)[,\s]+(эт|поверх|кв|квартира|под|під|п|к|парадна)(?:\.?\s*/\s*(?:офис|офіс))?\.?\s*\d+.*$", "")
     addr := RegExReplace(addr, "i)^\s*(?:м|г)\.?\s+", "")
     if (detectedCity != "")
-        addr := RegExReplace(addr, "i)^(Днепр|Дніпро|Харьков|Харків|Одесса|Одеса|Киев|Київ|Львов|Львів|Винница|Вінниця|Рівне|Ровно)[,\s]+", "")
-    addr := RegExReplace(addr, "i)(^|[,\s])(?:вул(?:иця)?|ул(?:ица)?)\.?\s+", "$1")
+        addr := RegExReplace(addr, "i)^(Днепр|Дніпро|Харьков|Харків|Одесса|Одеса|Киев|Київ|Львов|Львів|Винница|Вінниця|Рівне|Ровно|Белая Церковь|Біла Церква|Ивано-Франковск|Івано-Франківськ)[,\s]+", "")
     addr := RegExReplace(addr, "i)(^|[,\s])(?:вул(?:иця)?|ул(?:ица)?)\.?\s+", "$1")
     addr := RegExReplace(addr, "i)(^|[,\s])(?:буд(?:инок)?|дом|дім)\.?\s*", "$1")
+    addr := RegExReplace(addr, "i)(^|[,\s])(?:просп(?:ект)?|пр(?:оспект)?)\.?\s*", "$1")
+    addr := RegExReplace(addr, "i)(^|[,\s])(?:пров(?:улок)?|пер(?:еулок)?)\.?\s*", "$1")
+    addr := RegExReplace(addr, "i)(^|[,\s])(?:наб(?:ережна|ережная)?)\.?\s*", "$1")
+    addr := RegExReplace(addr, "i)(^|[,\s])(?:пл(?:оща|ощадь)?)\.?\s*", "$1")
+    addr := RegExReplace(addr, "i)(^|[,\s])(?:шосе|шоссе)\.?\s*", "$1")
     addr := RegExReplace(addr, "\s*\(.*?\)\s*", " ")
     addr := RegExReplace(addr, "i)Тополь[\-\s]*(\d)", "Тополя-$1")
     addr := RegExReplace(addr, "i)Победа[\-\s]*(\d)", "Перемога-$1")
     addr := RegExReplace(addr, "i)Сокол[\-\s]*(\d)", "Сокіл-$1")
     addr := RegExReplace(addr, "i)Красный Камень", "Червоний Камінь")
     addr := RegExReplace(addr, "i)Коммунар", "Покровський")
+    addr := RegExReplace(addr, "i)Левобережный[\-\s]*(\d)", "Лівобережний-$1")
+    addr := RegExReplace(addr, "i)Солнечный", "Сонячний")
+    addr := RegExReplace(addr, "i)Северный", "Північний")
+    addr := RegExReplace(addr, "i)Парус", "Парус")
     addr := Trim(addr)
 
     ; Show loading state
@@ -4917,6 +4939,8 @@ RcGeocodeResponseHasCity(resp, city) {
         aliases := "ровно|рівне"
     else if (needle = "ивано-франковск" || needle = "івано-франківськ" || needle = "франківськ")
         aliases := "ивано-франковск|івано-франківськ|франківськ"
+    else if (needle = "белая церковь" || needle = "біла церква")
+        aliases := "белая церковь|біла церква"
     Loop, Parse, aliases, |
         if InStr(haystack, A_LoopField)
             return 1

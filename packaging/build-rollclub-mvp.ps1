@@ -36,11 +36,7 @@ Copy-Item -LiteralPath (Join-Path $repoRoot "core") -Destination $rollHelperRoot
 Copy-Item -LiteralPath (Join-Path $repoRoot "lib") -Destination $rollHelperRoot -Recurse
 Copy-Item -Path (Join-Path $repoRoot "brands\rollclub\*") -Destination (Join-Path $rollHelperRoot "brands\rollclub") -Recurse
 foreach ($zoneFile in @(
-    "RkKitchens.ini",
     "RkKitchens.ini.bak_sheet",
-    "RkPresets.txt",
-    "zones.kml",
-    "zones_map.ini",
     "zones_map.BEFORE_NEW_MAPPINGS_20260726_215931.ini"
 )) {
     $zonePath = Join-Path $rollHelperRoot "brands\rollclub\$zoneFile"

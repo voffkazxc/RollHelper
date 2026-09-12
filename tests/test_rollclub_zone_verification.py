@@ -74,6 +74,43 @@ class RollClubZoneVerificationTests(unittest.TestCase):
         self.assertIn('RcCurrentKitchen := ""', reset_section)
         self.assertIn('lastZoneName := ""', reset_section)
 
+    def test_bundled_zones_enable_module_without_external_package(self):
+        self.assertIn('RcZonesModuleEnabled := Module_IsEnabled("zones") || FileExist(kmlPath)', self.source)
+
+    def test_bilingual_city_aliases_and_normalizations(self):
+        for city_ru, city_ua in [
+            ("Харьков", "Харків"),
+            ("Одесса", "Одеса"),
+            ("Киев", "Київ"),
+            ("Днепр", "Дніпро"),
+            ("Львов", "Львів"),
+            ("Винница", "Вінниця"),
+            ("Ровно", "Рівне"),
+            ("Белая Церковь", "Біла Церква"),
+        ]:
+            self.assertIn(f'"{city_ru}"', self.source)
+            self.assertIn(f'detectedCity := "{city_ua}"', self.source)
+
+    def test_bilingual_street_prefix_and_microdistrict_cleaning(self):
+        self.assertIn("Тополя-$1", self.source)
+        self.assertIn("Перемога-$1", self.source)
+        self.assertIn("Сокіл-$1", self.source)
+        self.assertIn("Червоний Камінь", self.source)
+        self.assertIn("Покровський", self.source)
+        self.assertIn("Лівобережний-$1", self.source)
+        self.assertIn("Сонячний", self.source)
+        self.assertIn("Північний", self.source)
+        self.assertIn("шосе|шоссе", self.source)
+
+    def test_build_script_preserves_zone_files(self):
+        build_script = (ENGINE_PATH.parent / "packaging" / "build-rollclub-mvp.ps1").read_text(encoding="utf-8")
+        self.assertNotIn('"zones.kml"', build_script)
+        self.assertNotIn('"zones_map.ini"', build_script)
+        self.assertNotIn('"RkPresets.txt"', build_script)
+        self.assertIn('"zones_map.BEFORE_NEW_MAPPINGS_20260726_215931.ini"', build_script)
+
 
 if __name__ == "__main__":
     unittest.main()
+
+
