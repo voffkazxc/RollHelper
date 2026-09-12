@@ -338,10 +338,42 @@ class RollClubDutyCacheTests(unittest.TestCase):
         bridge.panel = Control("Панель данных", children=[target_row])
         bridge.grid = Control("gridDeliveries", children=[bridge.panel])
 
+    def test_aggregator_orders_bolt_glovo_are_skipped(self):
+        bridge = Bridge()
+        row_cells = [
+            Control("№ row 1", value="741910"),
+            Control("Примечание row 1", value="Заказ Bolt Food курьер заберет"),
+            Control("Оператор row 1", value=""),
+            Control("Статус row 1", value="Не подтверждена"),
+        ]
+        target_row = Control("Строка 1", children=row_cells)
+        bridge.panel = Control("Панель данных", children=[target_row])
+        bridge.grid = Control("gridDeliveries", children=[bridge.panel])
+
         result = MODULE.read_kc_list(bridge)
         self.assertTrue(result["ok"])
         self.assertIsNone(result["take"])
         self.assertEqual(result["take_no"], 0)
+        self.assertIn("агрегатори 1", result["reason"])
+
+    def test_offscreen_grid_returns_error(self):
+        bridge = Bridge()
+        bridge.grid.IsOffscreen = True
+        result = MODULE.read_kc_list(bridge)
+        self.assertFalse(result["ok"])
+        self.assertIn("прихована", result["error"])
+
+    def test_engine_has_no_tab_cycling_in_duty(self):
+        engine_path = MODULE_PATH.parents[3] / "engine_rollclub.ahk"
+        source = engine_path.read_text(encoding="utf-8-sig")
+
+        # Extract KcDutyTick and KcMonitor section
+        kc_tick_pos = source.index("KcDutyTick:")
+        kc_mon_end = source.index("#IfWinActive Rollclub PRO 33.0", kc_tick_pos)
+        duty_code = source[kc_tick_pos:kc_mon_end]
+
+        # Verify Send, ^{Tab} is completely absent from duty loop
+        self.assertNotIn("^{Tab}", duty_code)
 
 
 if __name__ == "__main__":

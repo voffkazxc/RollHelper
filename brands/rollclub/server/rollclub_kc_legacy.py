@@ -62,8 +62,16 @@ def read_kc_list(bridge, brand="rollclub"):
     data_panel = None
     cached = 0
     try:
+        delivery_form = getattr(bridge, "get_delivery_form", None)
+        if delivery_form and delivery_form() is not None:
+            bridge._kc_panel_cache = None
+            return {
+                "ok": False,
+                "error_code": "ACTIVE_ORDER_CARD",
+                "error": "Активна карточка заказа, а не список Доставки",
+            }
         foreground = bridge._get_foreground_win()
-        if bridge._find_by_id(foreground, "DeliveryOrderEditControl", max_depth=8) is not None:
+        if foreground and bridge._find_by_id(foreground, "DeliveryOrderEditControl", max_depth=15) is not None:
             bridge._kc_panel_cache = None
             return {
                 "ok": False,
@@ -90,9 +98,20 @@ def read_kc_list(bridge, brand="rollclub"):
         if grid is not None:
             try:
                 _ = grid.AutomationId
+                if getattr(grid, "IsOffscreen", False):
+                    grid = None
+                    bridge._kc_grid_cache = None
+                    bridge._kc_panel_cache = None
+                else:
+                    grect = getattr(grid, "BoundingRectangle", None)
+                    if grect and (grect.width() <= 20 or grect.height() <= 20):
+                        grid = None
+                        bridge._kc_grid_cache = None
+                        bridge._kc_panel_cache = None
             except Exception:
                 grid = None
                 bridge._kc_grid_cache = None
+                bridge._kc_panel_cache = None
 
         if grid is None:
             window = None
@@ -129,6 +148,11 @@ def read_kc_list(bridge, brand="rollclub"):
                 return {
                     "ok": False,
                     "error": "Список Доставки не відкрито (немає gridDeliveries)",
+                }
+            if getattr(grid, "IsOffscreen", False):
+                return {
+                    "ok": False,
+                    "error": "Вкладка «Доставки» не активна (прихована)",
                 }
             bridge._kc_grid_cache = grid
 
@@ -181,7 +205,7 @@ def read_kc_list(bridge, brand="rollclub"):
     take = None
     busy_count = 0
     callback_count = 0
-    no_post_count = 0
+    aggregator_count = 0
     cancelled_count = 0
     cell_error_count = 0
     filter_x = 0
@@ -295,6 +319,17 @@ def read_kc_list(bridge, brand="rollclub"):
                 )
             )
 
+            is_aggregator = any(
+                w in combined_text
+                for w in (
+                    "bolt",
+                    "болт",
+                    "glovo",
+                    "глово",
+                    "ракета",
+                )
+            )
+
             status = (delivery["status"] or "").lower()
             is_cancelled = any(w in status for w in ("тмен", "касов", "ancel"))
             is_eligible_status = any(w in status for w in ("подтвер", "підтвер", "необраб", "необроб", "не обраб", "не оброб", "нов", "new", "unconfirm"))
@@ -304,6 +339,8 @@ def read_kc_list(bridge, brand="rollclub"):
                 cancelled_count += 1
             elif (delivery["operator"] or "").strip():
                 busy_count += 1
+            elif is_aggregator:
+                aggregator_count += 1
             elif is_closed or (status and not is_eligible_status):
                 # Order is already being cooked, delivered, or completed
                 pass
@@ -329,11 +366,12 @@ def read_kc_list(bridge, brand="rollclub"):
             reason = "рядки знайдені, але значення клітинок не прочитані"
         else:
             reason = (
-                "всього %d: зайнято %d, передзвонити %d, відмінені %d"
+                "всього %d: зайнято %d, передзвонити %d, агрегатори %d, відмінені %d"
                 % (
                     len(rows),
                     busy_count,
                     callback_count,
+                    aggregator_count,
                     cancelled_count,
                 )
             )
