@@ -2599,6 +2599,7 @@ KcMonitor:
         _reason := ""
         RegExMatch(listResp, "reason""\s*:\s*""([^""]*)", _rM)
         _reason := _rM1
+        FileAppend, % "[" . A_Now . "] KC NO_ORDER: " . _reason . " resp=" . SubStr(listResp,1,160) . "`n", %A_ScriptDir%\ahk_debug.log
         ToolTip, % "Ctrl+F4: нема вільних для взяття`n" . _reason
         SetTimer, RemoveToolTip, -8000
         kcBusy := 0
@@ -2618,6 +2619,7 @@ KcMonitor:
     firstRowX := _rxM1 + 0
     RegExMatch(listResp, """first_row_y""\s*:\s*(\d+)", _ryM)
     firstRowY := _ryM1 + 0
+    FileAppend, % "[" . A_Now . "] KC TAKING: №" . takeNo . " filter=(" . filterX . "," . filterY . ") firstRow=(" . firstRowX . "," . firstRowY . ") poisk=(" . poiskX . "," . poiskY . ") row=(" . rowX . "," . rowY . ")`n", %A_ScriptDir%\ahk_debug.log
 
     ; 2) Клік у поле автофільтра (Поиск) та введення номера замовлення
     if (filterX > 0 && filterY > 0)
@@ -2654,6 +2656,7 @@ KcMonitor:
     _cnt := _cM1
     if (_cnt != "1" || !InStr(_chk, takeNo))
     {
+        FileAppend, % "[" . A_Now . "] KC NOT_NARROWED: expected №" . takeNo . " got cnt=" . _cnt . " chk=" . SubStr(_chk,1,160) . "`n", %A_ScriptDir%\ahk_debug.log
         ToolTip, % "Ctrl+F4: список не звузився до №" . takeNo . " — НЕ пробиваю (не на Доставках?)"
         SetTimer, RemoveToolTip, -5000
         kcBusy := 0
@@ -2679,6 +2682,7 @@ KcMonitor:
     }
 
     ; 4) Подвійний клік по першому рядку (відкриття картки замовлення)
+    FileAppend, % "[" . A_Now . "] KC OPENING: №" . takeNo . " click=(" . firstRowX . "," . firstRowY . ") fallback=(" . rowX . "," . rowY . ")`n", %A_ScriptDir%\ahk_debug.log
     if (firstRowX > 0 && firstRowY > 0)
     {
         _oldCoord := A_CoordModeMouse
@@ -2712,6 +2716,7 @@ KcMonitor:
         WinGetTitle, _busyTitle, ahk_id %_busyHwnd%
         WinGetText, _busyText, ahk_id %_busyHwnd%
         FileAppend, % "[" . A_Now . "] DUTY_OPERATOR_CONFLICT hwnd=" . _busyHwnd . " title=[" . _busyTitle . "] text=[" . RegExReplace(_busyText, "[\r\n]+", " ") . "]`n", %A_ScriptDir%\parse_debug.log
+        FileAppend, % "[" . A_Now . "] KC CONFLICT: №" . takeNo . " dialog detected, skipping`n", %A_ScriptDir%\ahk_debug.log
         WinActivate, ahk_id %_busyHwnd%
         Send, {Esc}
         Sleep, 250

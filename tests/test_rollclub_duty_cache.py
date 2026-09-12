@@ -218,6 +218,54 @@ class RollClubDutyCacheTests(unittest.TestCase):
         self.assertEqual(result["take"]["click_x"], 100)
         self.assertEqual(result["take"]["click_y"], 220)
 
+    def test_dnipro_and_kyiv_orders_are_taken(self):
+        bridge = Bridge()
+        row_cells = [
+            Control("№ row 1", value="857847"),
+            Control("Коментар row 1", value="Дніпро Доставка кур'єром"),
+            Control("Оператор row 1", value=""),
+            Control("Статус row 1", value="Не підтверджена"),
+        ]
+        target_row = Control("Рядок 1", children=row_cells)
+        bridge.panel = Control("Панель даних", children=[target_row])
+        bridge.grid = Control("gridDeliveries", children=[bridge.panel])
+
+        result = MODULE.read_kc_list(bridge)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["take_no"], 857847)
+
+    def test_lowercase_and_arbitrary_row_names_recognized(self):
+        bridge = Bridge()
+        row_cells = [
+            Control("№ row 1", value="796776"),
+            Control("Коментар row 1", value="Київ Доставка"),
+            Control("Оператор row 1", value=""),
+            Control("Статус row 1", value="Не підтверджена"),
+        ]
+        # DevExpress might name row in lowercase, by order number, or empty
+        target_row = Control("рядок 1", children=row_cells)
+        bridge.panel = Control("панель даних", children=[target_row])
+        bridge.grid = Control("gridDeliveries", children=[bridge.panel])
+        result = MODULE.read_kc_list(bridge)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["take_no"], 796776)
+
+    def test_order_number_with_prefix_and_nomer_column(self):
+        bridge = Bridge()
+        row_cells = [
+            Control("Номер row 1", value="№ 857847"),
+            Control("Коментар row 1", value="Дніпро самовивіз"),
+            Control("Оператор row 1", value=""),
+            Control("Статус row 1", value="Не підтверджена"),
+        ]
+        target_row = Control("рядок 1", children=row_cells)
+        bridge.panel = Control("панель даних", children=[target_row])
+        bridge.grid = Control("gridDeliveries", children=[bridge.panel])
+
+        result = MODULE.read_kc_list(bridge)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["take_no"], 857847)
+
 
 if __name__ == "__main__":
     unittest.main()

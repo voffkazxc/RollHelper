@@ -20,11 +20,18 @@ def _read_cell(control):
         for getter in (
             lambda item: item.GetValuePattern().Value,
             lambda item: item.GetLegacyIAccessiblePattern().Value,
+            lambda item: item.GetLegacyIAccessiblePattern().Name,
+            lambda item: item.Name,
         ):
             try:
                 value = getter(candidate)
                 if value and str(value).strip():
-                    return str(value).strip()
+                    val_str = str(value).strip()
+                    if any(sep in val_str.lower() for sep in (" row ", " рядок ", " строка ")):
+                        continue
+                    if val_str.lower() == column.lower():
+                        continue
+                    return val_str
             except Exception:
                 pass
         return ""
@@ -68,9 +75,13 @@ def read_kc_list(bridge, brand="rollclub"):
 
     if bridge._kc_panel_cache is not None:
         try:
-            bridge._kc_panel_cache.GetChildren()
-            data_panel = bridge._kc_panel_cache
-            cached = 1
+            cached_children = bridge._kc_panel_cache.GetChildren()
+            if cached_children and len(cached_children) > 0:
+                data_panel = bridge._kc_panel_cache
+                children = cached_children
+                cached = 1
+            else:
+                bridge._kc_panel_cache = None
         except Exception:
             bridge._kc_panel_cache = None
 
@@ -111,19 +122,31 @@ def read_kc_list(bridge, brand="rollclub"):
                 "error": "Список Доставки не відкрито (немає gridDeliveries)",
             }
         try:
-            for child in grid.GetChildren():
-                cname = (child.Name or "").strip()
-                if cname in ("Панель данных", "Панель даних", "Data Panel") or ("Панель" in cname and ("дан" in cname or "данн" in cname)):
+            grid_children = grid.GetChildren()
+            for child in grid_children:
+                cname = (child.Name or "").strip().lower()
+                if "дан" in cname or "data" in cname or "panel" in cname or "панель" in cname:
                     data_panel = child
                     break
+            if data_panel is None:
+                for child in grid_children:
+                    sub = child.GetChildren()
+                    if sub and len(sub) > 0:
+                        data_panel = child
+                        break
         except Exception:
             pass
         if data_panel is None:
             return {"ok": False, "error": "Панель данных не знайдено"}
         bridge._kc_panel_cache = data_panel
+        try:
+            children = data_panel.GetChildren()
+        except Exception as error:
+            bridge._kc_panel_cache = None
+            return {"ok": False, "error": "get data_panel children: %s" % error}
 
     grid_ready_at = time.perf_counter()
-    needed_columns = ("№", "Комментарий", "Коментар", "Оператор", "Статус")
+    needed_columns = ("№", "Номер", "Комментарий", "Коментар", "Оператор", "Статус")
     rows = []
     take = None
     busy_count = 0
@@ -136,11 +159,6 @@ def read_kc_list(bridge, brand="rollclub"):
     first_row_x = 0
     first_row_y = 0
 
-    try:
-        children = data_panel.GetChildren()
-    except Exception as error:
-        return {"ok": False, "error": "get data_panel children: %s" % error}
-
     for row in children:
         try:
             row_name = (row.Name or "").strip()
@@ -149,7 +167,7 @@ def read_kc_list(bridge, brand="rollclub"):
                 try:
                     for cell in row.GetChildren():
                         cname = (cell.Name or "").lower()
-                        if cname.startswith("№") or " №" in cname or "№ " in cname:
+                        if cname.startswith("№") or " №" in cname or "№ " in cname or "номер" in cname:
                             crect = getattr(cell, "BoundingRectangle", None)
                             if crect and crect.width() > 10 and crect.height() > 5:
                                 filter_x = int(crect.xcenter())
@@ -159,30 +177,35 @@ def read_kc_list(bridge, brand="rollclub"):
                     pass
                 continue
 
-            if not (row_name.startswith("Строка") or row_name.startswith("Рядок") or row_name.startswith("Row")):
+            if any(skip in row_name_lower for skip in ("заголовок", "header", "колонк", "скролл", "scroll", "прокрут")):
                 continue
 
             values = {}
             cell_no_rect = None
             try:
-                for cell in row.GetChildren():
-                    name = cell.Name or ""
-                    column = name
-                    for sep in (" row ", " рядок ", " строка "):
-                        if sep in column.lower():
-                            idx = column.lower().find(sep)
-                            column = column[:idx].strip()
-                            break
-                    if column == "№":
-                        crect = getattr(cell, "BoundingRectangle", None)
-                        if crect and crect.width() > 10 and crect.height() > 5:
-                            cell_no_rect = crect
-                    if column not in needed_columns:
-                        continue
-                    _, value = _read_cell(cell)
-                    values[column] = value
+                cells = row.GetChildren()
             except Exception:
-                cell_error_count += 1
+                cells = []
+
+            for cell in cells:
+                name = cell.Name or ""
+                column = name
+                for sep in (" row ", " рядок ", " строка "):
+                    if sep in column.lower():
+                        idx = column.lower().find(sep)
+                        column = column[:idx].strip()
+                        break
+                if column in ("№", "Номер"):
+                    crect = getattr(cell, "BoundingRectangle", None)
+                    if crect and crect.width() > 10 and crect.height() > 5:
+                        cell_no_rect = crect
+                if column not in needed_columns:
+                    continue
+                _, value = _read_cell(cell)
+                values[column] = value
+
+            if not values and not any(k in row_name_lower for k in ("строк", "рядок", "row", "запис")):
+                continue
 
             if first_row_x == 0:
                 if cell_no_rect:
@@ -204,7 +227,7 @@ def read_kc_list(bridge, brand="rollclub"):
                         pass
 
             delivery = {
-                "no": values.get("№", ""),
+                "no": values.get("№") or values.get("Номер") or "",
                 "comment": values.get("Комментарий") or values.get("Коментар") or "",
                 "operator": values.get("Оператор", ""),
                 "status": values.get("Статус", ""),
@@ -219,9 +242,7 @@ def read_kc_list(bridge, brand="rollclub"):
             else:
                 comment = delivery["comment"] or ""
                 comment_lower = comment.lower()
-                if "пост" not in comment_lower and "post" not in comment_lower:
-                    no_post_count += 1
-                elif "передзвонити" in comment_lower or "перезвонить" in comment_lower:
+                if "передзвонити" in comment_lower or "перезвонить" in comment_lower:
                     callback_count += 1
                 else:
                     take = delivery
@@ -235,24 +256,37 @@ def read_kc_list(bridge, brand="rollclub"):
         except Exception:
             continue
 
+    if len(rows) == 0:
+        bridge._kc_panel_cache = None
+
     reason = ""
     if take is None:
         if rows and not any(row["no"] for row in rows):
             reason = "рядки знайдені, але значення клітинок не прочитані"
         else:
             reason = (
-                "всього %d: зайнято %d, передзвонити %d, без Пост %d, відмінені %d"
+                "всього %d: зайнято %d, передзвонити %d, відмінені %d"
                 % (
                     len(rows),
                     busy_count,
                     callback_count,
-                    no_post_count,
                     cancelled_count,
                 )
             )
 
+    info_str = ""
+    if take:
+        info_str = "TAKE: №%s (op='%s', st='%s', comm='%s')" % (take.get("no"), take.get("operator"), take.get("status"), take.get("comment"))
+    elif rows:
+        info_str = "NO_TAKE: first=%s" % (", ".join("№%s[%s]" % (r.get("no"), r.get("operator") or "free") for r in rows[:3]))
+    else:
+        info_str = "ZERO_ROWS (data_panel children: %d)" % len(children)
+        if children:
+            child_names = [repr(getattr(c, "Name", None)) for c in children[:5]]
+            info_str += " names=[%s]" % (", ".join(child_names))
+
     bridge._log(
-        "KC-LIST LEGACY timing s: cached=%d find=%.2f read_rows=%.2f TOTAL=%.2f rows=%d cell_errors=%d"
+        "KC-LIST LEGACY timing s: cached=%d find=%.2f read_rows=%.2f TOTAL=%.2f rows=%d cell_errors=%d | %s"
         % (
             cached,
             grid_ready_at - started_at,
@@ -260,19 +294,23 @@ def read_kc_list(bridge, brand="rollclub"):
             time.perf_counter() - started_at,
             len(rows),
             cell_error_count,
+            info_str,
         )
     )
+    clean_take_no = 0
+    if take and take.get("no"):
+        import re
+        m = re.search(r"\d+", str(take["no"]))
+        if m:
+            clean_take_no = int(m.group())
+
     return {
         "ok": True,
         "count": len(rows),
         "rows": rows,
         "take": take,
         "reason": reason,
-        "take_no": (
-            int(take["no"])
-            if take and str(take["no"]).strip().isdigit()
-            else 0
-        ),
+        "take_no": clean_take_no,
         "filter_x": filter_x,
         "filter_y": filter_y,
         "first_row_x": first_row_x,
