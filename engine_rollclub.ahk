@@ -2622,28 +2622,20 @@ KcMonitor:
     FileAppend, % "[" . A_Now . "] KC TAKING: №" . takeNo . " filter=(" . filterX . "," . filterY . ") firstRow=(" . firstRowX . "," . firstRowY . ") poisk=(" . poiskX . "," . poiskY . ") row=(" . rowX . "," . rowY . ")`n", %A_ScriptDir%\ahk_debug.log
 
     ; 2) Клік у поле автофільтра (Поиск) та введення номера замовлення
-    if (poiskX != 0)
-    {
-        Click, %poiskX%, %poiskY%
-        Sleep, 200
-        Send, ^a
-        Sleep, 50
-        Send, {Delete}          ; примусово стерти старий № перед вводом (інакше SendInput дописує → задвоєний фільтр → список порожній → холостий круг)
-        Sleep, 80
-        SendInput, %takeNo%
-        Sleep, 800
-    }
-    else if (filterX > 0 && filterY > 0)
+    targetPoiskX := (poiskX != 0) ? poiskX : filterX
+    targetPoiskY := (poiskX != 0) ? poiskY : filterY
+    if (targetPoiskX > 0 && targetPoiskY > 0)
     {
         _oldCoord := A_CoordModeMouse
         CoordMode, Mouse, Screen
-        Click, %filterX%, %filterY%
+        Click, %targetPoiskX%, %targetPoiskY%
         CoordMode, Mouse, %_oldCoord%
         Sleep, 150
-        Send, ^a
+        ; Безпечне очищення рядка вводу без Ctrl+A (щоб не виділяти всю таблицю, якщо клік потрапив у сітку)
+        Send, {Home}+{End}{Delete}
         Sleep, 50
-        Send, {Delete}
-        Sleep, 80
+        Send, {BackSpace 10}
+        Sleep, 50
         SendInput, %takeNo%
         Sleep, 800
     }
@@ -2691,23 +2683,54 @@ KcMonitor:
 
     ; 4) Подвійний клік по першому рядку (відкриття картки замовлення)
     FileAppend, % "[" . A_Now . "] KC OPENING: №" . takeNo . " poisk=(" . poiskX . "," . poiskY . ") row=(" . rowX . "," . rowY . ") uiaRow=(" . firstRowX . "," . firstRowY . ")`n", %A_ScriptDir%\ahk_debug.log
-    if (rowX != 0)
-    {
-        Click, %rowX%, %rowY%
-        Sleep, 120
-        Click, %rowX%, %rowY%
-        Sleep, 700
-    }
-    else if (firstRowX > 0 && firstRowY > 0)
+    targetRowX := (rowX != 0) ? rowX : firstRowX
+    targetRowY := (rowX != 0) ? rowY : firstRowY
+    if (targetRowX > 0 && targetRowY > 0)
     {
         _oldCoord := A_CoordModeMouse
         CoordMode, Mouse, Screen
-        Click, %firstRowX%, %firstRowY%
+        Click, %targetRowX%, %targetRowY%
         Sleep, 120
-        Click, %firstRowX%, %firstRowY%
+        Click, %targetRowX%, %targetRowY%
         CoordMode, Mouse, %_oldCoord%
-        Sleep, 700
+        Sleep, 500
     }
+
+    ; --- КРИТИЧНИЙ ЗАХИСТ: перевірка, чи РЕАЛЬНО відкрилася картка замовлення ---
+    ; Чекаємо до 3 секунд появи активної картки замовлення.
+    ; Якщо замовлення НЕ відкрилося — КАТЕГОРИЧНО ЗАБОРОНЕНО натискати тільду або вносити палички!
+    _cardOpened := 0
+    _cardDeadline := A_TickCount + 2500
+    while (A_TickCount < _cardDeadline)
+    {
+        _chkCard := RhGet("/api/iiko/kc-list", 1200)
+        if InStr(_chkCard, "ACTIVE_ORDER_CARD")
+        {
+            _cardOpened := 1
+            break
+        }
+        ; Якщо перший клік за rowX не спрацював, але маємо firstRowX від UIA — робимо спробу за UIA
+        if (A_TickCount > _cardDeadline - 1300 && !_cardOpened && firstRowX > 0 && firstRowY > 0 && (targetRowX != firstRowX || targetRowY != firstRowY))
+        {
+            _oldCoord := A_CoordModeMouse
+            CoordMode, Mouse, Screen
+            Click, %firstRowX%, %firstRowY%
+            Sleep, 120
+            Click, %firstRowX%, %firstRowY%
+            CoordMode, Mouse, %_oldCoord%
+            Sleep, 500
+        }
+        Sleep, 150
+    }
+    if (!_cardOpened)
+    {
+        FileAppend, % "[" . A_Now . "] KC OPEN_FAILED: order card №" . takeNo . " did not open, aborting punch`n", %A_ScriptDir%\ahk_debug.log
+        ToolTip, % "Ctrl+F4: замовлення №" . takeNo . " НЕ відкрилося! Спробуй відкалібрувати Poisk/Row в налаштуваннях"
+        SetTimer, RemoveToolTip, -5000
+        kcBusy := 0
+        return
+    }
+
     ; --- ЗАХИСТ: діалог "Подтверждение: Доставка обрабатывается оператором ... продолжить?" ---
     ;    З'являється НЕ миттєво після кліку — ЧЕКАЄМО його до 2с. Є → Нет (Esc) і ПРОПУСКАЄМО.
     _busyHwnd := 0

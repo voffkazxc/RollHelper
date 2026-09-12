@@ -194,6 +194,10 @@ class RollClubDutyCacheTests(unittest.TestCase):
                 return (self.top + self.bottom) // 2
 
         bridge = Bridge()
+        filter_no_cell = Control("№ filter", value="")
+        filter_no_cell.BoundingRectangle = MockRect(50, 160, 150, 200)
+        filter_row = Control("Рядок фільтра", children=[filter_no_cell])
+
         no_cell = Control("№ row 1", value="741899")
         no_cell.BoundingRectangle = MockRect(50, 200, 150, 240)
         row_cells = [
@@ -204,7 +208,7 @@ class RollClubDutyCacheTests(unittest.TestCase):
         ]
         target_row = Control("Рядок 1", children=row_cells)
         target_row.BoundingRectangle = MockRect(0, 200, 800, 240)
-        bridge.panel = Control("Панель даних", children=[target_row])
+        bridge.panel = Control("Панель даних", children=[filter_row, target_row])
         bridge.grid = Control("gridDeliveries", children=[bridge.panel])
 
         result = MODULE.read_kc_list(bridge)
@@ -290,18 +294,54 @@ class RollClubDutyCacheTests(unittest.TestCase):
         source = engine_path.read_text(encoding="utf-8-sig")
 
         # 1. Verify poiskX is prioritized over filterX
-        poisk_pos = source.index("if (poiskX != 0)")
-        filter_pos = source.index("else if (filterX > 0 && filterY > 0)")
-        self.assertLess(poisk_pos, filter_pos)
+        self.assertIn("targetPoiskX := (poiskX != 0) ? poiskX : filterX", source)
 
         # 2. Verify narrowing check has retry loop
         self.assertIn("_chkDeadline := A_TickCount + 2500", source)
         self.assertIn("while (A_TickCount < _chkDeadline)", source)
 
         # 3. Verify rowX is prioritized over firstRowX
-        row_pos = source.index("if (rowX != 0)", filter_pos)
-        first_row_pos = source.index("else if (firstRowX > 0 && firstRowY > 0)", row_pos)
-        self.assertLess(row_pos, first_row_pos)
+        self.assertIn("targetRowX := (rowX != 0) ? rowX : firstRowX", source)
+
+        # 4. Verify order card opened guard prevents TriggerMain on unopened orders
+        card_guard_pos = source.index("if (!_cardOpened)")
+        trigger_main_pos = source.index("GoSub, TriggerMain")
+        self.assertLess(card_guard_pos, trigger_main_pos)
+
+    def test_callback_orders_with_note_and_comment_are_skipped(self):
+        bridge = Bridge()
+        row_cells = [
+            Control("№ row 1", value="741899"),
+            Control("Примечание row 1", value="Перезвонить клиенту для уточнения"),
+            Control("Оператор row 1", value=""),
+            Control("Статус row 1", value="Не подтверждена"),
+        ]
+        target_row = Control("Строка 1", children=row_cells)
+        bridge.panel = Control("Панель данных", children=[target_row])
+        bridge.grid = Control("gridDeliveries", children=[bridge.panel])
+
+        result = MODULE.read_kc_list(bridge)
+        self.assertTrue(result["ok"])
+        self.assertIsNone(result["take"])
+        self.assertEqual(result["take_no"], 0)
+        self.assertIn("передзвонити 1", result["reason"])
+
+    def test_cooked_and_delivered_orders_are_skipped(self):
+        bridge = Bridge()
+        row_cells = [
+            Control("№ row 1", value="741899"),
+            Control("Примечание row 1", value="Обычный заказ"),
+            Control("Оператор row 1", value=""),
+            Control("Статус row 1", value="Готовится"),
+        ]
+        target_row = Control("Строка 1", children=row_cells)
+        bridge.panel = Control("Панель данных", children=[target_row])
+        bridge.grid = Control("gridDeliveries", children=[bridge.panel])
+
+        result = MODULE.read_kc_list(bridge)
+        self.assertTrue(result["ok"])
+        self.assertIsNone(result["take"])
+        self.assertEqual(result["take_no"], 0)
 
 
 if __name__ == "__main__":

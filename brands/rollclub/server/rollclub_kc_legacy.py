@@ -217,6 +217,7 @@ def read_kc_list(bridge, brand="rollclub"):
             except Exception:
                 cells = []
 
+            all_cell_texts = []
             for cell in cells:
                 name = (cell.Name or "").strip()
                 name_lower = name.lower()
@@ -232,15 +233,17 @@ def read_kc_list(bridge, brand="rollclub"):
                     crect = getattr(cell, "BoundingRectangle", None)
                     if crect and crect.width() > 10 and crect.height() > 5:
                         cell_no_rect = crect
-                elif "комент" in name_lower or "comment" in name_lower:
+                elif any(k in name_lower for k in ("комент", "коммент", "comment", "примеч", "приміт", "інфо", "инфо", "опис")):
                     col_key = "comment"
                 elif "оператор" in name_lower or "operator" in name_lower:
                     col_key = "operator"
                 elif "статус" in name_lower or "стан" in name_lower or "status" in name_lower:
                     col_key = "status"
 
+                _, value = _read_cell(cell)
+                if value:
+                    all_cell_texts.append(value)
                 if col_key:
-                    _, value = _read_cell(cell)
                     values[col_key] = value
 
             if not values and not any(k in row_name_lower for k in ("строк", "рядок", "row", "запис")):
@@ -260,18 +263,12 @@ def read_kc_list(bridge, brand="rollclub"):
                 if cell_no_rect:
                     first_row_x = int(cell_no_rect.xcenter())
                     first_row_y = int(cell_no_rect.ycenter())
-                    if filter_x == 0:
-                        filter_x = first_row_x
-                        filter_y = int(cell_no_rect.top - max(8, cell_no_rect.height() // 2))
                 else:
                     try:
                         rrect = getattr(row, "BoundingRectangle", None)
                         if rrect and rrect.width() > 20 and rrect.height() > 8:
                             first_row_x = int(rrect.left + min(60, rrect.width() // 4))
                             first_row_y = int(rrect.ycenter())
-                            if filter_x == 0:
-                                filter_x = first_row_x
-                                filter_y = int(rrect.top - max(8, rrect.height() // 2))
                     except Exception:
                         pass
 
@@ -283,25 +280,46 @@ def read_kc_list(bridge, brand="rollclub"):
             }
             rows.append(delivery)
 
+            combined_text = (values.get("comment", "") + " " + " ".join(all_cell_texts)).lower()
+            is_callback = any(
+                w in combined_text
+                for w in (
+                    "перезвон",
+                    "передзвон",
+                    "перетелефону",
+                    "позвон",
+                    "подзвон",
+                    "зателефону",
+                    "наберіть",
+                    "наберите",
+                )
+            )
+
             status = (delivery["status"] or "").lower()
-            if "тмен" in status or "касов" in status or "ancel" in status:
+            is_cancelled = any(w in status for w in ("тмен", "касов", "ancel"))
+            is_eligible_status = any(w in status for w in ("подтвер", "підтвер", "необраб", "необроб", "не обраб", "не оброб", "нов", "new", "unconfirm"))
+            is_closed = any(w in status for w in ("доставл", "закр", "выдан", "видан", "готов", "в пути", "в дороз"))
+
+            if is_cancelled:
                 cancelled_count += 1
             elif (delivery["operator"] or "").strip():
                 busy_count += 1
+            elif is_closed or (status and not is_eligible_status):
+                # Order is already being cooked, delivered, or completed
+                pass
+            elif is_callback:
+                callback_count += 1
+            elif not delivery["no"]:
+                pass
             else:
-                comment = delivery["comment"] or ""
-                comment_lower = comment.lower()
-                if "передзвонити" in comment_lower or "перезвонить" in comment_lower:
-                    callback_count += 1
-                else:
-                    take = delivery
-                    if cell_no_rect:
-                        take["click_x"] = int(cell_no_rect.xcenter())
-                        take["click_y"] = int(cell_no_rect.ycenter())
-                    elif first_row_x > 0:
-                        take["click_x"] = first_row_x
-                        take["click_y"] = first_row_y
-                    break
+                take = delivery
+                if cell_no_rect:
+                    take["click_x"] = int(cell_no_rect.xcenter())
+                    take["click_y"] = int(cell_no_rect.ycenter())
+                elif first_row_x > 0:
+                    take["click_x"] = first_row_x
+                    take["click_y"] = first_row_y
+                break
         except Exception:
             continue
 
