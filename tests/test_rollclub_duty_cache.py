@@ -266,6 +266,43 @@ class RollClubDutyCacheTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(result["take_no"], 857847)
 
+    def test_header_panel_is_not_mistaken_for_data_panel(self):
+        bridge = Bridge()
+        header_panel = Control("Панель столбцов", children=[
+            Control("№"), Control("Осталось, мин"), Control("Статус")
+        ])
+        row_cells = [
+            Control("№ row 1", value="857847"),
+            Control("Коментар row 1", value="Дніпро Доставка"),
+            Control("Оператор row 1", value=""),
+            Control("Статус row 1", value="Не підтверджена"),
+        ]
+        data_panel = Control("Панель данных", children=[Control("Строка 1", children=row_cells)])
+        bridge.grid = Control("gridDeliveries", children=[header_panel, data_panel])
+
+        result = MODULE.read_kc_list(bridge)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["take_no"], 857847)
+        self.assertEqual(result["count"], 1)
+
+    def test_engine_prioritizes_calibrated_poisk_and_row_with_retry_loop(self):
+        engine_path = MODULE_PATH.parents[3] / "engine_rollclub.ahk"
+        source = engine_path.read_text(encoding="utf-8-sig")
+
+        # 1. Verify poiskX is prioritized over filterX
+        poisk_pos = source.index("if (poiskX != 0)")
+        filter_pos = source.index("else if (filterX > 0 && filterY > 0)")
+        self.assertLess(poisk_pos, filter_pos)
+
+        # 2. Verify narrowing check has retry loop
+        self.assertIn("_chkDeadline := A_TickCount + 2500", source)
+        self.assertIn("while (A_TickCount < _chkDeadline)", source)
+
+        # 3. Verify rowX is prioritized over firstRowX
+        row_pos = source.index("if (rowX != 0)", filter_pos)
+        first_row_pos = source.index("else if (firstRowX > 0 && firstRowY > 0)", row_pos)
+        self.assertLess(row_pos, first_row_pos)
+
 
 if __name__ == "__main__":
     unittest.main()

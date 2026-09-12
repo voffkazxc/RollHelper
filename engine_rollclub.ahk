@@ -2622,7 +2622,18 @@ KcMonitor:
     FileAppend, % "[" . A_Now . "] KC TAKING: №" . takeNo . " filter=(" . filterX . "," . filterY . ") firstRow=(" . firstRowX . "," . firstRowY . ") poisk=(" . poiskX . "," . poiskY . ") row=(" . rowX . "," . rowY . ")`n", %A_ScriptDir%\ahk_debug.log
 
     ; 2) Клік у поле автофільтра (Поиск) та введення номера замовлення
-    if (filterX > 0 && filterY > 0)
+    if (poiskX != 0)
+    {
+        Click, %poiskX%, %poiskY%
+        Sleep, 200
+        Send, ^a
+        Sleep, 50
+        Send, {Delete}          ; примусово стерти старий № перед вводом (інакше SendInput дописує → задвоєний фільтр → список порожній → холостий круг)
+        Sleep, 80
+        SendInput, %takeNo%
+        Sleep, 800
+    }
+    else if (filterX > 0 && filterY > 0)
     {
         _oldCoord := A_CoordModeMouse
         CoordMode, Mouse, Screen
@@ -2636,24 +2647,21 @@ KcMonitor:
         SendInput, %takeNo%
         Sleep, 800
     }
-    else if (poiskX != 0)
-    {
-        Click, %poiskX%, %poiskY%
-        Sleep, 200
-        Send, ^a
-        Sleep, 50
-        Send, {Delete}          ; примусово стерти старий № перед вводом (інакше SendInput дописує → задвоєний фільтр → список порожній → холостий круг)
-        Sleep, 80
-        SendInput, %takeNo%
-        Sleep, 800
-    }
 
     ; 3) ПЕРЕВІРКА перед пробиттям: список має звузитись РІВНО до нашого №
     ; якщо ні (ми не на Доставках / фільтр не спрацював) — НЕ пробиваємо, пропускаємо цей круг.
-    _chk := RhGet("/api/iiko/kc-list", 6000)
+    _chkDeadline := A_TickCount + 2500
+    _chk := ""
     _cnt := ""
-    RegExMatch(_chk, "count""\s*:\s*(\d+)", _cM)
-    _cnt := _cM1
+    while (A_TickCount < _chkDeadline)
+    {
+        _chk := RhGet("/api/iiko/kc-list", 3000)
+        RegExMatch(_chk, "count""\s*:\s*(\d+)", _cM)
+        _cnt := _cM1
+        if (_cnt == "1" && InStr(_chk, takeNo))
+            break
+        Sleep, 250
+    }
     if (_cnt != "1" || !InStr(_chk, takeNo))
     {
         FileAppend, % "[" . A_Now . "] KC NOT_NARROWED: expected №" . takeNo . " got cnt=" . _cnt . " chk=" . SubStr(_chk,1,160) . "`n", %A_ScriptDir%\ahk_debug.log
@@ -2682,8 +2690,15 @@ KcMonitor:
     }
 
     ; 4) Подвійний клік по першому рядку (відкриття картки замовлення)
-    FileAppend, % "[" . A_Now . "] KC OPENING: №" . takeNo . " click=(" . firstRowX . "," . firstRowY . ") fallback=(" . rowX . "," . rowY . ")`n", %A_ScriptDir%\ahk_debug.log
-    if (firstRowX > 0 && firstRowY > 0)
+    FileAppend, % "[" . A_Now . "] KC OPENING: №" . takeNo . " poisk=(" . poiskX . "," . poiskY . ") row=(" . rowX . "," . rowY . ") uiaRow=(" . firstRowX . "," . firstRowY . ")`n", %A_ScriptDir%\ahk_debug.log
+    if (rowX != 0)
+    {
+        Click, %rowX%, %rowY%
+        Sleep, 120
+        Click, %rowX%, %rowY%
+        Sleep, 700
+    }
+    else if (firstRowX > 0 && firstRowY > 0)
     {
         _oldCoord := A_CoordModeMouse
         CoordMode, Mouse, Screen
@@ -2691,13 +2706,6 @@ KcMonitor:
         Sleep, 120
         Click, %firstRowX%, %firstRowY%
         CoordMode, Mouse, %_oldCoord%
-        Sleep, 700
-    }
-    else if (rowX != 0)
-    {
-        Click, %rowX%, %rowY%
-        Sleep, 120
-        Click, %rowX%, %rowY%
         Sleep, 700
     }
     ; --- ЗАХИСТ: діалог "Подтверждение: Доставка обрабатывается оператором ... продолжить?" ---

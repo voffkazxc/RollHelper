@@ -86,63 +86,93 @@ def read_kc_list(bridge, brand="rollclub"):
             bridge._kc_panel_cache = None
 
     if data_panel is None:
-        window = None
-        try:
-            root = auto.GetRootControl()
-            for candidate in root.GetChildren():
-                class_name = candidate.ClassName or ""
-                if any(
-                    blocked in class_name
-                    for blocked in (
-                        "Chrome_WidgetWin",
-                        "MozillaWindowClass",
-                        "ApplicationFrameWindow",
-                        "EdgeHTML",
-                    )
-                ):
-                    continue
-                title = (candidate.Name or "").lower()
-                if (
-                    "iiko" in title
-                    or "syrve" in title
-                    or "office" in title
-                    or "back" in title
-                ):
-                    window = candidate
-                    break
-        except Exception:
-            pass
-        if window is None:
-            return {"ok": False, "error": "Вікно iiko не знайдено"}
+        grid = getattr(bridge, "_kc_grid_cache", None)
+        if grid is not None:
+            try:
+                _ = grid.AutomationId
+            except Exception:
+                grid = None
+                bridge._kc_grid_cache = None
 
-        grid = bridge._find_by_id(window, "gridDeliveries", max_depth=12)
         if grid is None:
-            return {
-                "ok": False,
-                "error": "Список Доставки не відкрито (немає gridDeliveries)",
-            }
+            window = None
+            try:
+                root = auto.GetRootControl()
+                for candidate in root.GetChildren():
+                    class_name = candidate.ClassName or ""
+                    if any(
+                        blocked in class_name
+                        for blocked in (
+                            "Chrome_WidgetWin",
+                            "MozillaWindowClass",
+                            "ApplicationFrameWindow",
+                            "EdgeHTML",
+                        )
+                    ):
+                        continue
+                    title = (candidate.Name or "").lower()
+                    if (
+                        "iiko" in title
+                        or "syrve" in title
+                        or "office" in title
+                        or "back" in title
+                    ):
+                        window = candidate
+                        break
+            except Exception:
+                pass
+            if window is None:
+                return {"ok": False, "error": "Вікно iiko не знайдено"}
+
+            grid = bridge._find_by_id(window, "gridDeliveries", max_depth=12)
+            if grid is None:
+                return {
+                    "ok": False,
+                    "error": "Список Доставки не відкрито (немає gridDeliveries)",
+                }
+            bridge._kc_grid_cache = grid
+
         try:
             grid_children = grid.GetChildren()
+            # 1. Primary search: explicitly look for data panel by name, excluding headers/scrollbars
             for child in grid_children:
                 cname = (child.Name or "").strip().lower()
-                if "дан" in cname or "data" in cname or "panel" in cname or "панель" in cname:
+                if any(k in cname for k in ("столб", "колонк", "header", "column", "скролл", "scroll")):
+                    continue
+                if "дан" in cname or "data" in cname:
                     data_panel = child
                     break
+
+            # 2. Structural search: panel whose children are rows with cells
             if data_panel is None:
                 for child in grid_children:
+                    cname = (child.Name or "").strip().lower()
+                    if any(k in cname for k in ("столб", "колонк", "header", "column", "скролл", "scroll")):
+                        continue
                     sub = child.GetChildren()
                     if sub and len(sub) > 0:
-                        data_panel = child
-                        break
+                        first_sub = sub[0]
+                        first_sub_children = first_sub.GetChildren()
+                        if first_sub_children and len(first_sub_children) > 1:
+                            data_panel = child
+                            break
+                        first_name = (first_sub.Name or "").lower()
+                        if any(k in first_name for k in ("строк", "рядок", "row", "запис", "фильтр", "фільтр", "filter")):
+                            data_panel = child
+                            break
+                        if data_panel is None:
+                            data_panel = child
         except Exception:
             pass
         if data_panel is None:
+            bridge._kc_grid_cache = None
             return {"ok": False, "error": "Панель данных не знайдено"}
         bridge._kc_panel_cache = data_panel
         try:
             children = data_panel.GetChildren()
         except Exception as error:
             bridge._kc_panel_cache = None
+            bridge._kc_grid_cache = None
             return {"ok": False, "error": "get data_panel children: %s" % error}
 
     grid_ready_at = time.perf_counter()
@@ -274,9 +304,6 @@ def read_kc_list(bridge, brand="rollclub"):
                     break
         except Exception:
             continue
-
-    if len(rows) == 0:
-        bridge._kc_panel_cache = None
 
     reason = ""
     if take is None:
