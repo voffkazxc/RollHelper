@@ -188,25 +188,44 @@ def read_kc_list(bridge, brand="rollclub"):
                 cells = []
 
             for cell in cells:
-                name = cell.Name or ""
-                column = name
+                name = (cell.Name or "").strip()
+                name_lower = name.lower()
                 for sep in (" row ", " рядок ", " строка "):
-                    if sep in column.lower():
-                        idx = column.lower().find(sep)
-                        column = column[:idx].strip()
+                    if sep in name_lower:
+                        idx = name_lower.find(sep)
+                        name_lower = name_lower[:idx].strip()
                         break
-                if column in ("№", "Номер"):
+
+                col_key = None
+                if name_lower.startswith("№") or "номер" in name_lower or "№" in name_lower:
+                    col_key = "№"
                     crect = getattr(cell, "BoundingRectangle", None)
                     if crect and crect.width() > 10 and crect.height() > 5:
                         cell_no_rect = crect
-                if column not in needed_columns:
-                    continue
-                _, value = _read_cell(cell)
-                values[column] = value
+                elif "комент" in name_lower or "comment" in name_lower:
+                    col_key = "comment"
+                elif "оператор" in name_lower or "operator" in name_lower:
+                    col_key = "operator"
+                elif "статус" in name_lower or "стан" in name_lower or "status" in name_lower:
+                    col_key = "status"
+
+                if col_key:
+                    _, value = _read_cell(cell)
+                    values[col_key] = value
 
             if not values and not any(k in row_name_lower for k in ("строк", "рядок", "row", "запис")):
                 continue
 
+            order_no = values.get("№", "")
+            if not order_no:
+                for cell in cells:
+                    _, val = _read_cell(cell)
+                    if val and val.strip().isdigit() and 4 <= len(val.strip()) <= 8:
+                        order_no = val.strip()
+                        if not cell_no_rect:
+                            crect = getattr(cell, "BoundingRectangle", None)
+                            if crect and crect.width() > 10 and crect.height() > 5:
+                                cell_no_rect = crect
             if first_row_x == 0:
                 if cell_no_rect:
                     first_row_x = int(cell_no_rect.xcenter())
@@ -227,10 +246,10 @@ def read_kc_list(bridge, brand="rollclub"):
                         pass
 
             delivery = {
-                "no": values.get("№") or values.get("Номер") or "",
-                "comment": values.get("Комментарий") or values.get("Коментар") or "",
-                "operator": values.get("Оператор", ""),
-                "status": values.get("Статус", ""),
+                "no": order_no,
+                "comment": values.get("comment", ""),
+                "operator": values.get("operator", ""),
+                "status": values.get("status", ""),
             }
             rows.append(delivery)
 
