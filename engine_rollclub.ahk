@@ -2471,7 +2471,7 @@ KcDutyTick:
         return
 
     ; Тихе фонове опитування сервера — без крадіжки фокусу, без Esc і без перемикання вкладок!
-    listResp := RhGet("/api/iiko/kc-list", 3000)
+    listResp := RhGet("/api/iiko/kc-list", 4000)
     if InStr(listResp, "ACTIVE_ORDER_CARD")
     {
         ; Картка відкрита оператором — не заважаємо

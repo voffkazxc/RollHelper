@@ -62,16 +62,8 @@ def read_kc_list(bridge, brand="rollclub"):
     data_panel = None
     cached = 0
     try:
-        delivery_form = getattr(bridge, "get_delivery_form", None)
-        if delivery_form and delivery_form() is not None:
-            bridge._kc_panel_cache = None
-            return {
-                "ok": False,
-                "error_code": "ACTIVE_ORDER_CARD",
-                "error": "Активна карточка заказа, а не список Доставки",
-            }
         foreground = bridge._get_foreground_win()
-        if foreground and bridge._find_by_id(foreground, "DeliveryOrderEditControl", max_depth=15) is not None:
+        if foreground and bridge._find_by_id(foreground, "DeliveryOrderEditControl", max_depth=8) is not None:
             bridge._kc_panel_cache = None
             return {
                 "ok": False,
