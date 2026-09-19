@@ -363,7 +363,7 @@ class RollClubDutyCacheTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("прихована", result["error"])
 
-    def test_engine_has_no_tab_cycling_in_duty(self):
+    def test_engine_has_tab_cycling_in_duty(self):
         engine_path = MODULE_PATH.parents[3] / "engine_rollclub.ahk"
         source = engine_path.read_text(encoding="utf-8-sig")
 
@@ -372,8 +372,8 @@ class RollClubDutyCacheTests(unittest.TestCase):
         kc_mon_end = source.index("#IfWinActive Rollclub PRO 33.0", kc_tick_pos)
         duty_code = source[kc_tick_pos:kc_mon_end]
 
-        # Verify Send, ^{Tab} is completely absent from duty loop
-        self.assertNotIn("^{Tab}", duty_code)
+        # Verify Send, ^{Tab} is present in duty loop to refresh Syrve deliveries table
+        self.assertIn("^{Tab}", duty_code)
 
 
 if __name__ == "__main__":

@@ -2469,24 +2469,6 @@ KcDutyTick:
     }
     if (kcBusy)
         return
-
-    ; Тихе фонове опитування сервера — без крадіжки фокусу, без Esc і без перемикання вкладок!
-    listResp := RhGet("/api/iiko/kc-list", 4000)
-    if InStr(listResp, "ACTIVE_ORDER_CARD")
-    {
-        ; Картка відкрита оператором — не заважаємо
-        return
-    }
-    takeNo := ""
-    RegExMatch(listResp, "take_no\D+(\d+)", tM)
-    takeNo := tM1
-    if (takeNo == "" || takeNo == "0")
-    {
-        ; Вільних замовлень немає — тихо чекаємо наступного тіку, вікно не чіпаємо
-        return
-    }
-
-    ; Знайдено дійсне замовлення для взяття!
     kcForce := 1
     kcPaused := 0
     kcTook := 0
@@ -2567,6 +2549,7 @@ KcMonitor:
     kcForce := 0
     kcBusy := 1
     kcStop := 0                     ; свіжий захід — скинути прапор стопу
+    ; === ПРАВИЛЬНИЙ ПОРЯДОК: вікно → стерти старий № → оновити КЦ (Ctrl+Tab×2) → аж тоді питати сервер ===
     SetTitleMatchMode, 2
     if !WinExist("Syrve Office")
     {
@@ -2575,43 +2558,65 @@ KcMonitor:
         kcBusy := 0
         return
     }
-
-    ; Якщо номер замовлення ще не отримано (наприклад, при ручному виклику KcTakeOnce):
-    if (takeNo == "" || takeNo == "0")
-    {
-        listResp := RhGet("/api/iiko/kc-list", 4000)
-        if InStr(listResp, "ACTIVE_ORDER_CARD")
-        {
-            kcBusy := 0
-            ToolTip, Ctrl+F4: відкрита картка замовлення — завершіть її або відкрийте Доставки
-            SetTimer, RemoveToolTip, -4000
-            return
-        }
-        RegExMatch(listResp, "take_no\D+(\d+)", tM)
-        takeNo := tM1
-        if (takeNo == "" || takeNo == "0")
-        {
-            _reason := ""
-            RegExMatch(listResp, "reason""\s*:\s*""([^""]*)", _rM)
-            _reason := _rM1
-            FileAppend, % "[" . A_Now . "] KC NO_ORDER: " . _reason . "`n", %A_ScriptDir%\ahk_debug.log
-            ToolTip, % "Ctrl+F4: нема вільних для взяття`n" . _reason
-            SetTimer, RemoveToolTip, -5000
-            kcBusy := 0
-            return
-        }
-    }
-
     WinActivate, Syrve Office
     WinWaitActive, Syrve Office,, 2
     SetTitleMatchMode, 1
-    Sleep, 150
-
+    Sleep, 200
+    Send, {Esc}                    ; закрити випадкові випадашки/фокус у карточці
+    Sleep, 120
+    ; 1) оновити КЦ без кулдауна: на сусідню вкладку і назад.
+    ; ВАЖЛИВО: до цього моменту НЕ клікаємо PoiskX/PoiskY — на карточці це поле "Оператор".
+    Send, ^{Tab}
+    Sleep, 220
+    Send, ^{Tab}
+    Sleep, 330
+    if (kcStop)
+    {
+        kcBusy := 0
+        ToolTip, Стоп (Ctrl+F4)
+        SetTimer, RemoveToolTip, -1500
+        return
+    }
+    ; 2) список свіжий — тепер питаємо сервер (+ серверний таймінг у bridge.log)
+    ToolTip, Ctrl+F4: питаю сервер про годний заказ...
+    listResp := RhGet("/api/iiko/kc-list", 12000)
+    if InStr(listResp, "ACTIVE_ORDER_CARD")
+    {
+        ToolTip, Ctrl+F4: активна карточка — переходжу на Доставки...
+        Send, {Esc}
+        Sleep, 180
+        Send, ^{Tab}
+        Sleep, 700
+        listResp := RhGet("/api/iiko/kc-list", 12000)
+    }
+    if InStr(listResp, "ACTIVE_ORDER_CARD")
+    {
+        kcBusy := 0
+        ToolTip, Ctrl+F4: досі карточка заказа — відкрий вкладку Доставки
+        SetTimer, RemoveToolTip, -6000
+        return
+    }
+    Sleep, 30                       ; дати шанс F4-стопу під час блокуючого запиту
     if (kcStop)
     {
         kcBusy := 0
         ToolTip, Стоп (Ctrl+F4) — заказ не чіпаю
         SetTimer, RemoveToolTip, -1500
+        return
+    }
+    takeNo := ""
+    RegExMatch(listResp, "take_no\D+(\d+)", tM)
+    takeNo := tM1
+    FileAppend, % "[" . A_Now . "] KC takeNo=" . takeNo . " paused=" . kcPaused . " poiskX=" . poiskX . " rowX=" . rowX . " resp=" . SubStr(listResp,1,160) . "`n", %A_ScriptDir%\ahk_debug.log
+    if (takeNo == "" || takeNo == "0")
+    {
+        _reason := ""
+        RegExMatch(listResp, "reason""\s*:\s*""([^""]*)", _rM)
+        _reason := _rM1
+        FileAppend, % "[" . A_Now . "] KC NO_ORDER: " . _reason . " resp=" . SubStr(listResp,1,160) . "`n", %A_ScriptDir%\ahk_debug.log
+        ToolTip, % "Ctrl+F4: нема вільних для взяття`n" . _reason
+        SetTimer, RemoveToolTip, -8000
+        kcBusy := 0
         return
     }
     ToolTip, Ctrl+F4: беру заказ №%takeNo%...
