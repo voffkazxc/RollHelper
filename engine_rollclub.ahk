@@ -1,4 +1,4 @@
-﻿#Requires AutoHotkey v1.1
+#Requires AutoHotkey v1.1
 #NoEnv
 #SingleInstance Force
 SetWorkingDir %A_ScriptDir%\brands\rollclub   ; дані Roll Club (конфіг, промо, кухні, img)
@@ -2811,15 +2811,14 @@ KcMonitor:
     kcPaused := 1
     SetTimer, KcDutyTick, Off
     SetTimer, KcMonitor, Off
-    _inDutyTake := 1
-    GoSub, TriggerMain
-    Sleep, 3000
-    GoSub, ApplyRollclub
-    _inDutyTake := 0
-    Sleep, 500
-    GoSub, SoundOk
+    
+    ; Замість автопробиття — просто подаємо м'який звуковий сигнал
+    SoundBeep, 450, 200
+    Sleep, 150
+    SoundBeep, 600, 300
+    
     kcTook := 1
-    ToolTip, ✅ ВЗЯВ №%takeNo% — перевір і натисни Ctrl+Enter
+    ToolTip, ✅ ВІДКРИВ №%takeNo% — замовлення готове до ручного пробиття
     SetTimer, RemoveToolTip, -15000
     kcPaused := 1
     kcBusy := 0
