@@ -63,7 +63,7 @@ def read_kc_list(bridge, brand="rollclub"):
     cached = 0
     try:
         foreground = bridge._get_foreground_win()
-        if foreground and bridge._find_by_id(foreground, "DeliveryOrderEditControl", max_depth=8) is not None:
+        if foreground and bridge._find_by_id(foreground, "DeliveryOrderEditControl", max_depth=16) is not None:
             bridge._kc_panel_cache = None
             return {
                 "ok": False,

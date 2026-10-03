@@ -2726,7 +2726,7 @@ KcMonitor:
     ; Чекаємо до 3 секунд появи активної картки замовлення.
     ; Якщо замовлення НЕ відкрилося — КАТЕГОРИЧНО ЗАБОРОНЕНО натискати тільду або вносити палички!
     _cardOpened := 0
-    _cardDeadline := A_TickCount + 2500
+    _cardDeadline := A_TickCount + 3500
     while (A_TickCount < _cardDeadline)
     {
         _chkCard := RhGet("/api/iiko/kc-list", 1200)
