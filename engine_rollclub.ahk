@@ -2812,10 +2812,12 @@ KcMonitor:
     SetTimer, KcDutyTick, Off
     SetTimer, KcMonitor, Off
     
-    ; Замість автопробиття — просто подаємо м'який звуковий сигнал
-    SoundBeep, 450, 200
-    Sleep, 150
-    SoundBeep, 600, 300
+    ; Замість автопробиття — просто подаємо надійний звуковий сигнал
+    SoundPlay, %A_ScriptDir%\beep_ok.wav
+    Sleep, 400
+    SoundPlay, %A_ScriptDir%\beep_ok.wav
+    Sleep, 400
+    SoundPlay, %A_ScriptDir%\beep_ok.wav
     
     kcTook := 1
     ToolTip, ✅ ВІДКРИВ №%takeNo% — замовлення готове до ручного пробиття
