@@ -1,4 +1,4 @@
-﻿; ==============================================================================
+; ==============================================================================
 ; FILE: RollHelper/lib/IikoDriver.ahk
 ; ARCHITECTURE LAYER: UI Automation Low-Level Driver (Production-Grade)
 ; RESPONSIBILITY: Process handle management, UIA initialization, robust clicks,
@@ -15,13 +15,23 @@ global IikoDriver_LogPath := A_ScriptDir . "\iiko_ui_driver.log"
 IikoDriver_GetIikoHwnd() {
     global IikoDriver_TargetProcess
     SetTitleMatchMode, 2
-    hwnd := WinExist("ahk_exe " . IikoDriver_TargetProcess)
+    hwnd := WinExist("ahk_exe BackOffice.exe")
+    if (!hwnd)
+        hwnd := WinExist("ahk_exe iikoFront.Net.exe")
+    if (!hwnd)
+        hwnd := WinExist("ahk_exe " . IikoDriver_TargetProcess)
     if (!hwnd)
         hwnd := WinExist("Syrve")
     if (!hwnd)
-        hwnd := WinExist("Office")
+        hwnd := WinExist("iiko")
     if (!hwnd)
-        hwnd := WinActive("A")
+        hwnd := WinExist("Office")
+    if (!hwnd) {
+        actHwnd := WinActive("A")
+        WinGetTitle, actTitle, ahk_id %actHwnd%
+        if (!InStr(actTitle, "Rollclub PRO") && !InStr(actTitle, "RollClub"))
+            hwnd := actHwnd
+    }
     return hwnd
 }
 
@@ -488,6 +498,41 @@ IikoDriver_FocusElement(automationId, fallbackX := 0, fallbackY := 0) {
     }
     
     return false
+}
+
+; Get Value of UI Element by AutomationId
+IikoDriver_GetElementValue(automationId) {
+    elem := IikoDriver_FindElement(automationId)
+    if (!elem) {
+        iikoWin := IikoDriver_GetWindow()
+        if (iikoWin) {
+            try elem := iikoWin.FindFirstBy("AutomationId=" . automationId)
+            catch e0
+                elem := ""
+        }
+    }
+    if (!IsObject(elem))
+        return ""
+    val := ""
+    try val := elem.CurrentValue
+    catch e1
+        val := ""
+    if (val = "") {
+        try val := elem.CurrentValuePattern.Value
+        catch e2
+            val := ""
+    }
+    if (val = "") {
+        try val := elem.CurrentLegacyIAccessible.Value
+        catch e3
+            val := ""
+    }
+    if (val = "") {
+        try val := elem.CurrentName
+        catch e4
+            val := ""
+    }
+    return Trim(val)
 }
 
 ; Set Value of UI Element by AutomationId

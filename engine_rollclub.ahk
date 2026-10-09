@@ -367,41 +367,108 @@ TriggerMain:
         }
     }
     ; Пульту немає взагалі → повний скан
-    if (commX = 0 || commX = "" || commX = "ERROR") {
+    _hasIikoWin := IikoDriver_GetIikoHwnd()
+    if ((commX = 0 || commX = "" || commX = "ERROR") && !RH_SERVER_OK && !RhPing() && !_hasIikoWin) {
         MsgBox, 48, Налаштування, Координати не встановлені!`nЗараз відкриється вікно налаштувань.
         GoSub, OpenSettings
         return
     }
 
+    if (!Kitchens.MaxIndex())
+        GoSub, LoadKitchens
     GoSub, RcKitchensSyncIfStale
 
-    ; --- Читання коментаря+суми: спершу СЕРВЕР (по іменах), інакше КЛІКОМ ---
+    ; --- Читання замовлення: 1. СЕРВЕР → 2. Нативний UIA → 3. КЛІКИ ---
     rawComment := ""
     orderSum := 0
+    rawAddress := ""
     _srvOk := 0
+    _readMethod := ""
+
+    ; 1. Спроба через сервер (швидко та надійно, без миші)
     if (RH_SERVER_OK || RhPing()) {
         _d := RhGet("/api/iiko/read", 8000)
         if (_d != "" && !InStr(_d, """ok"":false") && !InStr(_d, """ok"": false")) {
+            ; Коментар замовлення
             RegExMatch(_d, """comment""\s*:\s*""((?:[^""\\]|\\.)*)""", _mc)
             _srvComment := StrReplace(StrReplace(_mc1, "\n", "`n"), "\r", "")
-            if (_srvComment != "") {
-                rawComment := _srvComment
-                RegExMatch(_d, """sum""\s*:\s*(\d+)", _ms)
-                orderSum := _ms1 + 0
-                _srvOk := 1
+            if (_srvComment = "") {
+                RegExMatch(_d, """customer_comment""\s*:\s*""((?:[^""\\]|\\.)*)""", _mcc)
+                _srvComment := StrReplace(StrReplace(_mcc1, "\n", "`n"), "\r", "")
             }
+            rawComment := _srvComment
+
+            ; Сума
+            RegExMatch(_d, """sum""\s*:\s*(\d+)", _ms)
+            if (_ms1 != "")
+                orderSum := _ms1 + 0
+
+            ; Вулиця та будинок
+            RegExMatch(_d, """street""\s*:\s*""((?:[^""\\]|\\.)*)""", _mst)
+            _srvStreet := Trim(StrReplace(StrReplace(_mst1, "\n", "`n"), "\r", ""))
+            RegExMatch(_d, """house""\s*:\s*""((?:[^""\\]|\\.)*)""", _mh)
+            _srvHouse := Trim(StrReplace(StrReplace(_mh1, "\n", "`n"), "\r", ""))
+            if (_srvStreet != "")
+                rawAddress := _srvStreet . (_srvHouse != "" ? (" " . _srvHouse) : "")
+
+            ; Картка
+            RegExMatch(_d, """card""\s*:\s*""((?:[^""\\]|\\.)*)""", _mcard)
+            _srvCard := Trim(StrReplace(StrReplace(_mcard1, "\n", "`n"), "\r", ""))
+            if (_srvCard != "")
+                cardText := _srvCard
+
+            _srvOk := 1
+            _readMethod := "СЕРВЕР"
         }
     }
+
+    ; 2. Спроба через нативний UIA в AHK (якщо сервер не відповів)
     if (!_srvOk) {
-        ; Фолбек — читання кліком (як раніше, якщо сервер не відповів)
-        Clipboard := ""
-        IikoUI_FocusComment()
-        Sleep, 100
-        Send, ^a
-        Sleep, 50
-        Send, ^c
-        ClipWait, 1.5
-        rawComment := Clipboard
+        _uiaOk := 0
+        try {
+            cVal := RcUiaGetText("Коментар", "memoEditDeliveryComment")
+            if (cVal != "") {
+                rawComment := cVal
+                _uiaOk := 1
+            }
+            sVal := RcUiaGetText("Вулиця", "gridLookUpEditStreetAddress")
+            hVal := RcUiaGetText("Будинок", "textEditDeliveryHouse")
+            if (sVal != "") {
+                rawAddress := Trim(sVal . (hVal != "" ? (" " . hVal) : ""))
+                _uiaOk := 1
+            }
+            sumVal := RcUiaGetText("Сума Замовлення", "labelOrderSum")
+            if (sumVal != "") {
+                pSum := RcParseSumValue(sumVal)
+                if (pSum > 0) {
+                    orderSum := pSum
+                    _uiaOk := 1
+                }
+            }
+            cardVal := RcUiaGetText("Картка", "textEditCustomerCardNumber")
+            if (cardVal != "") {
+                cardText := cardVal
+                _uiaOk := 1
+            }
+        } catch eUiaRead {
+        }
+        if (_uiaOk)
+            _readMethod := "UIA"
+    }
+
+    ; 3. Повний фолбек — читання кліками (якщо сервер і UIA недоступні)
+    if (!_srvOk && !_readMethod) {
+        _readMethod := "КЛІКИ"
+        if (commX != 0 && commX != "ERROR") {
+            Clipboard := ""
+            IikoUI_FocusComment()
+            Sleep, 100
+            Send, ^a
+            Sleep, 50
+            Send, ^c
+            ClipWait, 1.5
+            rawComment := Clipboard
+        }
 
         if (sumX != 0 && sumX != "ERROR") {
             Clipboard := ""
@@ -417,9 +484,8 @@ TriggerMain:
         }
     }
 
-    ; Читаємо адресу заказу (для детекту міста та статусу кухонь)
-    rawAddress := ""
-    if (adrReadX != 0 && adrReadX != "ERROR") {
+    ; Додатковий фолбек для адреси, якщо UIA/сервер не дали її
+    if (rawAddress = "" && adrReadX != 0 && adrReadX != "ERROR") {
         Clipboard := ""
         Click, %adrReadX%, %adrReadY%
         Sleep, 100
@@ -431,10 +497,12 @@ TriggerMain:
     }
 
     ; Видима підказка: через що прочитали замовлення
-    if (_srvOk)
+    if (_readMethod == "СЕРВЕР")
         ToolTip, % "📡 Прочитано через СЕРВЕР", 30, 30
+    else if (_readMethod == "UIA")
+        ToolTip, % "⚡ Прочитано через UIA", 30, 30
     else
-        ToolTip, % "🖱 Прочитано КЛІКОМ (сервер не відповів)", 30, 30
+        ToolTip, % "🖱 Прочитано КЛІКОМ (UIA/Сервер недоступні)", 30, 30
     SetTimer, RcRemoveTip, -2500
 
     GoSub, SilentMagicClean
@@ -1488,10 +1556,14 @@ SilentMagicClean:
     }
 
     ; --- Самовивіз (детект до парсингу адресних нотаток) ---
-    if RegExMatch(workComment, "i)(?<![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])Самовивіз(?![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])") {
+    if RegExMatch(workComment, "i)(*UCP)(?<![\wа-яА-ЯіїєґІЇЄҐёЁ])(Самовивіз|Самовывоз|Самовынос)(?![\wа-яА-ЯіїєґІЇЄҐёЁ])") {
         hasPickup := 1
-        if RegExMatch(workComment, "i)Самовивіз:\s*([^\.\r\n]+?)(?=\s*(?:Знижка|Доставка|Прибори|Купон|Подарунок|Найближчим|\d{4}-\d{2}|$))", mPick)
+        if RegExMatch(workComment, "i)(*UCP)(?:Самовивіз|Самовывоз|Самовынос)\s*[:\-—]?\s*([^\.\r\n]+?)(?=\s*(?:Знижка|Скидка|Доставка|Прибори|Приборы|Купон|Подарунок|Подарок|Найближчим|Ближайш|\d{4}-\d{2}|$))", mPick)
             pickupPoint := Trim(mPick1)
+        if (pickupPoint = "") {
+            if RegExMatch(workComment, "i)(*UCP)(?:Самовивіз|Самовывоз|Самовынос)\s+([^\.\r\n,]+)", mPick2)
+                pickupPoint := Trim(mPick21)
+        }
     }
 
     ; --- Виделка/Ніж/Ложка → авто-пробитие через окремий PLU ---
@@ -2086,12 +2158,24 @@ DrawRollclub:
     curY := 84
 
     ; ZONE BLOCK — саме важливе, має бути одразу помітним!
+    _initialZoneTxt := "Визначення зони..."
+    if (hasPickup) {
+        _initialZoneTxt := "САМОВИВІЗ" . (pickupPoint != "" ? (": " . pickupPoint) : "")
+    } else if (rawAddress = "") {
+        _initialZoneTxt := "Адресу не знайдено"
+    }
     Gui, Roll:Font, s9 bold c555555, %RhFontName%
-    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h28 Center +0x200 HwndhZoneBox vMapSearch, Визначення зони...
-    RhRegColor(hZoneBox, 0xE8E8E8, 0x555555)
+    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h28 Center +0x200 HwndhZoneBox vMapSearch, %_initialZoneTxt%
+    if (hasPickup)
+        RhRegColor(hZoneBox, RhB_Green, RhB_White)
+    else if (rawAddress = "")
+        RhRegColor(hZoneBox, 0xE8E8E8, 0x777777)
+    else
+        RhRegColor(hZoneBox, 0xE8E8E8, 0x555555)
     curY += 30
+    _kitchInitTxt := (hasPickup && IsObject(RcCurrentKitchen)) ? RcCurrentKitchen.Name : ""
     Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
-    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200 vKitchenStatusText,
+    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200 vKitchenStatusText, %_kitchInitTxt%
     curY += 20
 
     ; Alerts
@@ -3792,7 +3876,7 @@ ApplyRollclub:
     Gui, Roll:Submit, NoHide
     Gui, Roll:Destroy
     ; Звірка точки — синхронно, ДО решти кліків (тільки доставка, тільки якщо увімкнено)
-    if (!hasPickup && CHECK_POINT_ENABLED && naitiX != 0 && tochkaX != 0) {
+    if (!hasPickup && CHECK_POINT_ENABLED && RcLastZone != "" && naitiX != 0 && tochkaX != 0) {
         GoSub, RcVerifyPoint
         _ptSum := RcReadCurrentOrderSum()
         if (_ptSum > 0) {
@@ -3819,27 +3903,63 @@ ApplyRollclub:
     MouseGetPos, originalMouseX, originalMouseY
     Sleep, 400
 
-    if (OrderComment != "" && commX != 0) {
+    if (OrderComment != "") {
         Clipboard := OrderComment
-        Click, %commX%, %commY%
-        Sleep, 200
-        Send, ^a{BackSpace}
-        Sleep, 50
-        Send, ^v
-        Sleep, 300
+        focused := 0
+        elComm := RcUiaFind("Коментар", "memoEditDeliveryComment")
+        if (IsObject(elComm)) {
+            try {
+                elComm.SetFocus()
+                focused := 1
+            } catch {
+                try {
+                    elComm.Click()
+                    focused := 1
+                }
+            }
+        }
+        if (!focused && commX != 0 && commX != "ERROR") {
+            Click, %commX%, %commY%
+            focused := 1
+        }
+        if (focused) {
+            Sleep, 150
+            Send, ^a{BackSpace}
+            Sleep, 50
+            Send, ^v
+            Sleep, 300
+        }
     }
 
-    if (ClientCard != "" && cardX != 0) {
+    if (ClientCard != "") {
         Clipboard := ClientCard
-        Click, %cardX%, %cardY%
-        Sleep, 250
-        Send, ^a{BackSpace}
-        Sleep, 50
-        Send, ^v{Enter}
-        Sleep, 400
+        focused := 0
+        elCard := RcUiaFind("Картка", "textEditCustomerCardNumber")
+        if (IsObject(elCard)) {
+            try {
+                elCard.SetFocus()
+                focused := 1
+            } catch {
+                try {
+                    elCard.Click()
+                    focused := 1
+                }
+            }
+        }
+        if (!focused && cardX != 0 && cardX != "ERROR") {
+            Click, %cardX%, %cardY%
+            focused := 1
+        }
+        if (focused) {
+            Sleep, 150
+            Send, ^a{BackSpace}
+            Sleep, 50
+            Send, ^v{Enter}
+            Sleep, 400
+        }
     }
 
-    if (ClientInfo != "" && infoX != 0) {
+    if (ClientInfo != "" && infoX != 0 && infoX != "ERROR") {
         Clipboard := ClientInfo
         Sleep, 150
         Click, %infoX% %infoY% 2     ; подвійний клік -> режим редагування комірки коментаря страви
@@ -3853,14 +3973,32 @@ ApplyRollclub:
     }
 
     ; При самовивозі поле "Примечание к адресу" в iiko заблоковане — НЕ пишемо туди.
-    if (AddressNote != "" && addrX != 0 && !hasPickup) {
+    if (AddressNote != "" && !hasPickup) {
         AddressNote := RcCleanAddressNote(AddressNote, rawAddress, commentStreet)
         if (AddressNote != "") {
             Clipboard := AddressNote
-            Click, %addrX%, %addrY%
-            Sleep, 200
-            Send, ^a{BackSpace}^v
-            Sleep, 300
+            focused := 0
+            elAddrNote := RcUiaFind("Примітка до адреси", "memoEditDeliveryAddressComment")
+            if (IsObject(elAddrNote)) {
+                try {
+                    elAddrNote.SetFocus()
+                    focused := 1
+                } catch {
+                    try {
+                        elAddrNote.Click()
+                        focused := 1
+                    }
+                }
+            }
+            if (!focused && addrX != 0 && addrX != "ERROR") {
+                Click, %addrX%, %addrY%
+                focused := 1
+            }
+            if (focused) {
+                Sleep, 150
+                Send, ^a{BackSpace}^v
+                Sleep, 300
+            }
         }
     }
 
@@ -4305,6 +4443,32 @@ RcUiaClick(role, defaultAid := "") {
     } catch e {
         return 0
     }
+}
+
+RcUiaGetText(role, defaultAid := "") {
+    element := RcUiaFind(role, defaultAid)
+    if (!IsObject(element))
+        return ""
+    val := ""
+    try val := element.CurrentValue
+    catch e1
+        val := ""
+    if (val = "") {
+        try val := element.CurrentValuePattern.Value
+        catch e2
+            val := ""
+    }
+    if (val = "") {
+        try val := element.CurrentLegacyIAccessible.Value
+        catch e3
+            val := ""
+    }
+    if (val = "") {
+        try val := element.CurrentName
+        catch e4
+            val := ""
+    }
+    return Trim(val)
 }
 
 RcHasUiaMap(role) {
@@ -4765,8 +4929,17 @@ RcCheckZone:
     if (!Kitchens.MaxIndex())
         GoSub, LoadKitchens
     addr := Trim(rawAddress)
-    if (addr = "" || hasPickup) {
+    if (hasPickup) {
+        _pTxt := "САМОВИВІЗ" . (pickupPoint != "" ? (": " . pickupPoint) : "")
+        GuiControl, Roll:, MapSearch, %_pTxt%
+        GuiControl, Roll:, KitchenStatusText, % (IsObject(RcCurrentKitchen) ? RcCurrentKitchen.Name : "")
+        RhRegColor(hZoneBox, RhB_Green, RhB_White)
+        return
+    }
+    if (addr = "") {
+        GuiControl, Roll:, MapSearch, Адресу не знайдено
         GuiControl, Roll:, KitchenStatusText,
+        RhRegColor(hZoneBox, 0xE8E8E8, 0x777777)
         return
     }
     addr := RegExReplace(addr, "i)[,\s]+(эт|поверх|кв|квартира|под|під|п|к|парадна)(?:\.?\s*/\s*(?:офис|офіс))?\.?\s*\d+.*$", "")
@@ -5033,7 +5206,7 @@ RcBlkNorm(s) {
 ; === RcVerifyPoint: натиснути «Найти точку», прочитати поле «Точка» і звірити з KML-зоною. ===
 RcVerifyPoint:
     SetTimer, RcVerifyPoint, Off
-    if (!CHECK_POINT_ENABLED || hasPickup || naitiX = 0 || tochkaX = 0) {
+    if (!CHECK_POINT_ENABLED || hasPickup || naitiX = 0 || tochkaX = 0 || RcLastZone = "") {
         return
     }
     ToolTip, Звірка доставки: підготовка...
