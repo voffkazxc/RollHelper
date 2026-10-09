@@ -23,7 +23,7 @@ def rc_is_street_or_address(text: str, raw_address: str = "") -> bool:
                 if len(w_clean) >= 4 and w_clean.lower() in raw_address.lower():
                     return True
 
-    if re.search(r'(?i)^\s*(?:Фоп|Самовивіз|Знижка)', clean):
+    if re.search(r'(?i)^\s*(?:Фоп|ФОП|FOP|Самовивіз|Знижка)', clean):
         return True
 
     return False
@@ -36,6 +36,16 @@ def rc_clean_address_note(note: str, raw_address: str = "", comment_street: str 
     clean_parts = []
     for part in parts:
         p = part.strip()
+        if not p:
+            continue
+
+        # Strip FOP block (e.g. "Фоп Пруднікова О.А. вул." or "ФОП Богатий П.О.")
+        p = re.sub(r'(?i)\b(?:Фоп|ФОП|FOP)\b.*?(?=\||$)', '', p).strip()
+        # Strip stray street markers at beginning or end
+        p = re.sub(r'(?i)^\s*(?:вул\.?|вулиця|просп\.?|проспект|пров\.?|провулок|буд\.?)\s*', '', p)
+        p = re.sub(r'(?i)\s*(?:\bвул\.?|вулиця|\bпросп\.?|проспект|\bпров\.?|провулок|\bбуд\.?)\s*$', '', p)
+        p = p.strip(" \t\r\n,.-")
+
         if not p:
             continue
         if rc_is_street_or_address(p, raw_address):
@@ -90,6 +100,36 @@ class TestAddressNoteClean(unittest.TestCase):
         note = "код двору 146, сірі двері праворуч"
         cleaned = rc_clean_address_note(note, "вулиця Пантелеймонівська 22", "Пантелеймонівська")
         self.assertEqual(cleaned, "код двору 146, сірі двері праворуч")
+
+    def test_fop_prudnikova_alone_becomes_empty(self):
+        note = "Фоп Пруднікова О.А. вул."
+        cleaned = rc_clean_address_note(note, "вул. Шевченка 12", "Шевченка")
+        self.assertEqual(cleaned, "")
+
+    def test_fop_prudnikova_with_courier_note(self):
+        note = "код 123 Фоп Пруднікова О.А. вул."
+        cleaned = rc_clean_address_note(note, "вул. Шевченка 12", "Шевченка")
+        self.assertEqual(cleaned, "код 123")
+
+    def test_fop_prudnikova_pipe_separated(self):
+        note = "3 поверх | Фоп Пруднікова О.А. вул."
+        cleaned = rc_clean_address_note(note, "вул. Шевченка 12", "Шевченка")
+        self.assertEqual(cleaned, "3 поверх")
+
+    def test_fop_bogatyi_trailing_street(self):
+        note = "Фоп Богатий П.О. Тракторобудівників проспект"
+        cleaned = rc_clean_address_note(note, "Тракторобудівників проспект 10", "Тракторобудівників")
+        self.assertEqual(cleaned, "")
+
+    def test_fop_velesyk_with_note(self):
+        note = "домофон 45, 2 під'їзд | Фоп Велесик Р.О. Біла вулиця"
+        cleaned = rc_clean_address_note(note, "Біла вулиця 5", "Біла")
+        self.assertEqual(cleaned, "домофон 45, 2 під'їзд")
+
+    def test_fop_initials_only(self):
+        note = "ФОП Іванов І.І."
+        cleaned = rc_clean_address_note(note, "вул. Миру 1", "Миру")
+        self.assertEqual(cleaned, "")
 
 if __name__ == '__main__':
     unittest.main()
