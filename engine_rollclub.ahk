@@ -1,6 +1,7 @@
 #Requires AutoHotkey v1.1
 #NoEnv
 #SingleInstance Force
+#Persistent
 SetWorkingDir %A_ScriptDir%\brands\rollclub   ; дані Roll Club (конфіг, промо, кухні, img)
 FileEncoding, UTF-8
 #Include %A_ScriptDir%\lib\IikoUI.ahk
@@ -12,6 +13,7 @@ ModuleRegistry_Init(A_ScriptDir, "rollclub", "mvp")
 ModuleRegistry_RegisterExternal("duty", "rollclub-duty")
 ModuleRegistry_RegisterExternal("zones", "rollclub-zones")
 ModuleRegistry_RegisterExternal("refund", "rollclub-refund")
+ModuleRegistry_RegisterExternal("first_order_gunkan", "rollclub-first-order-gunkan")
 
 RcStopLegacyDutyProcess()
 if (Module_IsEnabled("zones"))
@@ -249,6 +251,7 @@ GoSub, LoadPromoBase
 ; --- База кухонь / зон ---
 global RcZonesModuleEnabled := 0
 RcRefreshZonesModuleState()
+global RcFirstOrderGunkanEnabled := Module_IsEnabled("first_order_gunkan")
 global KitchensPath  := RcReadableRollclubDataPath("RkKitchens.ini")
 global PresetsPath   := RcReadableRollclubDataPath("RkPresets.txt")
 global Kitchens := []          ; масив об'єктів {Name, City, Address, ...}
@@ -299,6 +302,7 @@ global RcLastZoneOverlap := ""
 ; ========================================================
 ; ГАРЯЧІ КЛАВІШІ
 ; ========================================================
+FileAppend, % "[" A_Now "] HOTKEYS main=" hkMain " siv=" hkSiv "`n", %rcLogPath%
 Hotkey, %hkMain%, TriggerMain, On
 Hotkey, %hkSiv%,  TriggerSiv,  On
 ; FinishOrder тепер статична клавіша в #IfWinActive блоках (надійніше ніж Hotkey динамічний)
@@ -307,7 +311,7 @@ SetTimer, RollFocusWatcher, 300
 if (RcZonesModuleEnabled)
     SetTimer, RcKitchensBackgroundSync, 180000
 
-
+FileAppend, % "[" A_Now "] AUTO_EXECUTE_DONE`n", %rcLogPath%
 return
 
 ^F4::
@@ -1049,16 +1053,40 @@ RcKitchensSyncBlocked() {
 
 RcFindKitchenFromText(text) {
     global Kitchens
+    if (!IsObject(Kitchens) || !Kitchens.MaxIndex())
+        GoSub, LoadKitchens
     hay := text
     StringLower, hay, hay
     if (hay == "")
         return ""
+
+    ; 1. Перевірка через концепцію самовивозу
+    c := PickupConcept(text)
+    if (c != "") {
+        kName := RcFindKitchenByConcept(c)
+        if (kName != "") {
+            for _, k in Kitchens {
+                if (k.Name == kName)
+                    return k
+            }
+        }
+    }
+
+    ; 2. Прямий пошук по Kitchens: назва, KmlKey, або вулиця з адреси
     for _, k in Kitchens {
         n := k.Name, a := k.Address, key := k.KmlKey
         StringLower, n, n
         StringLower, a, a
         StringLower, key, key
-        if ((n != "" && InStr(hay, n)) || (key != "" && InStr(hay, key)) || (a != "" && InStr(hay, a)))
+        if (n != "" && InStr(hay, n))
+            return k
+        if (key != "" && InStr(hay, key))
+            return k
+        streetOnly := RegExReplace(a, "\s*\d+.*$", "")
+        streetOnly := Trim(streetOnly)
+        if (streetOnly != "" && StrLen(streetOnly) >= 4 && InStr(hay, streetOnly))
+            return k
+        if (a != "" && InStr(hay, a))
             return k
     }
     return ""
@@ -1115,15 +1143,28 @@ RcParseKitchenMinutes(text, defaultMin) {
     StringLower, t, t
     if InStr(t, "стандарт")
         return defaultMin
-    if InStr(t, "стоп")
+
+    ; Якщо це чистий повний стоп кухні (наприклад "стоп", "св стоп", "повний стоп")
+    if (t == "стоп" || t == "св стоп" || InStr(t, "повний стоп") || InStr(t, "кухня стоп"))
         return "стоп"
+
     t := StrReplace(t, "–", "-")
     t := StrReplace(t, "—", "-")
     t := StrReplace(t, ",", ".")
+
+    ; Якщо є числа (наприклад "1.5-2", "60", "60, Запечене СТОП")
     if RegExMatch(t, "(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)", m)
         return RcValueToMinutes(m2)
     if RegExMatch(t, "(\d+(?:\.\d+)?)", m)
         return RcValueToMinutes(m1)
+
+    ; Якщо чисел немає, але написано "стоп"
+    if InStr(t, "стоп") {
+        if RegExMatch(t, "i)(?:запечен|рол|сет|піц|бургер)")
+            return defaultMin
+        return "стоп"
+    }
+
     return defaultMin
 }
 
@@ -1491,8 +1532,12 @@ SilentMagicClean:
     }
 
     ; --- Час ---
-    if (hasPickup && pickupPoint != "")
-        RcCurrentKitchen := RcFindKitchenFromText(pickupPoint)
+    if (hasPickup) {
+        if (pickupPoint != "")
+            RcCurrentKitchen := RcFindKitchenFromText(pickupPoint)
+        if (!IsObject(RcCurrentKitchen))
+            RcCurrentKitchen := RcFindKitchenFromText(workComment)
+    }
     if (isFutureDate) {
         extractedTime := ""   ; передзамовлення — час вже виставлений в CRM, не чіпаємо
     } else {
@@ -1549,7 +1594,7 @@ SilentMagicClean:
         autoSticksEdu := 1
     }
 
-    if (RC_GIFTS_ENABLED && RegExMatch(workComment, "i)!!!ПЕРШЕМОБ")) {
+    if (RcFirstOrderGunkanEnabled && RegExMatch(workComment, "i)!!!ПЕРШЕМОБ")) {
         autoGunkan := 1
         if (cardText == "")
             cardText := "ПЕРШЕМОБ"
@@ -1595,9 +1640,9 @@ SilentMagicClean:
     }
 
     ; --- Адресні нотатки: явні маркери ---
-    if RegExMatch(workComment, "i)(?:Коментар|Комментарий)\s+до?\s*адреси?:\s*(.*?)(?=\s*(?:Купон:|Подарунок:|Промокод:|Прибори:|Звичайні:|Учбові:|Найближчим|Самовивіз|\d{4}-\d{2}-\d{2}|$))", mAddr)
+    if RegExMatch(workComment, "i)(?:Коментар|Комментарий)\s+до?\s*адреси?:\s*(.*?)(?=\s*(?:Купон:|Подарунок:|Промокод:|Прибори:|Звичайні:|Учбові:|Найближчим|Самовивіз|\bФоп\b|\d{4}-\d{2}-\d{2}|$))", mAddr)
         addrNote := Trim(mAddr1)
-    if RegExMatch(workComment, "i)(?<![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])доставка:\s*(.*?)(?=\s*(?:Купон:|Подарунок:|Прибори:|Найближчим|\d{4}-\d{2}-\d{2}|$))", mDel) {
+    if RegExMatch(workComment, "i)(?<![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])доставка:\s*(.*?)(?=\s*(?:Купон:|Подарунок:|Прибори:|Найближчим|Самовивіз|\bФоп\b|\d{4}-\d{2}-\d{2}|$))", mDel) {
         cand := Trim(mDel1)
         if (cand != "" && !InStr(addrNote, cand))
             addrNote := (addrNote != "") ? (addrNote . " | " . cand) : cand
@@ -1605,6 +1650,8 @@ SilentMagicClean:
 
     ; --- Пред-чистка тексту для адресного парсингу (зрізаємо шум) ---
     textForAddr := workComment
+    ; Зрізаємо Фоп і ВСЕ що йде після нього (адреса/самовивіз, які система передає в кінці)
+    textForAddr := RegExReplace(textForAddr, "i)\bФоп\b[\s\S]*$", " ")
     textForAddr := RegExReplace(textForAddr, "i)Пост-\d+", " ")
     textForAddr := RegExReplace(textForAddr, "i)(?<![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])(Mob|Сайт)(?![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])", " ")
     textForAddr := RegExReplace(textForAddr, "i)!!!ПЕРШЕМОБ", " ")
@@ -1615,7 +1662,6 @@ SilentMagicClean:
     textForAddr := RegExReplace(textForAddr, "i)ОПЛАЧЕНО\s*№\s*\d+", " ")
     textForAddr := RegExReplace(textForAddr, "i)QR\s*code\s*№?\s*\d+", " ")
     textForAddr := RegExReplace(textForAddr, "№\s*\d+", " ")
-    textForAddr := RegExReplace(textForAddr, "i)Фоп\s+\S+\s+\S+", " ")
     textForAddr := RegExReplace(textForAddr, "\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2})?", " ")
     textForAddr := RegExReplace(textForAddr, "i)Прибори:[^|]*?(?=(?:Купон|Подарунок|Найближчим|Самовивіз|Знижка|$))", " ")
     textForAddr := RegExReplace(textForAddr, "i)Купон:[^|]*?(?=(?:Прибори|Подарунок|Найближчим|Самовивіз|Знижка|$))", " ")
@@ -1628,9 +1674,9 @@ SilentMagicClean:
     textForAddr := RegExReplace(textForAddr, "i)Самовивіз:\s*[^\.\r\n]+?(?=(?:Знижка|Доставка|Прибори|Купон|Подарунок|$))", " ")
     ; Прибираємо "Коментар до адреси:" — вже оброблений явним маркером, не дублюємо
     textForAddr := RegExReplace(textForAddr, "i)(?:Коментар|Комментарий)\s+до?\s*адреси?:.*?(?=(?:\||Купон:|Подарунок:|Прибори:|Знижка|Найближчим|Самовивіз|\d{4}-\d{2}|$))", " ")
-    ; Прибираємо назву вулиці з кінця — вона вже пішла в perевірку адреси, тут шум
-    textForAddr := RegExReplace(textForAddr, "i)(?:вул\.?\s+)(?:[А-ЯІЇЄҐа-яіїєґ][А-ЯІЇЄҐа-яіїєґ\-]+\s*){1,3}\.?\s*$", " ")
-    textForAddr := RegExReplace(textForAddr, "i)(?:[А-ЯІЇЄҐа-яіїєґ][А-ЯІЇЄҐа-яіїєґ\-]+\s+){1,3}вулиця\.?\s*$", " ")
+    ; Прибираємо назву вулиці з кінця — вона вже пішла в перевірку адреси, тут шум
+    _stTypesRegex := "вул\.?|вулиця|просп\.?|проспект|пров\.?|провулок|шосе|бульв\.?|бульвар|набережна|узвіз|площа|майдан|тупик|проїзд|алея"
+    textForAddr := RegExReplace(textForAddr, "i)(?:\b(?:" . _stTypesRegex . ")\s+)?(?:[А-ЯІЇЄҐа-яіїєґ0-9\'\-]+\s*){1,4}(?:\b(?:" . _stTypesRegex . ")\b)?\s*(?:\([^)]*\))?\s*$", " ")
 
     ; --- Адресні нотатки за ключовиками (розширений набір) ---
     Loop {
@@ -1728,7 +1774,7 @@ SilentMagicClean:
     ; --- Залишок тексту ---
     textForAddr := Trim(RegExReplace(textForAddr, "\s+", " "))
     if (textForAddr != "" && textForAddr != " " && StrLen(textForAddr) > 3) {
-        if (!hasCustomerReq && !hasDeliveryTime)
+        if (!hasCustomerReq && !hasDeliveryTime && !RcIsStreetOrAddress(textForAddr, rawAddress))
             addrNote := (addrNote != "") ? (addrNote . " | " . textForAddr) : textForAddr
     }
 
@@ -1769,7 +1815,7 @@ SilentMagicClean:
                     autoCash := 1
                 }
                 if (pKey == "addrNote" && pVal != "") {
-                    if (!InStr(addrNote, pVal))
+                    if (!InStr(addrNote, pVal) && !RcIsStreetOrAddress(pVal, rawAddress))
                         addrNote := (addrNote != "") ? (pVal . " | " . addrNote) : pVal
                 }
                 if (pKey == "kitchenNote" && pVal != "") {
@@ -1843,7 +1889,7 @@ SilentMagicClean:
     for i, part in cleanParts
         cleanComment .= (cleanComment != "" ? " " : "") . part
 
-    if (clientChange != "")
+    if (clientChange != "" && clientChange >= orderSum)
         calcChange := clientChange
     else if (orderSum > 0)
         calcChange := Ceil(orderSum / 200) * 200
@@ -1990,6 +2036,8 @@ SilentMagicClean:
             SoundPlay, %A_ScriptDir%\beep_err.wav
         }
     }
+    ; --- Фінальна санітизація addrNote: видаляємо дублювання самої вулиці / адреси ---
+    addrNote := RcCleanAddressNote(addrNote, rawAddress, commentStreet)
 
 return
 
@@ -2179,23 +2227,31 @@ DrawRollclub:
 
     ControlsToMove := []
 
-    if (RC_GIFTS_ENABLED) {
+    if (RC_GIFTS_ENABLED || RcFirstOrderGunkanEnabled) {
         ; Extras block
         Gui, Roll:Font, s8 bold c%RhC_Muted%, %RhFontName%
-        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200 vLblGifts HwndhC1, ДОПИ
+        _extrasTitle := RC_GIFTS_ENABLED ? "ДОПИ" : "АКЦІЯ"
+        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200 vLblGifts HwndhC1, %_extrasTitle%
         ControlsToMove.Push(hC1)
         curY += 20
 
         Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
-        Gui, Roll:Add, Text, x16  y%curY% w76 h24 Center +0x200 HwndhGiftG gToggleGiftG, Гункан
-        Gui, Roll:Add, Text, x100 y%curY% w76 h24 Center +0x200 HwndhGiftP gToggleGiftP, Пепсі
-        Gui, Roll:Add, Text, x184 y%curY% w76 h24 Center +0x200 HwndhGiftB gToggleGiftB, Бургер
-        Gui, Roll:Add, Text, x268 y%curY% w76 h24 Center +0x200 HwndhGiftS gToggleGiftS, Сендвіч
-        ControlsToMove.Push(hGiftG), ControlsToMove.Push(hGiftP), ControlsToMove.Push(hGiftB), ControlsToMove.Push(hGiftS)
+        if (RC_GIFTS_ENABLED) {
+            Gui, Roll:Add, Text, x16  y%curY% w76 h24 Center +0x200 HwndhGiftG gToggleGiftG, Гункан
+            Gui, Roll:Add, Text, x100 y%curY% w76 h24 Center +0x200 HwndhGiftP gToggleGiftP, Пепсі
+            Gui, Roll:Add, Text, x184 y%curY% w76 h24 Center +0x200 HwndhGiftB gToggleGiftB, Бургер
+            Gui, Roll:Add, Text, x268 y%curY% w76 h24 Center +0x200 HwndhGiftS gToggleGiftS, Сендвіч
+            ControlsToMove.Push(hGiftG), ControlsToMove.Push(hGiftP), ControlsToMove.Push(hGiftB), ControlsToMove.Push(hGiftS)
+        } else {
+            Gui, Roll:Add, Text, x16 y%curY% w328 h24 Center +0x200 HwndhGiftG gToggleGiftG, Гункан · перше замовлення з додатку
+            ControlsToMove.Push(hGiftG)
+        }
         RhRegColor(hGiftG, (autoGunkan   ? RhB_GiftGunkan   : RhB_Chip), RhB_Text)
-        RhRegColor(hGiftP, (autoPepsi    ? RhB_GiftPepsi    : RhB_Chip), RhB_Text)
-        RhRegColor(hGiftB, (autoBurger   ? RhB_GiftBurger   : RhB_Chip), RhB_Text)
-        RhRegColor(hGiftS, (autoSandwich ? RhB_GiftSandwich : RhB_Chip), RhB_Text)
+        if (RC_GIFTS_ENABLED) {
+            RhRegColor(hGiftP, (autoPepsi    ? RhB_GiftPepsi    : RhB_Chip), RhB_Text)
+            RhRegColor(hGiftB, (autoBurger   ? RhB_GiftBurger   : RhB_Chip), RhB_Text)
+            RhRegColor(hGiftS, (autoSandwich ? RhB_GiftSandwich : RhB_Chip), RhB_Text)
+        }
         curY += 34
     }
 
@@ -2301,16 +2357,18 @@ ToggleGiftS:
     GoSub, RefreshGifts
 return
 RefreshGifts:
-    if (!RC_GIFTS_ENABLED)
+    if (!RC_GIFTS_ENABLED && !RcFirstOrderGunkanEnabled)
         return
     RhRegColor(hGiftG, (autoGunkan   ? RhB_GiftGunkan   : RhB_Chip), RhB_Text)
-    RhRegColor(hGiftP, (autoPepsi    ? RhB_GiftPepsi    : RhB_Chip), RhB_Text)
-    RhRegColor(hGiftB, (autoBurger   ? RhB_GiftBurger   : RhB_Chip), RhB_Text)
-    RhRegColor(hGiftS, (autoSandwich ? RhB_GiftSandwich : RhB_Chip), RhB_Text)
     DllCall("InvalidateRect", "Ptr", hGiftG, "Ptr", 0, "Int", 1)
-    DllCall("InvalidateRect", "Ptr", hGiftP, "Ptr", 0, "Int", 1)
-    DllCall("InvalidateRect", "Ptr", hGiftB, "Ptr", 0, "Int", 1)
-    DllCall("InvalidateRect", "Ptr", hGiftS, "Ptr", 0, "Int", 1)
+    if (RC_GIFTS_ENABLED) {
+        RhRegColor(hGiftP, (autoPepsi    ? RhB_GiftPepsi    : RhB_Chip), RhB_Text)
+        RhRegColor(hGiftB, (autoBurger   ? RhB_GiftBurger   : RhB_Chip), RhB_Text)
+        RhRegColor(hGiftS, (autoSandwich ? RhB_GiftSandwich : RhB_Chip), RhB_Text)
+        DllCall("InvalidateRect", "Ptr", hGiftP, "Ptr", 0, "Int", 1)
+        DllCall("InvalidateRect", "Ptr", hGiftB, "Ptr", 0, "Int", 1)
+        DllCall("InvalidateRect", "Ptr", hGiftS, "Ptr", 0, "Int", 1)
+    }
 return
 
 ToggleAutoCash:
@@ -2911,6 +2969,13 @@ OpenSettings:
     Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewPluFork Center Limit10, %pluFork%
     Gui, Settings:Add, Text, x24 y+6 w170 h22 +0x200, Ніж
     Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewPluKnife Center Limit10, %pluKnife%
+    if (RcFirstOrderGunkanEnabled) {
+        Gui, Settings:Font, s9 bold c%RhC_Text%, %RhFontName%
+        Gui, Settings:Add, Text, x24 y+14 w300 h20, АКЦІЯ ПЕРШОГО ЗАМОВЛЕННЯ
+        Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+        Gui, Settings:Add, Text, x24 y+6 w170 h22 +0x200, Гункан
+        Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewGunkan Center Limit10, %pluGunkan%
+    }
     Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
     Gui, Settings:Add, Text, x24 y+8 w300, PLU вводиться повністю, разом із нулями на початку.
 
@@ -2991,6 +3056,8 @@ SaveSettings:
     IniWrite, %NewPluSoy%,     %ConfigPath%, PLU_SIV, Soy
     IniWrite, %NewPluGinger%,  %ConfigPath%, PLU_SIV, Ginger
     IniWrite, %NewPluWasabi%,  %ConfigPath%, PLU_SIV, Wasabi
+    if (RcFirstOrderGunkanEnabled)
+        IniWrite, %NewGunkan%, %ConfigPath%, PLU, Gunkan
     IniWrite, %NewHkMain%,   %ConfigPath%, Hotkeys, Main
     IniWrite, %NewHkSiv%,    %ConfigPath%, Hotkeys, Siv
     IniWrite, %NewHkFinish%, %ConfigPath%, Hotkeys, Finish
@@ -3076,12 +3143,7 @@ SetCrossTarget:
     IniWrite, %crossY%, %ConfigPath%, Targets, CrossY
     Gui, Settings:Show
 return
-    total := A_Hour*60 + A_Min + CalcType
-    HH := Mod(Floor(total / 60), 24)
-    MM := Mod(total, 60)
-    GuiControl, Roll:, ReadyTimeH, % Format("{:02}", HH)
-    GuiControl, Roll:, ReadyTimeM, % Format("{:02}", MM)
-return
+
 SetCashTarget:
     Gui, Settings:Hide
     Sleep, 300
@@ -3502,8 +3564,10 @@ return
 ProcessTimeCalc:
     if (CalcType == "стоп")
         return
-    total := A_Hour*60 + A_Min + CalcType
-    HFinishOrder:
+    RcSetReadyByMinutes(CalcType)
+return
+
+HFinishOrder:
     GoSub, KcStopDuty          ; ручний фініш (Ctrl+Enter) → дежурство стоп
     FileAppend, % "[" . A_Now . "] FINISH UIA/Coord attempt`n", %A_ScriptDir%\ahk_debug.log
     
@@ -3728,8 +3792,17 @@ ApplyRollclub:
     Gui, Roll:Submit, NoHide
     Gui, Roll:Destroy
     ; Звірка точки — синхронно, ДО решти кліків (тільки доставка, тільки якщо увімкнено)
-    if (!hasPickup && CHECK_POINT_ENABLED && naitiX != 0 && tochkaX != 0)
+    if (!hasPickup && CHECK_POINT_ENABLED && naitiX != 0 && tochkaX != 0) {
         GoSub, RcVerifyPoint
+        _ptSum := RcReadCurrentOrderSum()
+        if (_ptSum > 0) {
+            orderSum := _ptSum
+            if (clientChange != "" && clientChange >= orderSum)
+                calcChange := clientChange
+            else
+                calcChange := Ceil(orderSum / 200) * 200
+        }
+    }
 
     ; ==== DEBUG: лог запису ====
     FormatTime, _wT,, yyyy-MM-dd HH:mm:ss
@@ -3781,45 +3854,217 @@ ApplyRollclub:
 
     ; При самовивозі поле "Примечание к адресу" в iiko заблоковане — НЕ пишемо туди.
     if (AddressNote != "" && addrX != 0 && !hasPickup) {
-        Clipboard := AddressNote
-        Click, %addrX%, %addrY%
-        Sleep, 200
-        Send, ^a{BackSpace}^v
-        Sleep, 300
+        AddressNote := RcCleanAddressNote(AddressNote, rawAddress, commentStreet)
+        if (AddressNote != "") {
+            Clipboard := AddressNote
+            Click, %addrX%, %addrY%
+            Sleep, 200
+            Send, ^a{BackSpace}^v
+            Sleep, 300
+        }
     }
 
-    if (ReadyTimeH != "" && ReadyTimeM != "" && timeX != 0) {
+    ; --- Самовивіз: авто Концепція + Точка за точкою з коментаря (1:1) ---
+    ; ВАЖЛИВО: для самовивозу спочатку перемикаємо Концепцію та Точку в Syrve,
+    ; і лише потім вбиваємо час, щоб Syrve не скидав наш розрахунковий час на дефолтний!
+    if (hasPickup && kontsX != 0) {  ; завжди ставимо точку для самовивозу (незалежно від autoMode)
+        pickKonts := PickupConcept(pickupPoint)
+        if (pickKonts != "") {
+            Sleep, 400
+            Click, %kontsX%, %kontsY%        ; поле "Концепція"
+            Sleep, 300
+            SetKeyDelay, 40
+            Send, ^a{BackSpace}
+            Sleep, 80
+            Send, %pickKonts%                ; вписуємо назву концепції
+            Sleep, 350
+            Send, {Tab}                      ; підтвердити концепцію + перейти на "Точка"
+            Sleep, 250
+            Send, {Space}                    ; відкрити список точок
+            Sleep, 250
+            Send, {PgUp}                      ; вгору списку = потрібна точка під цю концепцію
+            Sleep, 250
+            Send, {Enter}                    ; підтвердити точку
+            SetKeyDelay, -1
+            SetTimer, RcPickupVerifyPoint, -100
+            Sleep, 300
+        }
+    }
+
+    rH := (ReadyTimeH != "") ? Format("{:02}", ReadyTimeH + 0) : ""
+    rM := (ReadyTimeM != "") ? Format("{:02}", ReadyTimeM + 0) : ""
+    if (rH != "" && rM != "" && (timeX != 0 || RcHasUiaMap("Час"))) {
         Sleep, 300
-        Click, %timeX%, %timeY%
+        timeFocused := 0
+        el := RcUiaFind("Час", "timeEditDeliveryTime")
+        if (IsObject(el)) {
+            try {
+                rect := el.CurrentBoundingRectangle
+                if (rect.r > rect.l && rect.b > rect.t) {
+                    ; Клік у ліву чверть поля — гарантовано фокусує поле на годинах
+                    clickX := rect.l + Round((rect.r - rect.l) * 0.25)
+                    clickY := Round((rect.t + rect.b) / 2)
+                    Click, %clickX%, %clickY%
+                    timeFocused := 1
+                    Sleep, 150
+                }
+            }
+            if (!timeFocused) {
+                try {
+                    el.Click()
+                    timeFocused := 1
+                    Sleep, 150
+                }
+            }
+        }
+        if (!timeFocused && timeX != 0) {
+            Click, %timeX%, %timeY%
+            Sleep, 150
+        }
+
+        ; Надійний ввід: Home гарантує перехід на години незалежно від точки кліку
+        SetKeyDelay, 35
+        Send, {Home}
+        Sleep, 100
+        Send, {Del 3}
+        Sleep, 100
+        Send, %rH%
         Sleep, 200
-        SendInput, ^a{BackSpace}%ReadyTimeH%{Right}%ReadyTimeM%{Enter}
+        Send, {Right}
+        Sleep, 150
+        Send, %rM%
+        Sleep, 300
+        Send, {Tab}
+        SetKeyDelay, -1
         Sleep, 200
     }
 
     if (autoCash == 1 && (crossX != 0 || RcHasUiaMap("Хрестик Опл.")) && cashX != 0) {
-        Sleep, 400
-        if (!RcUiaClick("Хрестик Опл.", "buttonDeletePaymentItem"))
-            Click, %crossX%, %crossY%
-        Sleep, 400
-        IikoUI_NoChange()
-        Sleep, 400
-        SetKeyDelay, 40
-        Send, Готівка
-        Sleep, 300
-        Send, {PgDn}
-        Sleep, 300
-        Send, {Enter}
-        Sleep, 600
-        Send, {Tab 2}
-        Sleep, 300
-        Send, %calcChange%
-        Sleep, 300
-        Send, {Enter}
-        SetKeyDelay, -1
-        Sleep, 500
+        ; --- Актуалізація суми після "Найти точку" / зміни прайсу Syrve ---
+        _cashSum := RcReadCurrentOrderSum()
+        if (_cashSum > 0)
+            orderSum := _cashSum
+
+        _payInfo := RcDetectBonusPayment()
+        FileAppend, % "PAY_DETECT: hasBonus=" . _payInfo.hasBonus . " bonusSum=" . _payInfo.bonusSum . " bonusRow=" . _payInfo.bonusRow . " cashRow=" . _payInfo.cashRow . " orderSum=" . orderSum . "`n", %A_ScriptDir%\parse_debug.log, UTF-8
+
+        if (_payInfo.hasBonus) {
+            cashToPay := orderSum - _payInfo.bonusSum
+            if (cashToPay < 0)
+                cashToPay := 0
+            if (clientChange != "" && clientChange >= cashToPay)
+                calcChange := clientChange
+            else if (cashToPay > 0)
+                calcChange := Ceil(cashToPay / 200) * 200
+            else
+                calcChange := 0
+            FileAppend, % "BONUS_CHANGE: cashToPay=" . cashToPay . " calcChange=" . calcChange . "`n", %A_ScriptDir%\parse_debug.log, UTF-8
+
+            ; 1. Знайти та виділити саме рядок готівки, щоб не зачепити бонуси
+            cashClickX := 0
+            cashClickY := 0
+            if (_payInfo.cashRow >= 0) {
+                grid := RcUiaFind("Поле Оплати", "gridPaymentItems")
+                if (IsObject(grid)) {
+                    cashEl := ""
+                    try cashEl := grid.FindFirstBy("Name=Тип оплаты row " . _payInfo.cashRow)
+                    if (!IsObject(cashEl))
+                        try cashEl := grid.FindFirstBy("Name=Тип оплати row " . _payInfo.cashRow)
+                    if (IsObject(cashEl)) {
+                        try {
+                            cRect := cashEl.CurrentBoundingRectangle
+                            cashClickX := cRect.l + 10
+                            cashClickY := cRect.t + 10
+                        }
+                        try cashEl.Click()
+                        Sleep, 250
+                    }
+                }
+                ; 2. Видалити рядок готівки хрестиком
+                if (!RcUiaClick("Хрестик Опл.", "buttonDeletePaymentItem"))
+                    Click, %crossX%, %crossY%
+                Sleep, 400
+            }
+
+            ; 3. Ввести нову готівку зі здачею (УВАГА: категорично НЕ викликати "Без сдачи"!)
+            if (calcChange > 0) {
+                grid := RcUiaFind("Поле Оплати", "gridPaymentItems")
+                clickedTarget := 0
+                if (IsObject(grid)) {
+                    targetEl := ""
+                    try targetEl := grid.FindFirstBy("Name=Тип оплаты row 1")
+                    if (!IsObject(targetEl))
+                        try targetEl := grid.FindFirstBy("Name=Тип оплати row 1")
+                    if (!IsObject(targetEl)) {
+                        try targetEl := grid.FindFirstBy("Name=Тип оплаты row 0")
+                        if (!IsObject(targetEl))
+                            try targetEl := grid.FindFirstBy("Name=Тип оплати row 0")
+                    }
+                    if (IsObject(targetEl)) {
+                        try {
+                            targetEl.Click()
+                            clickedTarget := 1
+                            Sleep, 300
+                        }
+                    }
+                }
+                if (!clickedTarget) {
+                    if (cashClickX > 0)
+                        Click, %cashClickX%, %cashClickY%
+                    else if (!RcUiaClick("Поле Оплати", "gridPaymentItems") && cashX != 0)
+                        Click, %cashX%, %cashY%
+                    Sleep, 300
+                }
+
+                SetKeyDelay, 40
+                Send, Готівка
+                Sleep, 300
+                Send, {PgDn}
+                Sleep, 300
+                Send, {Enter}
+                Sleep, 600
+                Send, {Tab 2}
+                Sleep, 300
+                Send, %calcChange%
+                Sleep, 300
+                Send, {Enter}
+                SetKeyDelay, -1
+                Sleep, 500
+            }
+        } else {
+            ; --- Звичайне замовлення (без бонусів) ---
+            if (clientChange != "" && clientChange >= orderSum)
+                calcChange := clientChange
+            else if (orderSum > 0)
+                calcChange := Ceil(orderSum / 200) * 200
+            else if (calcChange < orderSum && orderSum > 0)
+                calcChange := Ceil(orderSum / 200) * 200
+            FileAppend, % "CASH_RECHECK: orderSum=" . orderSum . " calcChange=" . calcChange . "`n", %A_ScriptDir%\parse_debug.log, UTF-8
+
+            Sleep, 400
+            if (!RcUiaClick("Хрестик Опл.", "buttonDeletePaymentItem"))
+                Click, %crossX%, %crossY%
+            Sleep, 400
+            IikoUI_NoChange()
+            Sleep, 400
+            SetKeyDelay, 40
+            Send, Готівка
+            Sleep, 300
+            Send, {PgDn}
+            Sleep, 300
+            Send, {Enter}
+            Sleep, 600
+            Send, {Tab 2}
+            Sleep, 300
+            Send, %calcChange%
+            Sleep, 300
+            Send, {Enter}
+            SetKeyDelay, -1
+            Sleep, 500
+        }
     }
 
-    if (RC_GIFTS_ENABLED && (autoGunkan || autoPepsi || autoBurger || autoSandwich) && itemX != 0) {
+    if (RC_GIFTS_ENABLED && (autoPepsi || autoBurger || autoSandwich) && itemX != 0) {
         if (autoBurger) {
             GoSub, NewGiftMacro
             SendInput, %pluBurger%
@@ -3852,11 +4097,13 @@ ApplyRollclub:
             SendInput, %pluPepsi%
             GoSub, FinishGiftMacro
         }
-        if (autoGunkan) {
-            GoSub, NewGiftMacro
-            SendInput, %pluGunkan%
-            GoSub, FinishGiftMacro
-        }
+    }
+
+    ; --- Підготовка завдань на пробиття PLU (Гункани + СІВ) ---
+    _pluJobs := []
+    if (RcFirstOrderGunkanEnabled && autoGunkan && itemX != 0) {
+        if (pluGunkan != "" && pluGunkan != "0000")
+            RcAddPluJob(_pluJobs, pluGunkan, 1)
     }
 
     ; Пробиваємо СИВ (Палички та соуси)
@@ -3881,7 +4128,6 @@ ApplyRollclub:
         }
         _rcLog := A_ScriptDir "\siv_debug.log"
         FileAppend, % "[" . A_Now . "] SIV_SERIES_START itemX=" . itemX . " norm=" . VisNorm . " edu=" . VisEdu . " utensils=" . VisUtensils . "`n", %_rcLog%
-        _pluJobs := []
         RcAddPluJob(_pluJobs, pluSticksNorm, VisNorm)
         RcAddPluJob(_pluJobs, pluSticksEdu, VisEdu)
         RcAddPluJob(_pluJobs, pluSoy, _soyQty)
@@ -3889,35 +4135,14 @@ ApplyRollclub:
         RcAddPluJob(_pluJobs, pluWasabi, _gwQty)
         RcAddPluJob(_pluJobs, pluFork, VisUtensils)
         RcAddPluJob(_pluJobs, pluKnife, VisUtensils)
+    }
+
+    if (_pluJobs.MaxIndex() > 0) {
+        _rcLog := A_ScriptDir "\siv_debug.log"
+        FileAppend, % "[" . A_Now . "] PUNCH_PLU_SERIES_START total_jobs=" . _pluJobs.MaxIndex() . " gunkan=" . autoGunkan . "`n", %_rcLog%
         RcPunchPluSeries(_pluJobs)
     }
 
-    ; --- Самовивіз: авто Концепція + Точка за точкою з коментаря (1:1) ---
-    ; Концепцію беремо з таблиці PickupConcept(), вписуємо її → Tab → Space →
-    ; PgUp → Enter (перевірена послідовність: після концепції список точок
-    ; фільтрується, PgUp бере потрібну, "Ролл Клаб КЦ" не чіпаємо).
-    if (hasPickup && kontsX != 0) {  ; завжди ставимо точку для самовивозу (незалежно від autoMode)
-        pickKonts := PickupConcept(pickupPoint)
-        if (pickKonts != "") {
-            Sleep, 400
-            Click, %kontsX%, %kontsY%        ; поле "Концепція"
-            Sleep, 300
-            SetKeyDelay, 40
-            Send, ^a{BackSpace}
-            Sleep, 80
-            Send, %pickKonts%                ; вписуємо назву концепції
-            Sleep, 350
-            Send, {Tab}                      ; підтвердити концепцію + перейти на "Точка"
-            Sleep, 250
-            Send, {Space}                    ; відкрити список точок
-            Sleep, 250
-            Send, {PgUp}                      ; вгору списку = потрібна точка під цю концепцію
-            Sleep, 250
-            Send, {Enter}                    ; підтвердити точку
-            SetKeyDelay, -1
-            SetTimer, RcPickupVerifyPoint, -100
-        }
-    }
 
     if (RC_GIFTS_ENABLED && autoMode) {
     ; --- Подарунок: сервер обирає найдорожчий → пробиваємо по PLU (к-сть 1) ---
@@ -3990,34 +4215,34 @@ PickupConcept(pt) {
     ; ── КИЇВ ──
     if (InStr(pt, "Драгоманова"))
         return "Київ Драгоманова"
-    if (InStr(pt, "Антонова") || InStr(pt, "Солом'янськ"))
+    if (InStr(pt, "Антонова") || InStr(pt, "Солом'янськ") || InStr(pt, "Соломянськ"))
         return "Київ Антонова"
-    if (InStr(pt, "Стрільців") || InStr(pt, "Лук'янівка"))
+    if (InStr(pt, "Стрільців") || InStr(pt, "Стрильц") || InStr(pt, "Лук'янівка") || InStr(pt, "Лукьяновка") || InStr(pt, "Лукянівка"))
         return "Київ Стрільців"
-    if (InStr(pt, "Лаврухіна"))
+    if (InStr(pt, "Лаврухіна") || InStr(pt, "Лаврухина") || InStr(pt, "Троєщина") || InStr(pt, "Троещина"))
         return "Київ Лаврухіна"
     ; ── ХАРКІВ ──
-    if (InStr(pt, "Конституції"))
+    if (InStr(pt, "Конституції") || InStr(pt, "Конституции") || InStr(pt, "Ресторан"))
         return "РК Харків Конституції Доставка"
-    if (InStr(pt, "Садовий"))
+    if (InStr(pt, "Садовий") || InStr(pt, "Садовый") || InStr(pt, "Нові") || InStr(pt, "Нови") || InStr(pt, "Новые") || InStr(pt, "Новы") || InStr(pt, "НД"))
         return "Харків Нові Дома"
     ; ── ЛЬВІВ ──
-    if (InStr(pt, "Липа"))
+    if (InStr(pt, "Липа") || InStr(pt, "Крива Липа") || InStr(pt, "Кривая Липа"))
         return "Львов Липа"
     ; ── ДНІПРО ──
-    if (InStr(pt, "Мудрого") || InStr(pt, "Авіаторськ"))
+    if (InStr(pt, "Мудрого") || InStr(pt, "Авіаторськ") || InStr(pt, "Авиаторск") || InStr(pt, "Ярослава"))
         return "Дніпро Мудрого"
     ; ── БІЛА ЦЕРКВА ──
-    if (InStr(pt, "Вернадського") || InStr(pt, "Біла Церква"))
+    if (InStr(pt, "Вернадського") || InStr(pt, "Вернадского") || InStr(pt, "Біла Церква") || InStr(pt, "Белая Церковь") || InStr(pt, "БЦ"))
         return "Біла Церква"
     ; ── ОДЕСА ──
-    if (InStr(pt, "Незалежності") || InStr(pt, "Приморська") || InStr(pt, "Котовського") || InStr(pt, "Пересипськ"))
+    if (InStr(pt, "Незалежності") || InStr(pt, "Независимости") || InStr(pt, "Приморська") || InStr(pt, "Приморская") || InStr(pt, "Котовського") || InStr(pt, "Котовского") || InStr(pt, "Пересипськ"))
         return "Приморська"
     ; ── ІВАНО-ФРАНКІВСЬК ──
-    if (InStr(pt, "Фудотека") || InStr(pt, "Промприлад") || InStr(pt, "Перемоги") || InStr(pt, "Франківськ") || InStr(pt, "ІФ"))
+    if (InStr(pt, "Фудотека") || InStr(pt, "Промприлад") || InStr(pt, "Промприбор") || InStr(pt, "Перемоги") || InStr(pt, "Победы") || InStr(pt, "Франківськ") || InStr(pt, "Франковск") || InStr(pt, "ІФ"))
         return "Франківськ Фудотека"
     ; ── РІВНЕ ──
-    if (InStr(pt, "Кулика") || InStr(pt, "Екватор"))
+    if (InStr(pt, "Кулика") || InStr(pt, "Екватор") || InStr(pt, "Экватор") || InStr(pt, "Рівне") || InStr(pt, "Ровно"))
         return "Рівне"
     ; ── ВІННИЦЯ ──
     if (InStr(pt, "600") || InStr(pt, "Мегамолл") || InStr(pt, "Вінниц") || InStr(pt, "Винниц"))
@@ -4086,6 +4311,166 @@ RcHasUiaMap(role) {
     global UIA_MAP_CONFIG
     IniRead, mappedAid, %UIA_MAP_CONFIG%, UiaMap, %role%, %A_Space%
     return mappedAid != "" && mappedAid != "ERROR"
+}
+
+RcParseSumValue(str) {
+    if (str = "")
+        return 0
+    clean := StrReplace(str, Chr(160), "")
+    clean := StrReplace(clean, " ", "")
+    if (RegExMatch(clean, "(\d+(?:[.,]\d+)?)", m)) {
+        numStr := StrReplace(m1, ",", ".")
+        return Ceil(numStr + 0)
+    }
+    return 0
+}
+
+RcReadCurrentOrderSum() {
+    global sumX, sumY
+    
+    ; 1. Нативний UIA пошук поля labelOrderSum у вікні Syrve (~10-30 мс)
+    try {
+        el := RcUiaFind("Сума Замовлення", "labelOrderSum")
+        if (IsObject(el)) {
+            valText := ""
+            try valText := el.CurrentName
+            if (valText = "") {
+                try valText := el.CurrentValue
+            }
+            if (valText != "") {
+                parsed := RcParseSumValue(valText)
+                if (parsed > 0)
+                    return parsed
+            }
+        }
+    } catch eUia {
+    }
+
+    ; 2. Швидкий координаційний фолбек через буфер обміну (якщо UIA не дав значення)
+    if (sumX != 0 && sumX != "ERROR") {
+        prevClip := ClipboardAll
+        Clipboard := ""
+        Click, %sumX%, %sumY%
+        Sleep, 120
+        Send, ^c
+        ClipWait, 0.5
+        clipVal := Clipboard
+        Clipboard := prevClip
+        parsed := RcParseSumValue(clipVal)
+        if (parsed > 0)
+            return parsed
+    }
+
+    return 0
+}
+
+RcIsStreetOrAddress(text, rawAddress := "") {
+    clean := Trim(text)
+    if (clean = "")
+        return 1
+
+    ; Якщо містить реальні інструкції для кур'єра — це НЕ просто назва вулиці
+    if RegExMatch(clean, "i)(?:домофон|під'їзд|подъезд|поверх|этаж|квартир|кв\s*\d|парадн|двер|код\b|шлагбаум|зустрін|встрет|вийду|выйду|консьєрж|ресепшн|охорон|заїзд|вхід|вход|корпус|фасад|ворот|хвіртк|паркан|двір\b|двор\b|орієнтир|ориентир|навпроти|напротив|біля|рядом|зателефону|дзвон|звон|набрати|наберіть|наберите|стука|постуч|не\s+дзвон|не\s+звон|сплять|спят|під\s+двер|пам'?ятник|лікарн|госпітал)")
+        return 0
+
+    ; Префікси та суфікси вулиць
+    streetPat := "i)(?:\b(?:вул\.?|вулиця|просп\.?|проспект|пров\.?|провулок|шосе|бульв\.?|бульвар|набережна|узвіз|площа|майдан|тупик|проїзд|алея)\b)"
+    if RegExMatch(clean, streetPat)
+        return 1
+
+    ; Якщо чистий текст (1-4 слова) повністю або частково входить в rawAddress
+    if (rawAddress != "") {
+        words := StrSplit(clean, " ")
+        if (words.MaxIndex() <= 4) {
+            for _, w in words {
+                wClean := RegExReplace(w, "[^\wа-яіїєґА-ЯІЇЄҐёЁ]", "")
+                if (StrLen(wClean) >= 4 && InStr(rawAddress, wClean))
+                    return 1
+            }
+        }
+    }
+
+    ; Якщо це маркер ФОП або Самовивіз
+    if RegExMatch(clean, "i)^\s*(?:Фоп|Самовивіз|Знижка)")
+        return 1
+
+    return 0
+}
+
+RcCleanAddressNote(note, rawAddress := "", commentStreet := "") {
+    if (note = "")
+        return ""
+
+    parts := StrSplit(note, "|")
+    cleanParts := []
+    for _, part in parts {
+        p := Trim(part)
+        if (p = "")
+            continue
+
+        ; Якщо частина є просто адресою/вулицею — пропускаємо
+        if RcIsStreetOrAddress(p, rawAddress)
+            continue
+
+        if (commentStreet != "" && InStr(p, commentStreet)) {
+            subClean := Trim(StrReplace(p, commentStreet, ""))
+            if (subClean = "" || StrLen(subClean) < 3)
+                continue
+        }
+
+        cleanParts.Push(p)
+    }
+
+    result := ""
+    for _, cp in cleanParts {
+        result .= (result != "" ? " | " : "") . cp
+    }
+    return result
+}
+
+RcDetectBonusPayment() {
+    grid := RcUiaFind("Поле Оплати", "gridPaymentItems")
+    if (!IsObject(grid))
+        return {hasBonus: 0, bonusSum: 0, bonusRow: -1, cashRow: -1}
+
+    res := {hasBonus: 0, bonusSum: 0, bonusRow: -1, cashRow: -1}
+
+    Loop, 3 {
+        rIdx := A_Index - 1
+        typeEl := ""
+        try typeEl := grid.FindFirstBy("Name=Тип оплаты row " . rIdx)
+        if (!IsObject(typeEl))
+            try typeEl := grid.FindFirstBy("Name=Тип оплати row " . rIdx)
+
+        typeVal := ""
+        if (IsObject(typeEl)) {
+            try typeVal := typeEl.CurrentValue
+            if (typeVal = "")
+                try typeVal := typeEl.CurrentName
+        }
+
+        if (typeVal != "") {
+            if (RegExMatch(typeVal, "i)бонус|bonus")) {
+                res.hasBonus := 1
+                res.bonusRow := rIdx
+                sumEl := ""
+                try sumEl := grid.FindFirstBy("Name=Сумма row " . rIdx)
+                if (!IsObject(sumEl))
+                    try sumEl := grid.FindFirstBy("Name=Сума row " . rIdx)
+                if (IsObject(sumEl)) {
+                    sVal := ""
+                    try sVal := sumEl.CurrentValue
+                    if (sVal = "")
+                        try sVal := sumEl.CurrentName
+                    res.bonusSum := RcParseSumValue(sVal)
+                }
+            } else if (RegExMatch(typeVal, "i)готівк|наличн")) {
+                res.cashRow := rIdx
+            }
+        }
+    }
+
+    return res
 }
 
 RcClickFirstOrderRowUIA() {
@@ -5039,18 +5424,25 @@ RhKillDuplicateInstances() {
         return
     }
 
-    for proc in wmi.ExecQuery("Select ProcessId, CommandLine, Name from Win32_Process where Name like 'AutoHotkey%'") {
-        pid := proc.ProcessId + 0
-        cmd := proc.CommandLine . ""
-        if (pid && pid != currentPid && InStr(cmd, thisScript)) {
-            FileAppend, %A_Now% DUPLICATE_AHK_CLOSE pid=%pid% cmd=%cmd%`n, %logPath%
-            Process, Close, %pid%
+    FileAppend, % "[" A_Now "] RhKillDuplicateInstances enter pid=" currentPid "`n", %logPath%
+    try {
+        for proc in wmi.ExecQuery("Select ProcessId, CommandLine, Name from Win32_Process where Name like 'AutoHotkey%'") {
+            try {
+                pid := proc.ProcessId + 0
+                cmd := proc.CommandLine . ""
+                if (pid && pid != currentPid && InStr(cmd, thisScript)) {
+                    FileAppend, %A_Now% DUPLICATE_AHK_CLOSE pid=%pid% cmd=%cmd%`n, %logPath%
+                    Process, Close, %pid%
+                }
+            }
         }
     }
 
     Sleep, 250
     RhSingleInstanceMutex := DllCall("CreateMutex", "Ptr", 0, "Int", 0, "Str", "Global\RollHelper_RollClub_Engine_AHK_V1", "Ptr")
-    if (RhSingleInstanceMutex && A_LastError = 183) {
+    _err := A_LastError
+    FileAppend, % "[" A_Now "] RhKillDuplicateInstances mutex=" RhSingleInstanceMutex " err=" _err "`n", %logPath%
+    if (RhSingleInstanceMutex && _err = 183) {
         TrayTip, RollClub PRO, ⚠️ АНК Roll Club вже запущено. Другу копію не відкриваю., 4, 2
         ExitApp
     }
