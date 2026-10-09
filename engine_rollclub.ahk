@@ -175,19 +175,32 @@ IniRead, pluSoy,        %ConfigPath%, PLU_SIV, Soy,        00424
 IniRead, pluGinger,     %ConfigPath%, PLU_SIV, Ginger,     00428
 IniRead, pluWasabi,     %ConfigPath%, PLU_SIV, Wasabi,     00426
 
+RcNormalizeHotkey(hk, defaultHk := "") {
+    clean := Trim(hk)
+    if (clean = "" || clean = "None")
+        return defaultHk
+    if InStr(clean, "Тильда") || InStr(clean, "~")
+        return "vkC0"
+    if InStr(clean, "Ctrl+Shift+Enter")
+        return "^+Enter"
+    if InStr(clean, "Ctrl+Enter")
+        return "^Enter"
+    if InStr(clean, "Ctrl+Space") || InStr(clean, "Ctrl+Пробіл")
+        return "^Space"
+    clean := RegExReplace(clean, "\s*\(.*?\)\s*", "")
+    clean := RegExReplace(clean, "[^a-zA-Z0-9!#^+~]")
+    return (clean != "") ? clean : defaultHk
+}
+
 IniRead, hkMain,   %ConfigPath%, Hotkeys, Main,      vkC0
 IniRead, hkSiv,   %ConfigPath%, Hotkeys, Siv,       F1
 IniRead, hkFinish,%ConfigPath%, Hotkeys, Finish,    ^+Enter
 IniRead, uiTheme, %ConfigPath%, UI, Theme, light
 global uiTheme
 
-; Очищення від можливих артефактів кодування (нульових байтів)
-hkMain   := RegExReplace(hkMain,   "[^a-zA-Z0-9!#^+]")
-hkSiv    := RegExReplace(hkSiv,    "[^a-zA-Z0-9!#^+]")
-hkFinish := RegExReplace(hkFinish, "[^a-zA-Z0-9!#^+]")
-if (hkMain   = "") hkMain   := "vkC0"
-if (hkSiv    = "") hkSiv    := "F1"
-if (hkFinish = "") hkFinish := "^+Enter"
+hkMain   := RcNormalizeHotkey(hkMain, "vkC0")
+hkSiv    := RcNormalizeHotkey(hkSiv, "F1")
+hkFinish := RcNormalizeHotkey(hkFinish, "^+Enter")
 
 ; ========================================================
 ; ГЛОБАЛЬНІ ЗМІННІ
@@ -302,10 +315,12 @@ global RcLastZoneOverlap := ""
 ; ========================================================
 ; ГАРЯЧІ КЛАВІШІ
 ; ========================================================
-FileAppend, % "[" A_Now "] HOTKEYS main=" hkMain " siv=" hkSiv "`n", %rcLogPath%
-Hotkey, %hkMain%, TriggerMain, On
-Hotkey, %hkSiv%,  TriggerSiv,  On
-; FinishOrder тепер статична клавіша в #IfWinActive блоках (надійніше ніж Hotkey динамічний)
+FileAppend, % "[" A_Now "] HOTKEYS main=" hkMain " siv=" hkSiv " finish=" hkFinish "`n", %rcLogPath%
+try Hotkey, %hkMain%, TriggerMain, On
+try Hotkey, %hkSiv%,  TriggerSiv,  On
+if (hkFinish != "") {
+    try Hotkey, %hkFinish%, FinishOrder, On
+}
 
 SetTimer, RollFocusWatcher, 300
 if (RcZonesModuleEnabled)
@@ -2996,6 +3011,12 @@ NumpadEnter::GoSub, SivVisApply
 ; ========================================================
 ; НАЛАШТУВАННЯ
 ; ========================================================
+RcFormatCoordBtn(title, x, y) {
+    if (x > 0 && x != "ERROR" && y > 0 && y != "ERROR")
+        return title . " [" . x . ", " . y . "]"
+    return title . " [не задано ⚠]"
+}
+
 OpenSettings:
     RcRefreshZonesModuleState()
     Gui, Settings:Destroy
@@ -3006,14 +3027,159 @@ OpenSettings:
     Gui, Settings:Color, %RhC_BG%, %RhC_Panel%
 
     Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Tab3, x6 y6 w458 h610 vSettingsTab, WinAPI|PLU коди|Координати
+    Gui, Settings:Add, Tab3, x10 y10 w460 h595 vSettingsTab, Клавіші та Опції|Координати|PLU коди|Діагностика
 
-    ; ── Вкладка 1: WinAPI scanner ───────────────────────────
+    ; ── Вкладка 1: Клавіші та Опції ─────────────────────────
     Gui, Settings:Tab, 1
     Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, x16 y36 w430 Center, WinAPI: ЗАМІНА СТАРИХ ПРИЦІЛІВ
+    Gui, Settings:Add, Text, x24 y42 w430, ⌨ ГАРЯЧІ КЛАВІШІ
     Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, ListView, x16 y62 w430 h230 vUiaListView gUiaListClick Grid, Елемент Syrve|AutomationId / Name|Коорд.|Ключ
+    Gui, Settings:Add, Text, x24 y68 w200 h22 +0x200, Головне меню (сканування):
+    _mainOpts := "~ (Тильда)|F1|F2|F3|F4|F5|F6|F7|F8|F9|F10|F11|F12|^Space|!z"
+    Gui, Settings:Add, ComboBox, x230 y68 w220 vNewHkMain, %_mainOpts%
+    GuiControl, Settings:Text, NewHkMain, % (hkMain = "vkC0" ? "~ (Тильда)" : hkMain)
+
+    Gui, Settings:Add, Text, x24 y98 w200 h22 +0x200, Швидкий СІВ (палички/соуси):
+    _sivOpts := "F1|F2|F3|F4|F5|F6|F7|F8|F9|F10|F11|F12|^F1|^!s"
+    Gui, Settings:Add, ComboBox, x230 y98 w220 vNewHkSiv, %_sivOpts%
+    GuiControl, Settings:Text, NewHkSiv, %hkSiv%
+
+    Gui, Settings:Add, Text, x24 y128 w200 h22 +0x200, Фініш у Syrve (Підтвердити):
+    _finOpts := "Ctrl+Enter|Ctrl+Shift+Enter|F4|F12|^+Enter|^Enter"
+    Gui, Settings:Add, ComboBox, x230 y128 w220 vNewHkFinish, %_finOpts%
+    GuiControl, Settings:Text, NewHkFinish, % (hkFinish = "^+Enter" || hkFinish = "+^Enter" ? "Ctrl+Shift+Enter" : (hkFinish = "^Enter" ? "Ctrl+Enter" : hkFinish))
+
+    Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    Gui, Settings:Add, Text, x24 y156 w430 h32, 💡 Основна клавіша пробиття замовлення — Enter у вікні пульта.`nГоловне меню: ~ (тильда), СІВ: F1, Фініш у Syrve: Ctrl+Enter.
+
+    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Text, x24 y196 w430, ⚙ ФУНКЦІЇ ТА СТИЛЬ
+    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Checkbox, x24 y222 w430 h24 vNewCheckPoint Checked%CHECK_POINT_ENABLED%, 📍 Авто-Звірка Точки (клік у Syrve та перевірка зони)
+
+    Gui, Settings:Add, Text, x24 y254 w120 h22 +0x200, Тема оформлення:
+    _themeIdx := (uiTheme == "dark") ? 2 : 1
+    Gui, Settings:Add, DropDownList, x150 y254 w300 vNewUiTheme Choose%_themeIdx%, Light Premium|Neon Dark
+
+    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Text, x24 y292 w430, 🗺 ЗОНИ ДОСТАВКИ
+    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    if (Module_IsEnabled("zones"))
+        Gui, Settings:Add, Button, x24 y318 w426 h30 gOpenZonesModule, 🗺 Відкрити доповнення зон доставки
+    else
+        Gui, Settings:Add, Button, x24 y318 w426 h30 gRcLoadKmlFile, 📁 Завантажити KML-файл зон
+    Gui, Settings:Add, Button, x24 y354 w426 h30 gOpenKitchensEditor, 🏪 Редактор статусів кухонь (час, зони, стопи)
+
+    ; ── Вкладка 2: Резервні координати (Приціли) ────────────
+    Gui, Settings:Tab, 2
+    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Text, x24 y40 w430, 🎯 КООРДИНАТНІ ПРИЦІЛИ ДЛЯ SYRVE
+    Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    Gui, Settings:Add, Text, x24 y60 w430 h26, Клікніть будь-яку кнопку для калібрування. Значення в дужках — [X, Y].`nЯкщо [не задано ⚠], система знаходить елемент через WinAPI.
+
+    Gui, Settings:Font, s8 norm c%RhC_Text%, %RhFontName%
+    ; Колонка 1
+    _cTxt := RcFormatCoordBtn("1. Коментар", commX, commY)
+    Gui, Settings:Add, Button, x24 y92 w208 h28 gSetCommTarget vBtnComm, %_cTxt%
+
+    _cTxt := RcFormatCoordBtn("2. Картка", cardX, cardY)
+    Gui, Settings:Add, Button, x24 y124 w208 h28 gSetCardTarget vBtnCard, %_cTxt%
+
+    _cTxt := RcFormatCoordBtn("3. Кухня", infoX, infoY)
+    Gui, Settings:Add, Button, x24 y156 w208 h28 gSetInfoTarget vBtnInfo, %_cTxt%
+
+    _cTxt := RcFormatCoordBtn("4. Адреса", addrX, addrY)
+    Gui, Settings:Add, Button, x24 y188 w208 h28 gSetAddrTarget vBtnAddr, %_cTxt%
+
+    _cTxt := RcFormatCoordBtn("Час", timeX, timeY)
+    Gui, Settings:Add, Button, x24 y220 w208 h28 gSetTimeTarget vBtnTime, %_cTxt%
+
+    _cTxt := RcFormatCoordBtn("Табл. Страв", itemX, itemY)
+    Gui, Settings:Add, Button, x24 y252 w208 h28 gSetItemTarget vBtnItem, %_cTxt%
+
+    _cTxt := RcFormatCoordBtn("Хрестик Опл.", crossX, crossY)
+    Gui, Settings:Add, Button, x24 y284 w208 h28 gSetCrossTarget vBtnCross, %_cTxt%
+
+    _cTxt := RcFormatCoordBtn("Адреса (читання)", adrReadX, adrReadY)
+    Gui, Settings:Add, Button, x24 y316 w208 h28 gSetAdrReadTarget vBtnAdrRead, %_cTxt%
+
+    ; Колонка 2
+    _cTxt := RcFormatCoordBtn("Поле Оплати", cashX, cashY)
+    Gui, Settings:Add, Button, x242 y92 w208 h28 gSetCashTarget vBtnCash, %_cTxt%
+
+    _cTxt := RcFormatCoordBtn("Сума Замовл.", sumX, sumY)
+    Gui, Settings:Add, Button, x242 y124 w208 h28 gSetSumTarget vBtnSum, %_cTxt%
+
+    _cTxt := RcFormatCoordBtn("Концепція", kontsX, kontsY)
+    Gui, Settings:Add, Button, x242 y156 w208 h28 gSetKontsTarget vBtnKonts, %_cTxt%
+
+    _cTxt := RcFormatCoordBtn("Підтвердити", confirmX, confirmY)
+    Gui, Settings:Add, Button, x242 y188 w208 h28 gSetConfirmTarget vBtnConfirm, %_cTxt%
+
+    _cTxt := RcFormatCoordBtn("Зберегти точку", saveX, saveY)
+    Gui, Settings:Add, Button, x242 y220 w208 h28 gSetSaveTarget vBtnSave, %_cTxt%
+
+    _cTxt := RcFormatCoordBtn("Знайти точку", naitiX, naitiY)
+    Gui, Settings:Add, Button, x242 y252 w208 h28 gSetNaitiTarget vBtnNaiti, %_cTxt%
+
+    _cTxt := RcFormatCoordBtn("Поле «Точка»", tochkaX, tochkaY)
+    Gui, Settings:Add, Button, x242 y284 w208 h28 gSetTochkaTarget vBtnTochka, %_cTxt%
+
+    if (Module_IsEnabled("duty")) {
+        _cTxt := RcFormatCoordBtn("Ctrl+F4: Пошук", poiskX, poiskY)
+        Gui, Settings:Add, Button, x24 y348 w208 h28 gSetPoiskTarget vBtnPoisk, %_cTxt%
+        _cTxt := RcFormatCoordBtn("Ctrl+F4: Рядок", rowX, rowY)
+        Gui, Settings:Add, Button, x242 y348 w208 h28 gSetRowTarget vBtnRow, %_cTxt%
+    }
+
+    ; ── Вкладка 3: PLU-коди оператора ─────────────────────────
+    Gui, Settings:Tab, 3
+    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Text, w430 Center x24 y40, 🥢 PLU КОДИ СІВ ТА ПРИБОРІВ
+    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Text, x40 y70 w180 h22 +0x200, Бамбукові палички
+    Gui, Settings:Add, Edit, x230 y70 w100 h22 vNewSticksNorm Center Limit10, %pluSticksNorm%
+    Gui, Settings:Add, Text, x40 y98 w180 h22 +0x200, Навчальні палички
+    Gui, Settings:Add, Edit, x230 y98 w100 h22 vNewSticksEdu Center Limit10, %pluSticksEdu%
+    Gui, Settings:Add, Text, x40 y126 w180 h22 +0x200, Соєвий соус
+    Gui, Settings:Add, Edit, x230 y126 w100 h22 vNewPluSoy Center Limit10, %pluSoy%
+    Gui, Settings:Add, Text, x40 y154 w180 h22 +0x200, Імбир
+    Gui, Settings:Add, Edit, x230 y154 w100 h22 vNewPluGinger Center Limit10, %pluGinger%
+    Gui, Settings:Add, Text, x40 y182 w180 h22 +0x200, Васабі
+    Gui, Settings:Add, Edit, x230 y182 w100 h22 vNewPluWasabi Center Limit10, %pluWasabi%
+    Gui, Settings:Add, Text, x40 y210 w180 h22 +0x200, Прибори разом
+    Gui, Settings:Add, Edit, x230 y210 w100 h22 vNewUtensils Center Limit10, %pluUtensils%
+    Gui, Settings:Add, Text, x40 y238 w180 h22 +0x200, Вилка
+    Gui, Settings:Add, Edit, x230 y238 w100 h22 vNewPluFork Center Limit10, %pluFork%
+    Gui, Settings:Add, Text, x40 y266 w180 h22 +0x200, Ніж
+    Gui, Settings:Add, Edit, x230 y266 w100 h22 vNewPluKnife Center Limit10, %pluKnife%
+    if (RcFirstOrderGunkanEnabled) {
+        Gui, Settings:Font, s9 bold c%RhC_Text%, %RhFontName%
+        Gui, Settings:Add, Text, x40 y298 w180 h22 +0x200, Акційний гункан
+        Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+        Gui, Settings:Add, Edit, x230 y298 w100 h22 vNewGunkan Center Limit10, %pluGunkan%
+    }
+    Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    Gui, Settings:Add, Text, x40 y335 w380, PLU вводиться повністю, разом із нулями на початку.
+
+    ; ── Вкладка 4: Діагностика та WinAPI ─────────────────────
+    Gui, Settings:Tab, 4
+    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Text, x24 y40 w430, 🩺 ДІАГНОСТИКА ЗВ'ЯЗКУ ТА WINAPI
+
+    _iikoHwnd := IikoDriver_GetIikoHwnd()
+    _iikoStatusTxt := _iikoHwnd ? ("🟢 Syrve знайдено (HWND: " . Format("0x{:X}", _iikoHwnd) . ")") : "🔴 Syrve не знайдено (відкрийте вікно замовлення Syrve)"
+    _serverOk := RhPing()
+    _serverStatusTxt := _serverOk ? "🟢 Сервер RollHelper: Онлайн (127.0.0.1:5000)" : "🔴 Сервер RollHelper: Офлайн"
+
+    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Text, x24 y65 w430, %_iikoStatusTxt%
+    Gui, Settings:Add, Text, x24 y88 w430, %_serverStatusTxt%
+
+    Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
+    Gui, Settings:Add, Text, x24 y115 w430, Елементи WinAPI / UIA (керування полями без мишки):
+    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, ListView, x24 y135 w426 h215 vUiaListView gUiaListClick Grid, Елемент Syrve|AutomationId / Name|Коорд.|Ключ
     Gui, Settings:Default
     Gui, ListView, UiaListView
     LV_ModifyCol(1, 150)
@@ -3021,108 +3187,18 @@ OpenSettings:
     LV_ModifyCol(3, 58)
     LV_ModifyCol(4, 0)
     GoSub, LoadUiaMapToListView
+
     Gui, Settings:Font, s9 bold c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Button, x16 y302 w210 h32 gLaunchScanner, Замінити вибране
-    Gui, Settings:Add, Button, x236 y302 w210 h32 gDeleteSelectedUiaBinding, Видалити зі списку
-    Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
-    Gui, Settings:Add, Text, x16 y342 w430 h50, Виберіть елемент, натисніть «Замінити вибране», потім клікніть потрібну комірку або кнопку Syrve.`n⚠ означає тимчасову прив'язку — її бажано замінити. Старі координати залишаються запасним варіантом.
-    Gui, Settings:Add, Button, x16 y394 w430 h28 gAutoDiscoverUiaTargets, Автоматично знайти стабільні WinAPI елементи
-    Gui, Settings:Add, Button, x16 y430 w430 h26 gRestoreHiddenUiaTargets, Повернути приховані елементи
-
-    ; ── Вкладка 2: PLU-коди оператора ─────────────────────────
-    Gui, Settings:Tab, 2
-
-    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, w320 Center x16 y36, PLU КОДИ СІВ / ПРИБОРИ
-    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, x24 y66 w170 h18, Позиція
-    Gui, Settings:Add, Text, x+5 yp w80 h18 Center, PLU
-    Gui, Settings:Add, Text, x24 y+6 w170 h22 +0x200, Бамбукові палички
-    Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewSticksNorm Center Limit10, %pluSticksNorm%
-    Gui, Settings:Add, Text, x24 y+6 w170 h22 +0x200, Навчальні палички
-    Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewSticksEdu Center Limit10, %pluSticksEdu%
-    Gui, Settings:Add, Text, x24 y+6 w170 h22 +0x200, Соєвий соус
-    Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewPluSoy Center Limit10, %pluSoy%
-    Gui, Settings:Add, Text, x24 y+6 w170 h22 +0x200, Імбир
-    Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewPluGinger Center Limit10, %pluGinger%
-    Gui, Settings:Add, Text, x24 y+6 w170 h22 +0x200, Васабі
-    Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewPluWasabi Center Limit10, %pluWasabi%
-    Gui, Settings:Add, Text, x24 y+6 w170 h22 +0x200, Прибори разом
-    Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewUtensils Center Limit10, %pluUtensils%
-    Gui, Settings:Add, Text, x24 y+6 w170 h22 +0x200, Вилка
-    Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewPluFork Center Limit10, %pluFork%
-    Gui, Settings:Add, Text, x24 y+6 w170 h22 +0x200, Ніж
-    Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewPluKnife Center Limit10, %pluKnife%
-    if (RcFirstOrderGunkanEnabled) {
-        Gui, Settings:Font, s9 bold c%RhC_Text%, %RhFontName%
-        Gui, Settings:Add, Text, x24 y+14 w300 h20, АКЦІЯ ПЕРШОГО ЗАМОВЛЕННЯ
-        Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-        Gui, Settings:Add, Text, x24 y+6 w170 h22 +0x200, Гункан
-        Gui, Settings:Add, Edit, x+5 yp w80 h22 vNewGunkan Center Limit10, %pluGunkan%
-    }
-    Gui, Settings:Font, s8 norm c%RhC_Muted%, %RhFontName%
-    Gui, Settings:Add, Text, x24 y+8 w300, PLU вводиться повністю, разом із нулями на початку.
-
-    ; ── Вкладка 3: резервні координати та інші налаштування ──
-    Gui, Settings:Tab, 3
-
-    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, w300 Center, ПРИЦІЛИ (координати)
-    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Button, w140 x10 y+10 gSetCommTarget,  1. Коментар
-    Gui, Settings:Add, Button, w140 x+10 yp  gSetCardTarget,  2. Карта Клієнта
-    Gui, Settings:Add, Button, w140 x10  y+5 gSetInfoTarget,  3. Кухня
-    Gui, Settings:Add, Button, w140 x+10 yp  gSetAddrTarget,  4. Адреса
-    Gui, Settings:Add, Button, w140 x10  y+5 gSetTimeTarget,  Час
-    Gui, Settings:Add, Button, w140 x+10 yp  gSetItemTarget,  Табл. Страв
-    Gui, Settings:Add, Button, w140 x10  y+5 gSetCrossTarget, Хрестик Опл.
-    Gui, Settings:Add, Button, w140 x+10 yp  gSetCashTarget,  Поле Оплати
-    Gui, Settings:Add, Button, w140 x10  y+5 gSetSumTarget,   Сума Замовлення
-    Gui, Settings:Add, Button, w140 x+10 yp  gSetAdrReadTarget, Поле читання адреси
-    Gui, Settings:Add, Button, w290 x10  y+5 gSetKontsTarget,  Концепція (самовивіз)
-    Gui, Settings:Add, Button, w140 x10  y+5 gSetConfirmTarget, Подтвердить (фініш)
-    Gui, Settings:Add, Button, w140 x+10 yp  gSetSaveTarget,    Зберегти на точку
-    Gui, Settings:Add, Button, w290 x10  y+5 gSetNaitiTarget,  Найти точку (кнопка iiko)
-    Gui, Settings:Add, Button, w290 x10  y+5 gSetTochkaTarget, Точка (поле для звірки зони)
-    if (Module_IsEnabled("duty")) {
-        Gui, Settings:Add, Button, w140 x10  y+5 gSetPoiskTarget,  Ctrl+F4: Пошук
-        Gui, Settings:Add, Button, w140 x+10 yp  gSetRowTarget,    Ctrl+F4: Рядок
-    }
-
-    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, w300 Center x10 y+15, ФУНКЦІЇ
-    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Checkbox, w290 x10 y+10 vNewCheckPoint Checked%CHECK_POINT_ENABLED%, 📍 Авто-Звірка Точки (клік iiko + порівняння)
-
-    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, w300 Center x10 y+15, ТЕМА
-    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, x10 y+10 w60, Стиль:
-    _themeIdx := (uiTheme == "dark") ? 2 : 1
-    Gui, Settings:Add, DropDownList, x+5 yp-3 w220 vNewUiTheme Choose%_themeIdx%, Light Premium|Neon Dark
-
-    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, w300 Center x10 y+15, ЗОНИ ДОСТАВКИ
-    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    if (Module_IsEnabled("zones"))
-        Gui, Settings:Add, Button, x10 y+10 w290 h28 gOpenZonesModule, Відкрити доповнення зон
-    else
-        Gui, Settings:Add, Button, x10 y+10 w290 h28 gRcLoadKmlFile, Завантажити KML-файл зон
-
-    Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, w300 Center x10 y+15, ГАРЯЧІ КЛАВІШІ
-    Gui, Settings:Font, s9 norm c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Text, x10 y+10 w140, Головне меню:
-    Gui, Settings:Add, Hotkey, x+5 yp-3 w140 vNewHkMain, %hkMain%
-    Gui, Settings:Add, Text, x10 y+10 w140, Швидкий СИВ:
-    Gui, Settings:Add, Hotkey, x+5 yp-3 w140 vNewHkSiv, %hkSiv%
-    Gui, Settings:Add, Text, x10 y+10 w140, Фініш (Зберегти):
-    Gui, Settings:Add, Hotkey, x+5 yp-3 w140 vNewHkFinish, %hkFinish%
+    Gui, Settings:Add, Button, x24 y358 w210 h30 gLaunchScanner, Замінити вибране
+    Gui, Settings:Add, Button, x240 y358 w210 h30 gDeleteSelectedUiaBinding, Видалити зі списку
+    Gui, Settings:Font, s8 norm c%RhC_Text%, %RhFontName%
+    Gui, Settings:Add, Button, x24 y394 w426 h28 gAutoDiscoverUiaTargets, Автоматично знайти елементи Syrve
+    Gui, Settings:Add, Button, x24 y426 w426 h26 gRestoreHiddenUiaTargets, Повернути приховані елементи
 
     Gui, Settings:Tab
     Gui, Settings:Font, s10 bold c%RhC_Text%, %RhFontName%
-    Gui, Settings:Add, Button, w430 h35 x16 y630 gSaveSettings, Зберегти та Перезапустити
-    Gui, Settings:Show, w470 h680, Налаштування RollClub
+    Gui, Settings:Add, Button, w440 h36 x20 y615 gSaveSettings, 💾 Зберегти та Перезапустити
+    Gui, Settings:Show, w480 h665, Налаштування RollClub
 return
 
 SaveSettings:
@@ -3142,9 +3218,20 @@ SaveSettings:
     IniWrite, %NewPluWasabi%,  %ConfigPath%, PLU_SIV, Wasabi
     if (RcFirstOrderGunkanEnabled)
         IniWrite, %NewGunkan%, %ConfigPath%, PLU, Gunkan
-    IniWrite, %NewHkMain%,   %ConfigPath%, Hotkeys, Main
-    IniWrite, %NewHkSiv%,    %ConfigPath%, Hotkeys, Siv
-    IniWrite, %NewHkFinish%, %ConfigPath%, Hotkeys, Finish
+    normMain   := RcNormalizeHotkey(NewHkMain, "vkC0")
+    normSiv    := RcNormalizeHotkey(NewHkSiv, "F1")
+    normFinish := RcNormalizeHotkey(NewHkFinish, "^+Enter")
+
+    IniWrite, %normMain%,   %ConfigPath%, Hotkeys, Main
+    IniWrite, %normSiv%,    %ConfigPath%, Hotkeys, Siv
+    IniWrite, %normFinish%, %ConfigPath%, Hotkeys, Finish
+
+    ; Звільняємо м'ютекс перед перезавантаженням, щоб наступний процес не закрився
+    if (RhSingleInstanceMutex) {
+        DllCall("CloseHandle", "Ptr", RhSingleInstanceMutex)
+        RhSingleInstanceMutex := 0
+    }
+
     MsgBox, 64, Збережено, Налаштування збережено! Перезапуск..., 2
     Reload
 return
@@ -3160,92 +3247,110 @@ return
 SetCommTarget:
     Gui, Settings:Hide
     Sleep, 300
+    CoordMode, Mouse, Screen
     MsgBox, 4160, Налаштування, Клікни в поле КОМЕНТАР.
     KeyWait, LButton, Down
     MouseGetPos, commX, commY
     IniWrite, %commX%, %ConfigPath%, Targets, CommX
     IniWrite, %commY%, %ConfigPath%, Targets, CommY
+    try GuiControl, Settings:, BtnComm, % RcFormatCoordBtn("1. Коментар", commX, commY)
     Gui, Settings:Show
 return
 SetCardTarget:
     Gui, Settings:Hide
     Sleep, 300
+    CoordMode, Mouse, Screen
     MsgBox, 4160, Налаштування, Клікни в поле КАРТА КЛІЄНТА.
     KeyWait, LButton, Down
     MouseGetPos, cardX, cardY
     IniWrite, %cardX%, %ConfigPath%, Targets, CardX
     IniWrite, %cardY%, %ConfigPath%, Targets, CardY
+    try GuiControl, Settings:, BtnCard, % RcFormatCoordBtn("2. Картка", cardX, cardY)
     Gui, Settings:Show
 return
 SetInfoTarget:
     Gui, Settings:Hide
     Sleep, 300
+    CoordMode, Mouse, Screen
     MsgBox, 4160, Налаштування - КУХНЯ, КУХНЯ = комірка "Комментарий" у РЯДКУ СТРАВИ (стовпець Комментарий навпроти блюда).`n`nНЕ став на "Улица" і НЕ на "Информация о клиенте" - туди не можна (вулиця зітреться, кухня буде порожня).`n`nКлікни в ту комірку коментаря страви.
     KeyWait, LButton, Down
     MouseGetPos, infoX, infoY
     IniWrite, %infoX%, %ConfigPath%, Targets, InfoX
     IniWrite, %infoY%, %ConfigPath%, Targets, InfoY
+    try GuiControl, Settings:, BtnInfo, % RcFormatCoordBtn("3. Кухня", infoX, infoY)
     Gui, Settings:Show
 return
 SetAddrTarget:
     Gui, Settings:Hide
     Sleep, 300
+    CoordMode, Mouse, Screen
     MsgBox, 4160, Налаштування - АДРЕСА, АДРЕСА = поле "Примечание к адресу" (блок Доставка праворуч, під Районом).`n`nКлікни туди.
     KeyWait, LButton, Down
     MouseGetPos, addrX, addrY
     IniWrite, %addrX%, %ConfigPath%, Targets, AddrX
     IniWrite, %addrY%, %ConfigPath%, Targets, AddrY
+    try GuiControl, Settings:, BtnAddr, % RcFormatCoordBtn("4. Адреса", addrX, addrY)
     Gui, Settings:Show
 return
 SetTimeTarget:
     Gui, Settings:Hide
     Sleep, 300
+    CoordMode, Mouse, Screen
     MsgBox, 4160, Налаштування, Клікни в ПОЛЕ ЧАСУ.
     KeyWait, LButton, Down
     MouseGetPos, timeX, timeY
     IniWrite, %timeX%, %ConfigPath%, Targets, TimeX
     IniWrite, %timeY%, %ConfigPath%, Targets, TimeY
+    try GuiControl, Settings:, BtnTime, % RcFormatCoordBtn("Час", timeX, timeY)
     Gui, Settings:Show
 return
 SetItemTarget:
     Gui, Settings:Hide
     Sleep, 300
+    CoordMode, Mouse, Screen
     MsgBox, 4160, Налаштування, Клікни в ТАБЛИЦЮ СТРАВ.
     KeyWait, LButton, Down
     MouseGetPos, itemX, itemY
     IniWrite, %itemX%, %ConfigPath%, Targets, ItemX
     IniWrite, %itemY%, %ConfigPath%, Targets, ItemY
+    try GuiControl, Settings:, BtnItem, % RcFormatCoordBtn("Табл. Страв", itemX, itemY)
     Gui, Settings:Show
 return
 SetCrossTarget:
     Gui, Settings:Hide
     Sleep, 300
+    CoordMode, Mouse, Screen
     MsgBox, 4160, Налаштування, Клікни на ХРЕСТИК оплати.
     KeyWait, LButton, Down
     MouseGetPos, crossX, crossY
     IniWrite, %crossX%, %ConfigPath%, Targets, CrossX
     IniWrite, %crossY%, %ConfigPath%, Targets, CrossY
+    try GuiControl, Settings:, BtnCross, % RcFormatCoordBtn("Хрестик Опл.", crossX, crossY)
     Gui, Settings:Show
 return
 
 SetCashTarget:
     Gui, Settings:Hide
     Sleep, 300
+    CoordMode, Mouse, Screen
     MsgBox, 4160, Налаштування, Клікни в ПОЛЕ ОПЛАТИ.
     KeyWait, LButton, Down
     MouseGetPos, cashX, cashY
     IniWrite, %cashX%, %ConfigPath%, Targets, CashX
     IniWrite, %cashY%, %ConfigPath%, Targets, CashY
+    try GuiControl, Settings:, BtnCash, % RcFormatCoordBtn("Поле Оплати", cashX, cashY)
     Gui, Settings:Show
 return
 SetSumTarget:
     Gui, Settings:Hide
     Sleep, 300
+    CoordMode, Mouse, Screen
     MsgBox, 4160, Налаштування, Клікни в поле СУМИ.
     KeyWait, LButton, Down
     MouseGetPos, sumX, sumY
     IniWrite, %sumX%, %ConfigPath%, Targets, SumX
     IniWrite, %sumY%, %ConfigPath%, Targets, SumY
+    try GuiControl, Settings:, BtnSum, % RcFormatCoordBtn("Сума Замовл.", sumX, sumY)
     Gui, Settings:Show
 return
 CalibrateWaitZoneFromSettings:
@@ -3257,6 +3362,7 @@ return
 SetCallTarget:
     Gui, Settings:Hide
     Sleep, 300
+    CoordMode, Mouse, Screen
     MsgBox, 4160, Налаштування, Клікни в ОБЛАСТЬ ДЗВІНКА (Приціл для zxc1.png).
     KeyWait, LButton, Down
     MouseGetPos, callX, callY
@@ -3267,65 +3373,77 @@ return
 SetAdrReadTarget:
     Gui, Settings:Hide
     Sleep, 300
+    CoordMode, Mouse, Screen
     MsgBox, 4160, Налаштування, Клікни в поле, де відображається АДРЕСА заказу (звідки скрипт буде ЧИТАТИ адресу для детекту міста).
     KeyWait, LButton, Down
     MouseGetPos, adrReadX, adrReadY
     IniWrite, %adrReadX%, %ConfigPath%, Targets, AdrReadX
     IniWrite, %adrReadY%, %ConfigPath%, Targets, AdrReadY
+    try GuiControl, Settings:, BtnAdrRead, % RcFormatCoordBtn("Адреса (читання)", adrReadX, adrReadY)
     Gui, Settings:Show
 return
 SetKontsTarget:
     Gui, Settings:Hide
     Sleep, 300
+    CoordMode, Mouse, Screen
     MsgBox, 4160, Налаштування, Клікни в поле КОНЦЕПЦІЯ в iiko (для самовивозів Садовий проїзд).
     KeyWait, LButton, Down
     MouseGetPos, kontsX, kontsY
     IniWrite, %kontsX%, %ConfigPath%, Targets, KontsX
     IniWrite, %kontsY%, %ConfigPath%, Targets, KontsY
+    try GuiControl, Settings:, BtnKonts, % RcFormatCoordBtn("Концепція", kontsX, kontsY)
     Gui, Settings:Show
 return
 
 SetConfirmTarget:
     Gui, Settings:Hide
     Sleep, 300
+    CoordMode, Mouse, Screen
     MsgBox, 4160, Налаштування, Клікни в кнопку "Подтвердить" (унизу зліва вікна заказу iiko).
     KeyWait, LButton, Down
     MouseGetPos, confirmX, confirmY
     IniWrite, %confirmX%, %ConfigPath%, Targets, ConfirmX
     IniWrite, %confirmY%, %ConfigPath%, Targets, ConfirmY
+    try GuiControl, Settings:, BtnConfirm, % RcFormatCoordBtn("Підтвердити", confirmX, confirmY)
     Gui, Settings:Show
 return
 
 SetSaveTarget:
     Gui, Settings:Hide
     Sleep, 300
+    CoordMode, Mouse, Screen
     MsgBox, 4160, Налаштування, Клікни в кнопку "Сохранить на точку" (унизу справа вікна заказу iiko).
     KeyWait, LButton, Down
     MouseGetPos, saveX, saveY
     IniWrite, %saveX%, %ConfigPath%, Targets, SaveX
     IniWrite, %saveY%, %ConfigPath%, Targets, SaveY
+    try GuiControl, Settings:, BtnSave, % RcFormatCoordBtn("Зберегти точку", saveX, saveY)
     Gui, Settings:Show
 return
 
 SetNaitiTarget:
     Gui, Settings:Hide
     Sleep, 300
+    CoordMode, Mouse, Screen
     MsgBox, 4160, Налаштування, Клікни в кнопку "Найти точку" (справа у блоці Доставка iiko).
     KeyWait, LButton, Down
     MouseGetPos, naitiX, naitiY
     IniWrite, %naitiX%, %ConfigPath%, Targets, NaitiX
     IniWrite, %naitiY%, %ConfigPath%, Targets, NaitiY
+    try GuiControl, Settings:, BtnNaiti, % RcFormatCoordBtn("Знайти точку", naitiX, naitiY)
     Gui, Settings:Show
 return
 
 SetTochkaTarget:
     Gui, Settings:Hide
     Sleep, 300
+    CoordMode, Mouse, Screen
     MsgBox, 4160, Налаштування - ТОЧКА, ТОЧКА = поле "Точка*" (зверху форми, під Концепцією; те, що iiko заповнює після "Найти точку").`n`nКлікни в це поле.
     KeyWait, LButton, Down
     MouseGetPos, tochkaX, tochkaY
     IniWrite, %tochkaX%, %ConfigPath%, Targets, TochkaX
     IniWrite, %tochkaY%, %ConfigPath%, Targets, TochkaY
+    try GuiControl, Settings:, BtnTochka, % RcFormatCoordBtn("Поле «Точка»", tochkaX, tochkaY)
     Gui, Settings:Show
 return
 
@@ -3338,6 +3456,7 @@ SetPoiskTarget:
     MouseGetPos, poiskX, poiskY
     IniWrite, %poiskX%, %ConfigPath%, Targets, PoiskX
     IniWrite, %poiskY%, %ConfigPath%, Targets, PoiskY
+    try GuiControl, Settings:, BtnPoisk, % RcFormatCoordBtn("Ctrl+F4: Пошук", poiskX, poiskY)
     Gui, Settings:Show
 return
 
@@ -3350,6 +3469,7 @@ SetRowTarget:
     MouseGetPos, rowX, rowY
     IniWrite, %rowX%, %ConfigPath%, Targets, RowX
     IniWrite, %rowY%, %ConfigPath%, Targets, RowY
+    try GuiControl, Settings:, BtnRow, % RcFormatCoordBtn("Ctrl+F4: Рядок", rowX, rowY)
     Gui, Settings:Show
 return
 
@@ -3804,6 +3924,14 @@ SivVisApply:
     MouseGetPos, originalMouseX, originalMouseY
     Sleep, 200
 
+    ; Гарантовано активуємо вікно Syrve перед вводом страв СІВ
+    iikoHwnd := IikoDriver_GetIikoHwnd()
+    if (iikoHwnd) {
+        WinActivate, ahk_id %iikoHwnd%
+        WinWaitActive, ahk_id %iikoHwnd%,, 2
+        Sleep, 150
+    }
+
     ; Очищення від сміття та примусове перетворення в числа
     VisRolls := RegExReplace(VisRolls, "[^\d]", "")
     VisNorm := RegExReplace(VisNorm, "[^\d]", "")
@@ -3901,68 +4029,42 @@ ApplyRollclub:
     FileAppend, %_w%`n, %A_ScriptDir%\parse_debug.log, UTF-8
 
     MouseGetPos, originalMouseX, originalMouseY
-    Sleep, 400
+    Sleep, 200
+
+    ; Гарантовано активуємо вікно Syrve перед вводом тексту
+    iikoHwnd := IikoDriver_GetIikoHwnd()
+    if (iikoHwnd) {
+        WinActivate, ahk_id %iikoHwnd%
+        WinWaitActive, ahk_id %iikoHwnd%,, 1
+        Sleep, 150
+    }
 
     if (OrderComment != "") {
         Clipboard := OrderComment
-        focused := 0
-        elComm := RcUiaFind("Коментар", "memoEditDeliveryComment")
-        if (IsObject(elComm)) {
-            try {
-                elComm.SetFocus()
-                focused := 1
-            } catch {
-                try {
-                    elComm.Click()
-                    focused := 1
-                }
-            }
-        }
-        if (!focused && commX != 0 && commX != "ERROR") {
-            Click, %commX%, %commY%
-            focused := 1
-        }
-        if (focused) {
+        if (RcUiaFocusOrClick("Коментар", "memoEditDeliveryComment", commX, commY)) {
             Sleep, 150
             Send, ^a{BackSpace}
-            Sleep, 50
+            Sleep, 60
             Send, ^v
-            Sleep, 300
+            Sleep, 250
         }
     }
 
     if (ClientCard != "") {
         Clipboard := ClientCard
-        focused := 0
-        elCard := RcUiaFind("Картка", "textEditCustomerCardNumber")
-        if (IsObject(elCard)) {
-            try {
-                elCard.SetFocus()
-                focused := 1
-            } catch {
-                try {
-                    elCard.Click()
-                    focused := 1
-                }
-            }
-        }
-        if (!focused && cardX != 0 && cardX != "ERROR") {
-            Click, %cardX%, %cardY%
-            focused := 1
-        }
-        if (focused) {
+        if (RcUiaFocusOrClick("Картка", "textEditCustomerCardNumber", cardX, cardY)) {
             Sleep, 150
             Send, ^a{BackSpace}
-            Sleep, 50
+            Sleep, 60
             Send, ^v{Enter}
-            Sleep, 400
+            Sleep, 300
         }
     }
 
     if (ClientInfo != "" && infoX != 0 && infoX != "ERROR") {
         Clipboard := ClientInfo
         Sleep, 150
-        Click, %infoX% %infoY% 2     ; подвійний клік -> режим редагування комірки коментаря страви
+        IikoDriver_ClickScreen(infoX, infoY, 2)     ; подвійний клік -> режим редагування комірки коментаря страви
         Sleep, 200
         Send, ^a{BackSpace}
         Sleep, 60
@@ -3977,27 +4079,10 @@ ApplyRollclub:
         AddressNote := RcCleanAddressNote(AddressNote, rawAddress, commentStreet)
         if (AddressNote != "") {
             Clipboard := AddressNote
-            focused := 0
-            elAddrNote := RcUiaFind("Примітка до адреси", "memoEditDeliveryAddressComment")
-            if (IsObject(elAddrNote)) {
-                try {
-                    elAddrNote.SetFocus()
-                    focused := 1
-                } catch {
-                    try {
-                        elAddrNote.Click()
-                        focused := 1
-                    }
-                }
-            }
-            if (!focused && addrX != 0 && addrX != "ERROR") {
-                Click, %addrX%, %addrY%
-                focused := 1
-            }
-            if (focused) {
+            if (RcUiaFocusOrClick("Примітка до адреси", "memoEditDeliveryAddressComment", addrX, addrY)) {
                 Sleep, 150
                 Send, ^a{BackSpace}^v
-                Sleep, 300
+                Sleep, 250
             }
         }
     }
@@ -4471,6 +4556,35 @@ RcUiaGetText(role, defaultAid := "") {
     return Trim(val)
 }
 
+RcUiaFocusOrClick(role, defaultAid := "", fallbackX := 0, fallbackY := 0) {
+    el := RcUiaFind(role, defaultAid)
+    if (IsObject(el)) {
+        try {
+            rect := el.CurrentBoundingRectangle
+            if (rect.r > rect.l && rect.b > rect.t && rect.l >= 0 && rect.t >= 0) {
+                clickX := Round((rect.l + rect.r) / 2)
+                clickY := Round((rect.t + rect.b) / 2)
+                IikoDriver_ClickScreen(clickX, clickY)
+                Sleep, 150
+                return 1
+            }
+        } catch {
+        }
+        try {
+            el.SetFocus()
+            Sleep, 100
+            return 1
+        } catch {
+        }
+    }
+    if (fallbackX > 0 && fallbackX != "ERROR" && fallbackY > 0 && fallbackY != "ERROR") {
+        IikoDriver_ClickScreen(fallbackX, fallbackY)
+        Sleep, 150
+        return 1
+    }
+    return 0
+}
+
 RcHasUiaMap(role) {
     global UIA_MAP_CONFIG
     IniRead, mappedAid, %UIA_MAP_CONFIG%, UiaMap, %role%, %A_Space%
@@ -4655,6 +4769,12 @@ RcClickFirstOrderRowUIA() {
             mappedName := ""
         if (RegExMatch(mappedName, "^Блюдо row \d+$")) {
             try {
+                rect := mapped.CurrentBoundingRectangle
+                if (rect.r > rect.l && rect.b > rect.t && rect.l >= 0 && rect.t >= 0) {
+                    IikoDriver_ClickScreen(Round((rect.l + rect.r) / 2), Round((rect.t + rect.b) / 2))
+                    Sleep, 180
+                    return 1
+                }
                 mapped.Click()
                 Sleep, 180
                 return 1
@@ -4690,11 +4810,14 @@ RcClickFirstOrderRowUIA() {
     }
 
     try {
-        if (IsObject(best))
-            best.Click()
-        else
-            root.Click()
-        Sleep, 180
+        targetEl := IsObject(best) ? best : root
+        rect := targetEl.CurrentBoundingRectangle
+        if (rect.r > rect.l && rect.b > rect.t && rect.l >= 0 && rect.t >= 0) {
+            IikoDriver_ClickScreen(Round((rect.l + rect.r) / 2), Round((rect.t + rect.b) / 2))
+        } else {
+            targetEl.Click()
+        }
+        Sleep, 200
         return 1
     } catch e5 {
         return 0
@@ -4724,6 +4847,14 @@ RcPunchPluSeries(jobs) {
     global rcLogPath
     if (!IsObject(jobs) || jobs.MaxIndex() = "")
         return 1
+
+    iikoHwnd := IikoDriver_GetIikoHwnd()
+    if (iikoHwnd) {
+        WinActivate, ahk_id %iikoHwnd%
+        WinWaitActive, ahk_id %iikoHwnd%,, 2
+        Sleep, 150
+    }
+
     if (!RcFocusOrderItems()) {
         ToolTip, Не вдалося відкрити таблицю страв. СІВ зупинено.
         SetTimer, RcClearOkTip, -2000
@@ -4734,7 +4865,7 @@ RcPunchPluSeries(jobs) {
     Send, {PgDn}
     Sleep, 300
     Send, {Enter}
-    Sleep, 400
+    Sleep, 450
 
     Loop, % jobs.MaxIndex() {
         job := jobs[A_Index]
@@ -4762,17 +4893,22 @@ RcPunchPluInOpenEditor(pluCode, qty) {
         return 1
     }
 
-    ; PLU → вниз (автокомплет) → Enter → перехід на qty
-    SendInput, %pluCode%
-    Sleep, 400
+    ; Затримка на готовність інплейс-редактора DevExpress перед набором PLU
+    Sleep, 250
+
+    ; Набір PLU через SendEvent із KeyDelay (запобігає втраті символів у DevExpress)
+    SetKeyDelay, 45, 25
+    SendEvent, %pluCode%
+    Sleep, 450
     Send, {Down}
     Sleep, 300
     Send, {Enter}
-    Sleep, 400
+    Sleep, 450
 
-    ; qty вводимо одразу — DevExpress виділяє поле при вході, заміна відбувається автоматично
-    SendInput, %qty%
-    Sleep, 200
+    ; qty вводимо через SendEvent — DevExpress виділяє поле при вході
+    SetKeyDelay, 45, 25
+    SendEvent, %qty%
+    Sleep, 250
 
     ; Верифікація: ^a → ^c — читаємо що реально в полі qty
     Send, ^a
@@ -5608,6 +5744,7 @@ RhKillDuplicateInstances() {
     }
 
     FileAppend, % "[" A_Now "] RhKillDuplicateInstances enter pid=" currentPid "`n", %logPath%
+    killedAny := 0
     try {
         for proc in wmi.ExecQuery("Select ProcessId, CommandLine, Name from Win32_Process where Name like 'AutoHotkey%'") {
             try {
@@ -5616,16 +5753,25 @@ RhKillDuplicateInstances() {
                 if (pid && pid != currentPid && InStr(cmd, thisScript)) {
                     FileAppend, %A_Now% DUPLICATE_AHK_CLOSE pid=%pid% cmd=%cmd%`n, %logPath%
                     Process, Close, %pid%
+                    Process, WaitClose, %pid%, 2
+                    killedAny := 1
                 }
             }
         }
     }
 
-    Sleep, 250
-    RhSingleInstanceMutex := DllCall("CreateMutex", "Ptr", 0, "Int", 0, "Str", "Global\RollHelper_RollClub_Engine_AHK_V1", "Ptr")
-    _err := A_LastError
+    Sleep, 150
+    Loop, 15 {
+        RhSingleInstanceMutex := DllCall("CreateMutex", "Ptr", 0, "Int", 0, "Str", "Global\RollHelper_RollClub_Engine_AHK_V1", "Ptr")
+        _err := A_LastError
+        if (RhSingleInstanceMutex && _err != 183)
+            break
+        if (RhSingleInstanceMutex)
+            DllCall("CloseHandle", "Ptr", RhSingleInstanceMutex)
+        Sleep, 100
+    }
     FileAppend, % "[" A_Now "] RhKillDuplicateInstances mutex=" RhSingleInstanceMutex " err=" _err "`n", %logPath%
-    if (RhSingleInstanceMutex && _err = 183) {
+    if (RhSingleInstanceMutex && _err = 183 && !killedAny) {
         TrayTip, RollClub PRO, ⚠️ АНК Roll Club вже запущено. Другу копію не відкриваю., 4, 2
         ExitApp
     }
