@@ -367,12 +367,12 @@ TriggerMain:
     ; При дежурстві (_inDutyTake=1) НЕ тоглимо видимість, а ЗАВЖДИ робимо повний перечит нового заказу.
     ; Ручна тільда — як раніше: тогл показати/сховати.
     if (!_inDutyTake) {
-        ; Пульт видимий → сховати (тогл)
-        if WinExist("Rollclub PRO 33.0") {
+        ; Якщо активний сам пульт Rollclub — ховаємо по тільді (тогл)
+        ; Якщо користувач у Syrve — ЗАВЖДИ свіжо скануємо поточний відкритий заказ
+        if WinActive("Rollclub PRO 33.0") {
             Gui, Roll:Hide
             return
         }
-        ; Якщо пульт був схований — знищуємо старий екземпляр, щоб завжди сканувати поточний відкритий заказ
         DetectHiddenWindows, On
         if WinExist("Rollclub PRO 33.0")
             Gui, Roll:Destroy
@@ -2226,7 +2226,7 @@ DrawRollclub:
         _initialZoneTxt := "Адресу не знайдено"
     }
     Gui, Roll:Font, s9 bold c555555, %RhFontName%
-    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h28 Center +0x200 HwndhZoneBox vMapSearch, %_initialZoneTxt%
+    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h28 Center +0x200 HwndhZoneBox vMapSearch gRcRecheckZoneOrPoint, %_initialZoneTxt%
     if (hasPickup)
         RhRegColor(hZoneBox, RhB_Green, RhB_White)
     else if (rawAddress = "")
@@ -2480,9 +2480,13 @@ DrawRollclub:
         GoSub, RcToggleRawText
     }
 
-    if (rawAddress != "" && !hasPickup)
+    if (!hasPickup)
         SetTimer, RcCheckZone, -450
     ; Звірка точки відбувається при натисканні Внести (GoSub RcVerifyPoint на початку ApplyRollclub)
+return
+
+RcRecheckZoneOrPoint:
+    GoSub, RcCheckZone
 return
 ; ========================================================
 ; TOGGLE ГІФТИ ТА КЕШ
@@ -5263,8 +5267,10 @@ RcCheckZone:
         return
     }
     if (addr = "") {
+        if (RcApplyPointFallback("Адресу не знайдено"))
+            return
         GuiControl, Roll:, MapSearch, Адресу не знайдено
-        GuiControl, Roll:, KitchenStatusText,
+        GuiControl, Roll:, KitchenStatusText, Натисни «Знайти точку» в Syrve і знову ~ (Тільду)
         RhRegColor(hZoneBox, 0xE8E8E8, 0x777777)
         return
     }
@@ -5305,6 +5311,8 @@ RcCheckZone:
     }
     resp := RcHttpGet(url, 6000)
     if (resp = "") {
+        if (RcApplyPointFallback("Мережа недоступна"))
+            return
         GuiControl, Roll:, MapSearch, Мережа недоступна
         return
     }
@@ -5325,12 +5333,16 @@ RcCheckZone:
                     resp3 := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&q=" . RcUriEncode(addrNoHouse), 6000)
                 }
                 if (!RcTryGeocodeResponse(resp3, detectedCity, lat, lng)) {
+                    if (RcApplyPointFallback("Адресу не знайдено"))
+                        return
                     GuiControl, Roll:, MapSearch, Адресу не знайдено
                     return
                 }
                 resp := resp3
                 RcLastGeocodeApprox := 1
             } else {
+                if (RcApplyPointFallback("Адресу не знайдено"))
+                    return
                 GuiControl, Roll:, MapSearch, Адресу не знайдено
                 return
             }
@@ -5435,27 +5447,35 @@ RcCheckZone:
             GuiControl, Roll:, KitchenStatusText, %kAlertText%
         } else {
             RcLastZone := ""
+            if (RcApplyPointFallback("Точку не знайдено в зонах"))
+                return
             result := "Точку не знайдено в зонах доставки"
             GuiControl, Roll:, MapSearch, %result%
             RhRegColor(hZoneBox, RhB_Red, RhB_White)
             DllCall("InvalidateRect", "Ptr", hZoneBox, "Ptr", 0, "Int", 1)
-            GuiControl, Roll:, KitchenStatusText,
+            GuiControl, Roll:, KitchenStatusText, Натисни «Знайти точку» в Syrve і знову ~ (Тільду)
         }
 
         ; (звірку точки тепер планує DrawRollclub незалежно від геокодингу)
     } else if (!FileExist(kmlPath)) {
+        if (RcApplyPointFallback("Завантажте KML-файл зон"))
+            return
         result := "Завантажте KML-файл зон (Налаштування → KML)"
         GuiControl, Roll:, MapSearch, %result%
         RhRegColor(hZoneBox, RhB_TintAmber, RhB_Text)
         DllCall("InvalidateRect", "Ptr", hZoneBox, "Ptr", 0, "Int", 1)
-        GuiControl, Roll:, KitchenStatusText,
+        GuiControl, Roll:, KitchenStatusText, Натисни «Знайти точку» в Syrve і знову ~ (Тільду)
     } else if (!RcZonesOk) {
+        if (RcApplyPointFallback("KML: помилка читання"))
+            return
         result := "KML: помилка читання"
         GuiControl, Roll:, MapSearch, %result%
         RhRegColor(hZoneBox, RhB_TintAmber, RhB_Text)
         DllCall("InvalidateRect", "Ptr", hZoneBox, "Ptr", 0, "Int", 1)
-        GuiControl, Roll:, KitchenStatusText,
+        GuiControl, Roll:, KitchenStatusText, Натисни «Знайти точку» в Syrve і знову ~ (Тільду)
     } else {
+        if (RcApplyPointFallback("Немає зон"))
+            return
         result := lat . ", " . lng
         GuiControl, Roll:, MapSearch, %result%
         RhRegColor(hZoneBox, RhB_CardFill, RhB_Text)
@@ -5463,6 +5483,132 @@ RcCheckZone:
         GuiControl, Roll:, KitchenStatusText,
     }
 return
+
+; === ФОЛБЕК ПО ТОЧЦІ / КОНЦЕПЦІЇ ІЗ SYRVE ===
+; Якщо геокодинг адреси не дав результату, підтягує актуальну кухню і всі умови замовлення напряму з Syrve.
+RcApplyPointFallback(reasonText := "Адресу не знайдено") {
+    global Kitchens, RcCurrentKitchen, hZoneBox, cRaw, fRaw, minFar, extractedTimeAuto, hasPickup
+    global RhB_TintAmber, RhB_Red, RhB_White, RhB_Text, RH_SERVER_OK
+    
+    _curPoint := ""
+    _curConcept := ""
+    if (RH_SERVER_OK || RhPing()) {
+        _idResp := RhGet("/api/iiko/read_identity_fast", 1200)
+        if (RegExMatch(_idResp, """point""\s*:\s*""([^""]*)""", _mPt))
+            _curPoint := StrReplace(Trim(_mPt1), "\u0022", """")
+        if (RegExMatch(_idResp, """concept""\s*:\s*""([^""]*)""", _mCp))
+            _curConcept := StrReplace(Trim(_mCp1), "\u0022", """")
+    }
+    if (_curPoint == "") {
+        try _curPoint := RcUiaGetText("Точка (поле для звірки зони)", "lookUpEditDeliveryTerminal")
+    }
+    if (_curConcept == "") {
+        try _curConcept := RcUiaGetText("Концепція (самовивіз)", "restoCompletionConception")
+    }
+    
+    fallbackKitchen := RcFindKitchenFromPointOrConcept(_curPoint, _curConcept)
+    
+    if (IsObject(fallbackKitchen)) {
+        RcCurrentKitchen := fallbackKitchen
+        kAlertText := ""
+        kAlertBeep := 0
+        k := RcCurrentKitchen
+        parts := ""
+        if (k.Center != "Стандарт") {
+            parts .= "Центр: " . k.Center
+            kAlertBeep := 1
+        }
+        if (k.FarZone != "Стандарт") {
+            if (parts != "") parts .= " / "
+            parts .= "Дальня: " . k.FarZone
+            kAlertBeep := 1
+        }
+        if (k.Pickup != "Стандарт") {
+            if (parts != "") parts .= " / "
+            parts .= "Самовивіз: " . k.Pickup
+            kAlertBeep := 1
+        }
+        if (k.StopList != "") {
+            if (parts != "") parts .= "   "
+            parts .= "СТОП: " . k.StopList
+            kAlertBeep := 1
+        }
+        if (k.Remark != "") {
+            if (parts != "") parts .= "   "
+            parts .= k.Remark
+        }
+        kAlertText := parts
+        
+        _deliveryMin := RcGetEffectiveTime(RcCurrentKitchen.Name, "STANDARD", false, cRaw, fRaw, minFar)
+        GuiControl, Roll:, RhCalcDeliveryBtn, % "ДОСТ +" . _deliveryMin
+        if (extractedTimeAuto && !hasPickup)
+            RcSetReadyByMinutes(_deliveryMin)
+            
+        result := "⚠ ТОЧКА: " . RcCurrentKitchen.Name . " (перевір адресу)"
+        GuiControl, Roll:, MapSearch, %result%
+        GuiControl, Roll:, KitchenStatusText, %kAlertText%
+        RhRegColor(hZoneBox, RhB_TintAmber, RhB_Text)
+        DllCall("InvalidateRect", "Ptr", hZoneBox, "Ptr", 0, "Int", 1)
+        if (kAlertBeep)
+            SoundBeep, 600, 250
+        else
+            SoundPlay, %A_ScriptDir%\beep_ok.wav
+        return 1
+    }
+    
+    result := "⚠ " . reasonText . " → «Знайти точку»"
+    GuiControl, Roll:, MapSearch, %result%
+    GuiControl, Roll:, KitchenStatusText, Натисни «Знайти точку» в Syrve і знову ~ (Тільду)
+    RhRegColor(hZoneBox, RhB_Red, RhB_White)
+    DllCall("InvalidateRect", "Ptr", hZoneBox, "Ptr", 0, "Int", 1)
+    SoundBeep, 750, 180
+    Sleep, 80
+    SoundBeep, 750, 180
+    return 0
+}
+
+RcFindKitchenFromPointOrConcept(pointVal, conceptVal) {
+    global Kitchens
+    if (pointVal == "" && conceptVal == "")
+        return ""
+    kName := RcKitchenFromIikoPoint(pointVal)
+    if (kName == "")
+        kName := RcFindKitchenByConcept(conceptVal)
+    if (kName == "")
+        kName := RcFindKitchenByConcept(pointVal)
+    if (kName == "")
+        kName := RcKitchenFromIikoPoint(conceptVal)
+    if (kName == "") {
+        c := PickupConcept(pointVal)
+        if (c != "")
+            kName := RcFindKitchenByConcept(c)
+    }
+    if (kName == "") {
+        c := PickupConcept(conceptVal)
+        if (c != "")
+            kName := RcFindKitchenByConcept(c)
+    }
+    if (kName == "") {
+        combined := pointVal . " " . conceptVal
+        for _, k in Kitchens {
+            if (k.Name != "" && InStr(combined, k.Name)) {
+                kName := k.Name
+                break
+            }
+            if (k.KmlKey != "" && InStr(combined, k.KmlKey)) {
+                kName := k.Name
+                break
+            }
+        }
+    }
+    if (kName != "") {
+        for _, k in Kitchens {
+            if (k.Name == kName)
+                return k
+        }
+    }
+    return ""
+}
 
 ; === RcBlockedStreetHit: чи адреса на перекритій вулиці? Повертає "Вулиця — ділянка" або "". ===
 RcBlockedStreetHit(addr) {
