@@ -216,6 +216,9 @@ global cardText     := ""
 global orderSum     := 0
 global calcChange   := 0
 global autoCash     := 0
+global isPaidOrder   := 0
+global paymentMethod := ""
+global paymentNum    := ""
 global autoGunkan   := 0
 global autoPepsi    := 0
 global autoBurger   := 0
@@ -369,17 +372,11 @@ TriggerMain:
             Gui, Roll:Hide
             return
         }
-        ; Пульт захований → показати без ресканування
+        ; Якщо пульт був схований — знищуємо старий екземпляр, щоб завжди сканувати поточний відкритий заказ
         DetectHiddenWindows, On
-        rollHidden := WinExist("Rollclub PRO 33.0")
+        if WinExist("Rollclub PRO 33.0")
+            Gui, Roll:Destroy
         DetectHiddenWindows, Off
-        if (rollHidden) {
-            GoSub, RcKitchensSyncIfStale
-            Gui, Roll:Show
-            WinActivate, Rollclub PRO 33.0
-            GoSub, RhRepaintRollPult
-            return
-        }
     }
     ; Пульту немає взагалі → повний скан
     _hasIikoWin := IikoDriver_GetIikoHwnd()
@@ -1416,6 +1413,9 @@ SilentMagicClean:
     autoSticksNorm := 0
     autoSticksEdu  := 0
     autoCash     := 0
+    isPaidOrder  := 0
+    paymentMethod:= ""
+    paymentNum   := ""
     calcChange   := 0
     isPost       := 0
     postNum      := ""
@@ -1646,30 +1646,53 @@ SilentMagicClean:
         }
     }
 
+    isPaidOrder   := 0
     paymentMethod := ""
     paymentNum    := ""
 
-    if RegExMatch(workComment, "i)Готівкою\s*№(\d+)", mCash) {
-        paymentMethod := "Готівкою"
-        paymentNum    := mCash1
-        autoCash      := 1
-    }
-    if (paymentMethod == "" && RegExMatch(workComment, "i)(?:---ОПЛАЧЕНО---\s*)?(?:Картою[^№\r\n]*|ОПЛАЧЕНО\s*)№(\d+)", mCard)) {
+    ; 1. ПЕРЕВІРКА НА ОПЛАЧЕНО / ОНЛАЙН-ОПЛАТУ / КАРТКУ НА САЙТІ / QR
+    if RegExMatch(workComment, "i)(?:---ОПЛАЧЕНО---|(?<![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])(?:ОПЛАЧЕНО|Оплачено|Оплачен|Картою\s+на\s+сайті|Картой\s+на\s+сайте|Картою\s+онлайн|Картой\s+онлайн|Оплата\s+карткою|Оплата\s+картой|LiqPay|WayForPay|Portmone|Apple\s*Pay|Google\s*Pay|MonoPay)(?![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z]))") {
+        isPaidOrder   := 1
         paymentMethod := "Оплачено"
-        paymentNum    := mCard1
-    }
-    if (paymentMethod == "" && RegExMatch(workComment, "i)QR\s*code[^\d]*(\d{5,})", mQR)) {
+        if RegExMatch(workComment, "i)(?:---ОПЛАЧЕНО---\s*)?(?:Картою[^№\r\n]*|ОПЛАЧЕНО\s*|Оплачен[оа]?\s*(?:онлайн|на сайті|карткою)?\s*)№?\s*(\d+)", mCard)
+            paymentNum := mCard1
+        else if RegExMatch(workComment, "i)№\s*(\d{5,})", mNum)
+            paymentNum := mNum1
+    } else if RegExMatch(workComment, "i)QR\s*code[^\d]*(\d+)", mQR) {
+        isPaidOrder   := 1
         paymentMethod := "QR"
         paymentNum    := mQR1
+    } else if RegExMatch(workComment, "i)(?<![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])QR(?![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])") {
+        isPaidOrder   := 1
+        paymentMethod := "QR"
     }
 
-    ; --- Решта з: цифра ABO слово (ні/нет/без решти/no) ---
-    if RegExMatch(workComment, "i)[Рр]ешт[уа]\s+з[:\s]+(\d+)", mReshta) {
-        clientChange := mReshta1
-        autoCash     := 1
-    } else if RegExMatch(workComment, "i)[Рр]ешт[уа]\s+з[:\s]+(ні|нет|без\s+решти|no)") {
+    ; 2. ГОТІВКА (ТІЛЬКИ ЯКЩО НЕ ОПЛАЧЕНО!)
+    if (!isPaidOrder) {
+        if RegExMatch(workComment, "i)(?:Готівкою|Наличными|Готівка|Наличные)\s*№?\s*(\d*)", mCash) {
+            paymentMethod := "Готівкою"
+            paymentNum    := mCash1
+            autoCash      := 1
+        }
+    }
+
+    ; 3. РЕШТА З: (ТІЛЬКИ ДЛЯ ГОТІВКИ, КАТЕГОРИЧНО ЗАБОРОНЕНО ДЛЯ ОПЛАЧЕНИХ ЗАМОВЛЕНЬ)
+    if (isPaidOrder) {
+        autoCash     := 0
         clientChange := ""
-        autoCash     := 1
+        calcChange   := 0
+    } else {
+        if RegExMatch(workComment, "i)(?:[Рр]ешт[уа]|[Сс]дач[ау])\s+з[:\s]+(\d+)", mReshta) {
+            clientChange := mReshta1
+            autoCash     := 1
+            if (paymentMethod == "")
+                paymentMethod := "Готівкою"
+        } else if RegExMatch(workComment, "i)(?:[Рр]ешт[уа]|[Сс]дач[ау])\s+з[:\s]+(ні|нет|без\s+решти|без\s+сдачи|no|0)") {
+            clientChange := ""
+            autoCash     := 1
+            if (paymentMethod == "")
+                paymentMethod := "Готівкою"
+        }
     }
 
     if RegExMatch(workComment, "i)(?:Звичайні|Звичайних)[^\d]*(\d+)", mNorm) {
@@ -1939,7 +1962,7 @@ SilentMagicClean:
     _dbg .= "`nADDR   : " . addrNote
     _dbg .= "`nCUSTREQ: " . customerReqText
     _dbg .= "`nPICKUP : " . hasPickup . " / " . pickupPoint . " -> " . PickupConcept(pickupPoint)
-    _dbg .= "`nPAY    : " . paymentMethod . " #" . paymentNum . " | change=" . clientChange
+    _dbg .= "`nPAY    : " . paymentMethod . " #" . paymentNum . " | change=" . clientChange . " | isPaid=" . isPaidOrder
     _dbg .= "`nSTICKS : norm=" . parsedSticksNorm . " edu=" . parsedSticksEdu
     _dbg .= "`nUTENS  : text=[" . utensilsText . "] qty=" . parsedUtensils
     _dbg .= "`n"
@@ -1959,8 +1982,12 @@ SilentMagicClean:
     if (needCall)
         cleanParts.Push("Передзвонити")
 
-    if (paymentMethod != "" && paymentNum != "")
-        cleanParts.Push(paymentMethod . " №" . paymentNum)
+    if (paymentMethod != "") {
+        if (paymentNum != "")
+            cleanParts.Push(paymentMethod . " №" . paymentNum)
+        else
+            cleanParts.Push(paymentMethod)
+    }
 
     if (hasBirthday)
         cleanParts.Push("🎂 ДН — знижка")
@@ -1976,7 +2003,9 @@ SilentMagicClean:
     for i, part in cleanParts
         cleanComment .= (cleanComment != "" ? " " : "") . part
 
-    if (clientChange != "" && clientChange >= orderSum)
+    if (isPaidOrder)
+        calcChange := 0
+    else if (clientChange != "" && clientChange >= orderSum)
         calcChange := clientChange
     else if (orderSum > 0)
         calcChange := Ceil(orderSum / 200) * 200
@@ -2359,7 +2388,13 @@ DrawRollclub:
     ControlsToMove.Push(hC2)
     curY += 18
     Gui, Roll:Font, s9 bold c%RhC_Text%, %RhFontName%
-    _payText := "Готівка — решта з " . calcChange
+    if (isPaidOrder) {
+        _payText := "✓ " . paymentMethod . (paymentNum != "" ? " №" . paymentNum : "")
+    } else if (autoCash) {
+        _payText := (clientChange != "" ? "Готівка — решта з " . clientChange : "Готівка — решта з " . calcChange)
+    } else {
+        _payText := (paymentMethod != "" ? paymentMethod : "Оплата не змінюється")
+    }
     Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h28 Center +0x200 HwndhPayCash gToggleAutoCash, %_payText%
     ControlsToMove.Push(hPayCash)
     RhRegColor(hPayCash, (autoCash ? RhB_TintGreen : RhB_Chip), RhB_Text)
@@ -2472,6 +2507,14 @@ return
 
 ToggleAutoCash:
     autoCash := !autoCash
+    if (autoCash) {
+        _payText := (clientChange != "" ? "Готівка — решта з " . clientChange : "Готівка — решта з " . calcChange)
+    } else if (isPaidOrder) {
+        _payText := "✓ " . paymentMethod . (paymentNum != "" ? " №" . paymentNum : "")
+    } else {
+        _payText := (paymentMethod != "" ? paymentMethod : "Оплата не змінюється")
+    }
+    try GuiControl, Roll:, %hPayCash%, %_payText%
     RhRegColor(hPayCash, (autoCash ? RhB_TintGreen : RhB_Chip), RhB_Text)
     DllCall("InvalidateRect", "Ptr", hPayCash, "Ptr", 0, "Int", 1)
 return
@@ -4162,6 +4205,10 @@ ApplyRollclub:
         Sleep, 200
     }
 
+    ; Захист: якщо замовлення оплачено — ніякої готівки
+    if (isPaidOrder)
+        autoCash := 0
+
     if (autoCash == 1 && (crossX != 0 || RcHasUiaMap("Хрестик Опл.")) && cashX != 0) {
         ; --- Актуалізація суми після "Найти точку" / зміни прайсу Syrve ---
         _cashSum := RcReadCurrentOrderSum()
@@ -4169,7 +4216,16 @@ ApplyRollclub:
             orderSum := _cashSum
 
         _payInfo := RcDetectBonusPayment()
-        FileAppend, % "PAY_DETECT: hasBonus=" . _payInfo.hasBonus . " bonusSum=" . _payInfo.bonusSum . " bonusRow=" . _payInfo.bonusRow . " cashRow=" . _payInfo.cashRow . " orderSum=" . orderSum . "`n", %A_ScriptDir%\parse_debug.log, UTF-8
+        FileAppend, % "PAY_DETECT: hasBonus=" . _payInfo.hasBonus . " bonusSum=" . _payInfo.bonusSum . " bonusRow=" . _payInfo.bonusRow . " cashRow=" . _payInfo.cashRow . " hasOnlinePay=" . _payInfo.hasOnlinePay . " orderSum=" . orderSum . "`n", %A_ScriptDir%\parse_debug.log, UTF-8
+
+        ; Якщо в Syrve вже є онлайн-оплата, і замовлення не вимагає явно готівку — не чіпаємо!
+        if (_payInfo.hasOnlinePay && !InStr(workComment, "Готівкою")) {
+            FileAppend, % "[" . A_Now . "] SKIP_CASH: Syrve already has online payment '" . _payInfo.onlinePayName . "'`n", %A_ScriptDir%\parse_debug.log, UTF-8
+            autoCash := 0
+        }
+    }
+
+    if (autoCash == 1 && (crossX != 0 || RcHasUiaMap("Хрестик Опл.")) && cashX != 0) {
 
         if (_payInfo.hasBonus) {
             cashToPay := orderSum - _payInfo.bonusSum
@@ -4719,9 +4775,9 @@ RcCleanAddressNote(note, rawAddress := "", commentStreet := "") {
 RcDetectBonusPayment() {
     grid := RcUiaFind("Поле Оплати", "gridPaymentItems")
     if (!IsObject(grid))
-        return {hasBonus: 0, bonusSum: 0, bonusRow: -1, cashRow: -1}
+        return {hasBonus: 0, bonusSum: 0, bonusRow: -1, cashRow: -1, hasOnlinePay: 0, onlinePayName: ""}
 
-    res := {hasBonus: 0, bonusSum: 0, bonusRow: -1, cashRow: -1}
+    res := {hasBonus: 0, bonusSum: 0, bonusRow: -1, cashRow: -1, hasOnlinePay: 0, onlinePayName: ""}
 
     Loop, 3 {
         rIdx := A_Index - 1
@@ -4754,6 +4810,9 @@ RcDetectBonusPayment() {
                 }
             } else if (RegExMatch(typeVal, "i)готівк|наличн")) {
                 res.cashRow := rIdx
+            } else if (RegExMatch(typeVal, "i)карт|card|онлайн|online|liqpay|wayforpay|portmone|безгот|безнал|предоплат")) {
+                res.hasOnlinePay := 1
+                res.onlinePayName := typeVal
             }
         }
     }
