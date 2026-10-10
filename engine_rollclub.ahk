@@ -462,6 +462,14 @@ TriggerMain:
                 cardText := cardVal
                 _uiaOk := 1
             }
+            custVal := RcUiaGetText("Інформація про клієнта", "memoEditCustomerComment")
+            if (custVal != "") {
+                if (infoText == "")
+                    infoText := custVal
+                else if (!InStr(infoText, custVal))
+                    infoText := custVal . " | " . infoText
+                _uiaOk := 1
+            }
         } catch eUiaRead {
         }
         if (_uiaOk)
@@ -1704,12 +1712,10 @@ SilentMagicClean:
         autoSticksEdu := 1
     }
 
+    hasPershemob := 0
     if (RcFirstOrderGunkanEnabled && RegExMatch(workComment, "i)!!!ПЕРШЕМОБ")) {
-        autoGunkan := 1
-        if (cardText == "")
-            cardText := "ПЕРШЕМОБ"
-        else
-            cardText := "ПЕРШЕМОБ | " . cardText
+        autoGunkan   := 1
+        hasPershemob := 1
     }
 
     if (RC_GIFTS_ENABLED && orderSum > 0) {
@@ -1747,6 +1753,13 @@ SilentMagicClean:
             infoText := "🍳 " . kitchenNote
     } else if (hasAllergy) {
         infoText := "🚨 АЛЕРГІЯ — окремий бокс, підписати!"
+    }
+
+    if (hasPershemob) {
+        if (infoText == "")
+            infoText := "ПЕРШЕМОБ"
+        else if (!InStr(infoText, "ПЕРШЕМОБ"))
+            infoText := "ПЕРШЕМОБ | " . infoText
     }
 
     ; --- Адресні нотатки: явні маркери ---
@@ -1942,6 +1955,10 @@ SilentMagicClean:
                     needCall := 1
             }
         }
+    }
+
+    if (hasPershemob && !InStr(infoText, "ПЕРШЕМОБ")) {
+        infoText := (infoText != "") ? ("ПЕРШЕМОБ | " . infoText) : "ПЕРШЕМОБ"
     }
 
     ; --- Клієнт замовив прибори (Виделка/Ніж/Ложка) → палички НЕ пробиваємо ---
@@ -2304,7 +2321,7 @@ DrawRollclub:
     curY += 20
 
     Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
-    Gui, Roll:Add, Text, x%x0% y%curY% w156 h16 +0x200, Кухня
+    Gui, Roll:Add, Text, x%x0% y%curY% w156 h16 +0x200, Інфо клієнта / Кухня
     Gui, Roll:Add, Text, x188 y%curY% w156 h16 +0x200, Карта
     curY += 18
     Gui, Roll:Font, s9 norm c%RhC_Text%, %RhFontName%
@@ -4104,17 +4121,34 @@ ApplyRollclub:
         }
     }
 
-    if (ClientInfo != "" && infoX != 0 && infoX != "ERROR") {
-        Clipboard := ClientInfo
-        Sleep, 150
-        IikoDriver_ClickScreen(infoX, infoY, 2)     ; подвійний клік -> режим редагування комірки коментаря страви
-        Sleep, 200
-        Send, ^a{BackSpace}
-        Sleep, 60
-        Send, ^v
-        Sleep, 150
-        Send, {Enter}                ; підтвердити комірку
-        Sleep, 200
+    if (ClientInfo != "") {
+        _infoToSet := ClientInfo
+        ; Спершу пробуємо записати в поле "Інформація про клієнта" (memoEditCustomerComment) через WinAPI/UIA
+        if (RcUiaFocusOrClick("Інформація про клієнта", "memoEditCustomerComment")) {
+            Sleep, 150
+            try {
+                _existingCust := RcUiaGetText("Інформація про клієнта", "memoEditCustomerComment")
+                if (_existingCust != "" && !InStr(_existingCust, _infoToSet))
+                    _infoToSet := _existingCust . " | " . _infoToSet
+            }
+            Clipboard := _infoToSet
+            Sleep, 60
+            Send, ^a{BackSpace}
+            Sleep, 60
+            Send, ^v
+            Sleep, 200
+        } else if (infoX != 0 && infoX != "ERROR") {
+            Clipboard := _infoToSet
+            Sleep, 150
+            IikoDriver_ClickScreen(infoX, infoY, 2)     ; подвійний клік -> режим редагування комірки коментаря страви
+            Sleep, 200
+            Send, ^a{BackSpace}
+            Sleep, 60
+            Send, ^v
+            Sleep, 150
+            Send, {Enter}                ; підтвердити комірку
+            Sleep, 200
+        }
     }
 
     ; При самовивозі поле "Примечание к адресу" в iiko заблоковане — НЕ пишемо туди.
@@ -6223,6 +6257,10 @@ RcKnownUiaSelector(role) {
         return "memoEditDeliveryComment"
     if (role = "Карта Клієнта")
         return "textEditCustomerCardNumber"
+    if (role = "Інформація про клієнта" || role = "Коментар клієнта" || role = "Клієнт")
+        return "memoEditCustomerComment"
+    if (role = "Кухня")
+        return "memoEditCustomerComment"
     if (role = "Адреса")
         return "memoEditDeliveryAddressComment"
     if (role = "Час")
