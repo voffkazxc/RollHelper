@@ -5305,9 +5305,9 @@ RcCheckZone:
     if (detectedCity != "") {
         encCity   := RcUriEncode(detectedCity)
         encStreet := RcUriEncode(addr)
-        url := "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&city=" . encCity . "&street=" . encStreet
+        url := "https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&countrycodes=ua&city=" . encCity . "&street=" . encStreet
     } else {
-        url := "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&q=" . RcUriEncode(addr)
+        url := "https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&countrycodes=ua&q=" . RcUriEncode(addr)
     }
     resp := RcHttpGet(url, 6000)
     if (resp = "") {
@@ -5320,31 +5320,51 @@ RcCheckZone:
     lng := ""
     if (!RcTryGeocodeResponse(resp, detectedCity, lat, lng)) {
         fallbackQuery := (detectedCity != "") ? (detectedCity . ", " . addr) : addr
-        resp2 := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&q=" . RcUriEncode(fallbackQuery), 6000)
+        resp2 := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&countrycodes=ua&q=" . RcUriEncode(fallbackQuery), 6000)
         if (!RcTryGeocodeResponse(resp2, detectedCity, lat, lng)) {
-            if (InStr(addr, ",")) {
-                addrNoHouse := Trim(RegExReplace(addr, ",[^,]+$", ""))
-                resp3 := ""
-                if (detectedCity != "") {
-                    resp3 := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&city=" . RcUriEncode(detectedCity) . "&street=" . RcUriEncode(addrNoHouse), 6000)
-                    if (!RcTryGeocodeResponse(resp3, detectedCity, lat, lng))
-                        resp3 := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&q=" . RcUriEncode(detectedCity . ", " . addrNoHouse), 6000)
-                } else {
-                    resp3 := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ua&q=" . RcUriEncode(addrNoHouse), 6000)
+            ; Спробуємо фонетичну заміну е <-> и в назві вулиці (наприклад, Симеренка <-> Симиренка)
+            _foundVar := 0
+            if (InStr(addr, "е") || InStr(addr, "и")) {
+                addrVar := InStr(addr, "е") ? RegExReplace(addr, "([а-яіїєґ])е([а-яіїєґ])", "$1и$2") : RegExReplace(addr, "([а-яіїєґ])и([а-яіїєґ])", "$1е$2")
+                if (addrVar != "" && addrVar != addr) {
+                    if (detectedCity != "") {
+                        respVar := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&countrycodes=ua&city=" . RcUriEncode(detectedCity) . "&street=" . RcUriEncode(addrVar), 6000)
+                        if (!RcTryGeocodeResponse(respVar, detectedCity, lat, lng))
+                            respVar := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&countrycodes=ua&q=" . RcUriEncode(detectedCity . ", " . addrVar), 6000)
+                    } else {
+                        respVar := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&countrycodes=ua&q=" . RcUriEncode(addrVar), 6000)
+                    }
+                    if (RcTryGeocodeResponse(respVar, detectedCity, lat, lng)) {
+                        resp := respVar
+                        _foundVar := 1
+                    }
                 }
-                if (!RcTryGeocodeResponse(resp3, detectedCity, lat, lng)) {
+            }
+            if (!_foundVar) {
+                if (InStr(addr, ",")) {
+                    addrNoHouse := Trim(RegExReplace(addr, ",[^,]+$", ""))
+                    resp3 := ""
+                    if (detectedCity != "") {
+                        resp3 := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&countrycodes=ua&city=" . RcUriEncode(detectedCity) . "&street=" . RcUriEncode(addrNoHouse), 6000)
+                        if (!RcTryGeocodeResponse(resp3, detectedCity, lat, lng))
+                            resp3 := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&countrycodes=ua&q=" . RcUriEncode(detectedCity . ", " . addrNoHouse), 6000)
+                    } else {
+                        resp3 := RcHttpGet("https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&countrycodes=ua&q=" . RcUriEncode(addrNoHouse), 6000)
+                    }
+                    if (!RcTryGeocodeResponse(resp3, detectedCity, lat, lng)) {
+                        if (RcApplyPointFallback("Адресу не знайдено"))
+                            return
+                        GuiControl, Roll:, MapSearch, Адресу не знайдено
+                        return
+                    }
+                    resp := resp3
+                    RcLastGeocodeApprox := 1
+                } else {
                     if (RcApplyPointFallback("Адресу не знайдено"))
                         return
                     GuiControl, Roll:, MapSearch, Адресу не знайдено
                     return
                 }
-                resp := resp3
-                RcLastGeocodeApprox := 1
-            } else {
-                if (RcApplyPointFallback("Адресу не знайдено"))
-                    return
-                GuiControl, Roll:, MapSearch, Адресу не знайдено
-                return
             }
         } else {
             resp := resp2
@@ -5354,9 +5374,9 @@ RcCheckZone:
     if (!RcZonesOk && FileExist(kmlPath))
         RcLoadKml(kmlPath)
     if (RcZonesOk && RcZones.MaxIndex() > 0) {
-        zone := RcFindZone(lng, lat)
+        zone := RcFindZone(lng, lat, detectedCity)
         RcLastZoneBoundaryMeters := RcDistanceToZoneBoundaryMeters(lng, lat, zone)
-        RcLastZoneOverlap := RcFindOverlappingZone(lng, lat, zone)
+        RcLastZoneOverlap := RcFindOverlappingZone(lng, lat, zone, detectedCity)
         RcLastZoneUncertain := (RcLastGeocodeApprox || RcLastZoneOverlap != "" || (RcLastZoneBoundaryMeters >= 0 && RcLastZoneBoundaryMeters <= RcZoneBoundaryWarnMeters)) ? 1 : 0
         global RcCurrentDeliveryType, RcZoneMap, RcCurrentZoneMapped, lastZoneName
         lastZoneName := zone
@@ -5366,24 +5386,34 @@ RcCheckZone:
             kAlertText := ""
             kAlertBeep := 0
             
+            mappedKitchName := ""
             if (RcZoneMap.HasKey(zone)) {
                 RcCurrentZoneMapped := 1
                 RcCurrentDeliveryType := RcZoneMap[zone].Type
                 mappedKitchName := RcZoneMap[zone].Kitchen
-                for _, k in Kitchens {
-                    if (k.Name = mappedKitchName) {
-                        RcCurrentKitchen := k
-                        break
-                    }
-                }
             } else {
                 for _, k in Kitchens {
                     kSearchTerm := (k.KmlKey != "") ? k.KmlKey : k.Name
                     if (InStr(zone, kSearchTerm)) {
-                        RcCurrentKitchen := k
+                        mappedKitchName := k.Name
                         break
                     }
                 }
+            }
+            for _, k in Kitchens {
+                if (k.Name = mappedKitchName) {
+                    RcCurrentKitchen := k
+                    break
+                }
+            }
+            
+            ; 🛡️ ЖОРСТКИЙ БАР'ЄР МІСТА: якщо місто замовлення не співпадає з містом кухні
+            if (detectedCity != "" && IsObject(RcCurrentKitchen) && RcCurrentKitchen.City != "" && detectedCity != RcCurrentKitchen.City) {
+                FileAppend, % "[" A_Now "] HARD_CITY_MISMATCH orderCity=[" detectedCity "] zone=[" zone "] kitchen=[" RcCurrentKitchen.Name "] kitchenCity=[" RcCurrentKitchen.City "]`n", %A_ScriptDir%\parse_debug.log
+                zone := ""
+                RcCurrentKitchen := ""
+                RcCurrentZoneMapped := 0
+                RcCurrentDeliveryType := ""
             }
             
             if (RcCurrentKitchen) {
@@ -5966,8 +5996,11 @@ RcTryGeocodeResponse(resp, expectedCity, ByRef lat, ByRef lng) {
 }
 
 RcGeocodeResponseHasCity(resp, city) {
-    StringLower, haystack, resp
+    if (resp = "" || city = "")
+        return 0
+
     StringLower, needle, city
+    needle := Trim(needle)
     aliases := needle
     if (needle = "днепр" || needle = "дніпро")
         aliases := "днепр|дніпро"
@@ -5984,12 +6017,36 @@ RcGeocodeResponseHasCity(resp, city) {
     else if (needle = "ровно" || needle = "рівне")
         aliases := "ровно|рівне"
     else if (needle = "ивано-франковск" || needle = "івано-франківськ" || needle = "франківськ")
-        aliases := "ивано-франковск|івано-франківськ|франківськ"
+        aliases := "ивано-франковск|івано-франківськ|франківськ|іф"
     else if (needle = "белая церковь" || needle = "біла церква")
         aliases := "белая церковь|біла церква"
+
+    ; 1. Перевірка структурованого поля адреси з Nominatim (address.city / town / village)
+    if RegExMatch(resp, "i)""(?:city|town|village|municipality)""\s*:\s*""([^""]+)""", mCity) {
+        StringLower, actualCity, mCity1
+        actualCity := Trim(actualCity)
+        Loop, Parse, aliases, |
+        {
+            if (A_LoopField = actualCity || InStr(actualCity, A_LoopField))
+                return 1
+        }
+        ; Якщо Nominatim явно повернув інше місто (наприклад, "Біла Церква" замість "Київ") — відхиляємо
+        return 0
+    }
+
+    ; 2. Перевірка display_name із захистом від назв областей:
+    ; "Київська область" НЕ повинна зараховуватися як місто "Київ"!
+    ; "Дніпропетровська область" НЕ повинна зараховуватися як "Дніпро"!
+    StringLower, haystack, resp
+    haystack := RegExReplace(haystack, "i)[а-яіїєґё\w\-]+(?:ська|цька|зька|ская|цкая|зкая)\s+(?:область|обл|район|р\-н|громада)\b", " ")
+    haystack := RegExReplace(haystack, "i)[а-яіїєґё\w\-]+\s+(?:область|обл|район|р\-н|громада)\b", " ")
+
     Loop, Parse, aliases, |
-        if InStr(haystack, A_LoopField)
+    {
+        pat := "i)(?<![а-яіїєґё\w\-])" . A_LoopField . "(?![а-яіїєґё\w\-])"
+        if RegExMatch(haystack, pat)
             return 1
+    }
     return 0
 }
 
@@ -6041,22 +6098,74 @@ RcDistanceToZoneBoundaryMeters(lng, lat, zoneName) {
     return -1
 }
 
-RcFindOverlappingZone(lng, lat, selectedZoneName) {
-    global RcZones
+RcFindOverlappingZone(lng, lat, selectedZoneName, filterCity := "") {
+    global RcZones, RcZoneMap, Kitchens
     for _, zone in RcZones {
         if (zone.name = selectedZoneName)
             continue
-        if RcInPolygon(lng, lat, zone.coords)
+        if RcInPolygon(lng, lat, zone.coords) {
+            if (filterCity != "") {
+                zKitch := ""
+                if (IsObject(RcZoneMap) && RcZoneMap.HasKey(zone.name))
+                    zKitch := RcZoneMap[zone.name].Kitchen
+                if (zKitch = "") {
+                    for _, k in Kitchens {
+                        kSearch := (k.KmlKey != "") ? k.KmlKey : k.Name
+                        if (InStr(zone.name, kSearch)) {
+                            zKitch := k.Name
+                            break
+                        }
+                    }
+                }
+                if (zKitch != "") {
+                    zCity := ""
+                    for _, k in Kitchens {
+                        if (k.Name = zKitch) {
+                            zCity := k.City
+                            break
+                        }
+                    }
+                    if (zCity != "" && zCity != filterCity)
+                        continue
+                }
+            }
             return zone.name
+        }
     }
     return ""
 }
 
-RcFindZone(lng, lat) {
-    global RcZones
+RcFindZone(lng, lat, filterCity := "") {
+    global RcZones, RcZoneMap, Kitchens
     for i, z in RcZones {
-        if RcInPolygon(lng, lat, z.coords)
+        if RcInPolygon(lng, lat, z.coords) {
+            if (filterCity != "") {
+                zKitch := ""
+                if (IsObject(RcZoneMap) && RcZoneMap.HasKey(z.name))
+                    zKitch := RcZoneMap[z.name].Kitchen
+                if (zKitch = "") {
+                    for _, k in Kitchens {
+                        kSearch := (k.KmlKey != "") ? k.KmlKey : k.Name
+                        if (InStr(z.name, kSearch)) {
+                            zKitch := k.Name
+                            break
+                        }
+                    }
+                }
+                if (zKitch != "") {
+                    zCity := ""
+                    for _, k in Kitchens {
+                        if (k.Name = zKitch) {
+                            zCity := k.City
+                            break
+                        }
+                    }
+                    if (zCity != "" && zCity != filterCity)
+                        continue
+                }
+            }
             return z.name
+        }
     }
     return ""
 }

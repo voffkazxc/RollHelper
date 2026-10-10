@@ -65,6 +65,8 @@ class RollClubZoneVerificationTests(unittest.TestCase):
             'fallbackQuery := (detectedCity != "") ? (detectedCity . ", " . addr) : addr',
             self.source,
         )
+        self.assertIn("HARD_CITY_MISMATCH", self.source)
+        self.assertIn("RcFindZone(lng, lat, detectedCity)", self.source)
 
     def test_new_address_clears_previous_zone_before_lookup(self):
         start = self.source.index("\nRcCheckZone:")
