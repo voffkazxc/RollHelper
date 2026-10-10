@@ -203,6 +203,15 @@ public partial class MainWindow : Window
         }
     }
 
+    private void DiagnosticButton_Click(object sender, RoutedEventArgs e)
+    {
+        var window = new DiagnosticWindow
+        {
+            Owner = this
+        };
+        window.ShowDialog();
+    }
+
     private async Task RefreshManifestAsync()
     {
         if (!BeginOperation("Загрузка списка программ..."))
@@ -323,6 +332,47 @@ public partial class MainWindow : Window
 
                 SetStatus($"Остановка {otherProgram.DisplayName}...");
                 _packageInstaller.StopPackage(otherProgram.Package.Id);
+            }
+
+            if (!SystemDiagnosticService.IsCurrentProcessElevated())
+            {
+                var syrveElevated = false;
+                foreach (var sp in Process.GetProcesses())
+                {
+                    try
+                    {
+                        if (sp.ProcessName.Contains("BackOffice", StringComparison.OrdinalIgnoreCase) ||
+                            sp.ProcessName.Contains("iikoOffice", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (SystemDiagnosticService.IsProcessElevated(sp.Id) == true)
+                            {
+                                syrveElevated = true;
+                                break;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                if (syrveElevated)
+                {
+                    var msgResult = MessageBox.Show(
+                        this,
+                        "Внимание: Syrve запущен от имени Администратора, а RollHelper запущен без прав Администратора.\n\n" +
+                        "Из-за защиты Windows UIPI клавиша F1 и передача палочек в Syrve будут заблокированы!\n\n" +
+                        "Перезапустить лаунчер от имени Администратора прямо сейчас?",
+                        "Конфликт прав Администратора",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning);
+
+                    if (msgResult == MessageBoxResult.Yes)
+                    {
+                        if (SystemDiagnosticService.RestartLauncherAsAdministrator())
+                            return;
+                    }
+                }
             }
 
             SetStatus($"Запуск {selectedRow.DisplayName}...");

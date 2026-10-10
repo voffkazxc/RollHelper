@@ -6,6 +6,7 @@ param(
     [string]$RefundVersion = "0.1.8",
     [string]$GunkanVersion = "0.1.0",
     [string]$CallAutoAcceptVersion = "0.1.2",
+    [string]$LauncherVersion = "0.1.73",
     [string]$SourceRelease = "0.1.90",
     [string]$Repository = "voffkazxc/RollHelper",
     [string]$OutputDirectory = (Join-Path $env:TEMP "RollHelperRollClubRelease"),
@@ -14,6 +15,7 @@ param(
     [switch]$RebuildRefund,
     [switch]$RebuildGunkan,
     [switch]$RebuildCallAutoAccept,
+    [switch]$RebuildLauncher,
     [switch]$Publish
 )
 
@@ -32,6 +34,10 @@ foreach ($entry in @(
     if ($entry.Value -notmatch '^\d+\.\d+\.\d+$') {
         throw "Invalid $($entry.Name): $($entry.Value)"
     }
+}
+
+if ($RebuildLauncher -and ($LauncherVersion -notmatch '^\d+\.\d+\.\d+$')) {
+    throw "Invalid LauncherVersion: $LauncherVersion"
 }
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
@@ -198,11 +204,53 @@ $packages += $refundPackage
 $packages += $gunkanPackage
 $packages += $callAutoAcceptPackage
 
+if ($RebuildLauncher) {
+    $launcherPublishRoot = Join-Path $releaseRoot "launcher-publish"
+    $launcherAssetName = "RollHelperLauncher-win-x64-$LauncherVersion.zip"
+    $launcherAssetPath = Join-Path $releaseRoot $launcherAssetName
+    $launcherProject = Join-Path $repoRoot "Launcher\RollHelperLauncher\RollHelperLauncher.csproj"
+
+    if (Test-Path -LiteralPath $launcherPublishRoot) {
+        Remove-Item -LiteralPath $launcherPublishRoot -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force -Path $launcherPublishRoot | Out-Null
+
+    dotnet publish $launcherProject `
+        -c Release `
+        -r win-x64 `
+        --self-contained true `
+        -p:PublishSingleFile=true `
+        -p:Version=$LauncherVersion `
+        -o $launcherPublishRoot
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Launcher publish failed with exit code $LASTEXITCODE"
+    }
+
+    Get-ChildItem -LiteralPath $launcherPublishRoot -Filter "*.pdb" | Remove-Item -Force
+    Compress-Archive `
+        -Path (Join-Path $launcherPublishRoot "*") `
+        -DestinationPath $launcherAssetPath `
+        -CompressionLevel Optimal `
+        -Force
+    Remove-Item -LiteralPath $launcherPublishRoot -Recurse -Force
+
+    $launcherSha256 = (Get-FileHash -LiteralPath $launcherAssetPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $launcherSection = [ordered]@{
+        version = $LauncherVersion
+        asset = $launcherAssetName
+        url = "$assetBaseUrl/$launcherAssetName"
+        sha256 = $launcherSha256
+    }
+} else {
+    $launcherSection = $sourceManifest.launcher
+}
+
 $manifest = [ordered]@{
     schema = 1
     release = $CatalogVersion
     packages = $packages
-    launcher = $sourceManifest.launcher
+    launcher = $launcherSection
 }
 $manifestPath = Join-Path $releaseRoot "release-manifest.json"
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -211,9 +259,10 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 if ($Publish) {
     $notesPath = Join-Path $releaseRoot "release-notes.md"
     @"
-Оновлено RollClub MVP без змін RollHouse та його доповнень.
+Оновлено RollClub MVP та RollHelper Launcher.
 
 - RollClub: $RollClubVersion
+- RollHelper Launcher: $LauncherVersion (додано вбудований модуль самодіагностики робочого місця: перевірка прав Адміністратора / блокування F1 та тільди через Windows UIPI, стан демона, локального сервера та DPI)
 - виправлено розпізнавання кухні самовивозу (Садовий проїзд / Нові Дома, Одеса, Рівне, Київ) та підтягування підвищеного часу самовивозу (60 хв)
 - точка та концепція самовивозу в Syrve тепер обираються ДО вводу часу, що гарантує збереження розрахункового часу
 - виправлено клік по кнопках розрахунку часу на пульті (ДОСТ +XX, СВ +XX) без помилкового закриття замовлення
@@ -246,7 +295,7 @@ if ($Publish) {
 - додано регресійний тест повного ланцюжка: адреса → зона в пульті → звірка точки
 - визначення зони більше не зависає на мережевому пошуку адреси
 - мережевий запит має короткий ліміт часу, а повторна перевірка тієї самої адреси використовує кеш
-- RollHouse, його доповнення та лаунчер без змін
+- RollHouse та його доповнення без змін
 - додано окреме доповнення «Повернення коштів» з запуском через Ctrl+F5
 - «Повернення коштів» автоматично повторює читання при тимчасовому збої, без ручного натискання «Оновити дані»
 - виправлено ФОП без останньої крапки в ініціалах: адреса більше не потрапляє у поле ФОП
@@ -283,6 +332,9 @@ if ($Publish) {
     if ($RebuildCallAutoAccept) {
         $assetsToPublish += $callAutoAcceptBuild.AssetPath
     }
+    if ($RebuildLauncher) {
+        $assetsToPublish += $launcherAssetPath
+    }
     gh release create $catalogTag `
         $assetsToPublish `
         --target master `
@@ -303,6 +355,7 @@ if ($Publish) {
     RefundAsset = if ($RebuildRefund) { $refundBuild.AssetPath } else { [string]$refundPackage.url }
     GunkanAsset = if ($RebuildGunkan) { $gunkanBuild.AssetPath } else { [string]$gunkanPackage.url }
     CallAutoAcceptAsset = if ($RebuildCallAutoAccept) { $callAutoAcceptBuild.AssetPath } else { [string]$callAutoAcceptPackage.url }
+    LauncherAsset = if ($RebuildLauncher) { $launcherAssetPath } else { [string]$sourceManifest.launcher.url }
     Manifest = $manifestPath
     Published = [bool]$Publish
 }

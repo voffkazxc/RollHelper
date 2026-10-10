@@ -165,6 +165,21 @@ static async Task VerifyPrimaryProcessTrackingAsync(PackageInstaller installer, 
     {
         throw new InvalidOperationException("Stopping the package did not stop its background process.");
     }
+
+    // Verify SystemDiagnosticService
+    var diagReport = await SystemDiagnosticService.RunFullDiagnosticAsync();
+    if (diagReport.Items.Count < 5)
+    {
+        throw new InvalidOperationException($"Expected at least 5 diagnostic checks, got {diagReport.Items.Count}");
+    }
+    if (!diagReport.Items.Any(i => i.Category.Contains("Горячие клавиши")))
+    {
+        throw new InvalidOperationException("Hotkey diagnostic check was not included in the report.");
+    }
+    if (!diagReport.Items.Any(i => i.Category.Contains("Права доступа")))
+    {
+        throw new InvalidOperationException("Elevation / UIPI check was not included in the report.");
+    }
 }
 
 static Process StartProbeProcess(string executablePath)

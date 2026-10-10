@@ -196,6 +196,11 @@
                         Margin="0,0,10,0"
                         Style="{StaticResource HeaderPrimaryButtonStyle}"
                         Click="RefreshButton_Click" />
+                <Button x:Name="DiagnosticButton"
+                        Content="🩺 Самодиагностика (F1 / Среда)"
+                        Margin="0,0,10,0"
+                        Style="{StaticResource HeaderCompactButtonStyle}"
+                        Click="DiagnosticButton_Click" />
                 <Button Content="Открыть лог"
                         Margin="0,0,10,0"
                         Style="{StaticResource HeaderCompactButtonStyle}"
