@@ -197,6 +197,7 @@ def read_kc_list(bridge, brand="rollclub"):
     take = None
     busy_count = 0
     callback_count = 0
+    new_client_count = 0
     aggregator_count = 0
     cancelled_count = 0
     cell_error_count = 0
@@ -308,6 +309,10 @@ def read_kc_list(bridge, brand="rollclub"):
                     "зателефону",
                     "наберіть",
                     "наберите",
+                    "дзвонит",
+                    "дзвоніть",
+                    "звонит",
+                    "звоните",
                 )
             )
 
@@ -321,6 +326,28 @@ def read_kc_list(bridge, brand="rollclub"):
                     "ракета",
                 )
             )
+
+            import re
+            is_regular = any(
+                w in combined_text
+                for w in (
+                    "пост-",
+                    "пост ",
+                    "пост1",
+                    "пост2",
+                    "пост3",
+                    "пост4",
+                    "пост5",
+                    "пост6",
+                    "пост7",
+                    "пост8",
+                    "пост9",
+                    "постійн",
+                    "постоян",
+                    "post-",
+                    "post ",
+                )
+            ) or bool(re.search(r"\bпост\b", combined_text))
 
             status = (delivery["status"] or "").lower()
             is_cancelled = any(w in status for w in ("тмен", "касов", "ancel"))
@@ -338,6 +365,8 @@ def read_kc_list(bridge, brand="rollclub"):
                 pass
             elif is_callback:
                 callback_count += 1
+            elif not is_regular:
+                new_client_count += 1
             elif not delivery["no"]:
                 pass
             else:
@@ -358,11 +387,12 @@ def read_kc_list(bridge, brand="rollclub"):
             reason = "рядки знайдені, але значення клітинок не прочитані"
         else:
             reason = (
-                "всього %d: зайнято %d, передзвонити %d, агрегатори %d, відмінені %d"
+                "всього %d: зайнято %d, передзвонити %d, нові (без Пост) %d, агрегатори %d, відмінені %d"
                 % (
                     len(rows),
                     busy_count,
                     callback_count,
+                    new_client_count,
                     aggregator_count,
                     cancelled_count,
                 )

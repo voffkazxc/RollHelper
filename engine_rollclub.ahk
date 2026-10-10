@@ -2617,6 +2617,7 @@ RhAutoToggle:
 return
 
 KcStopDuty:
+    Gui, DutyBanner:Destroy
     ; будь-яка РУЧНА дія оператора (тільда/F1/F2/F3/Enter/Ctrl+Enter) → вимкнути дежурство + вікно "оператор працює".
     ; _inDutyTake=1 → викликано самим дежурством під час взяття, НЕ гасимо і вікно НЕ ставимо.
     if (!_inDutyTake)
@@ -2633,6 +2634,11 @@ return
 
 KcDutyToggle:
     OpCoord_Event("DutyScanning", "toggle", "KcDutyToggle", "was_dutyOn=" . dutyOn . ";punchBusy=" . rhPunchBusy . ";inDutyTake=" . _inDutyTake)
+    if WinExist("DutyContinueBannerWin")
+    {
+        GoSub, DutyContinueSearch
+        return
+    }
     ; Ctrl+F4 з доповнення «Дежурство заказов»: бере перше вільне замовлення і зупиняється.
     FileAppend, % "[" . A_Now . "] F4-TOGGLE (was dutyOn=" . dutyOn . ")`n", %A_ScriptDir%\parse_debug.log
     if (rhPunchBusy || _inDutyTake)
@@ -2661,6 +2667,7 @@ KcDutyToggle:
     }
     else
     {
+        Gui, DutyBanner:Destroy
         kcStop := 1                 ; перервати захід, що вже виконується
         SetTimer, KcDutyTick, Off
         ToolTip, Дежурство ВИМКНЕНО
@@ -2694,16 +2701,12 @@ KcDutyTick:
     {
         dutyOn := 0
         SetTimer, KcDutyTick, Off
-        GoSub, LoudAlarm
     }
 return
 
 LoudAlarm:
-    Loop, 6
-    {
-        SoundBeep, 900, 220
-        SoundBeep, 1350, 220
-    }
+    ; Резервна звукова індикація
+    SoundPlay, %A_ScriptDir%\beep_ok.wav
 return
 
 KcTakeOnce:
@@ -3029,19 +3032,113 @@ KcMonitor:
     SetTimer, KcDutyTick, Off
     SetTimer, KcMonitor, Off
     
-    ; Замість автопробиття — просто подаємо надійний звуковий сигнал
+    ; 1. Надійний звуковий сигнал
     SoundPlay, %A_ScriptDir%\beep_ok.wav
     Sleep, 400
     SoundPlay, %A_ScriptDir%\beep_ok.wav
     Sleep, 400
     SoundPlay, %A_ScriptDir%\beep_ok.wav
+    Sleep, 300
     
+    ; 2. Закриваємо картку замовлення (замовлення заброньовано за оператором)
+    ToolTip, 🔄 Замовлення №%takeNo% заброньовано. Закриваю картку...
+    try IikoUI_CloseForm()
+    Sleep, 300
+    _chkClose := RhGet("/api/iiko/kc-list", 800)
+    if (InStr(_chkClose, "ACTIVE_ORDER_CARD"))
+    {
+        Send, {Esc}
+        Sleep, 350
+        _chkClose := RhGet("/api/iiko/kc-list", 800)
+        if (InStr(_chkClose, "ACTIVE_ORDER_CARD"))
+        {
+            Send, ^{F4}
+            Sleep, 350
+        }
+    }
+
+    ; 3. Повертаємося до вікна Syrve Office (список замовлень/колл-центр)
+    if WinExist("Syrve Office")
+    {
+        WinActivate, Syrve Office
+        WinWaitActive, Syrve Office,, 1
+    }
+    Sleep, 200
+
+    ; 4. Очищаємо поле автофільтра (Поиск), щоб бачити всі замовлення
+    if (targetPoiskX > 0 && targetPoiskY > 0)
+    {
+        _oldCoord := A_CoordModeMouse
+        CoordMode, Mouse, Screen
+        Click, %targetPoiskX%, %targetPoiskY%
+        CoordMode, Mouse, %_oldCoord%
+        Sleep, 80
+        Send, {Home}+{End}{Delete}
+        Sleep, 40
+        Send, {BackSpace 12}
+        Sleep, 60
+        Send, {Enter}
+        Sleep, 150
+    }
+
+    ToolTip
     kcTook := 1
-    ToolTip, ✅ ВІДКРИВ №%takeNo% — замовлення готове до ручного пробиття
-    SetTimer, RemoveToolTip, -15000
     kcPaused := 1
     kcBusy := 0
+
+    ; 5. Показуємо плашку «Продовжити пошук»
+    lastBookedNo := takeNo
+    GoSub, ShowDutyContinueBanner
 return
+
+ShowDutyContinueBanner:
+    Gui, DutyBanner:Destroy
+    Gui, DutyBanner:+AlwaysOnTop -Caption +ToolWindow +Border
+    Gui, DutyBanner:Color, 1E293B, FFFFFF
+    Gui, DutyBanner:Font, s12 bold c10B981, Segoe UI
+    Gui, DutyBanner:Add, Text, x15 y12 w410 Center, % "🟢 ЗАМОВЛЕННЯ №" . lastBookedNo . " ЗАБРОНЬОВАНО!"
+    Gui, DutyBanner:Font, s9 norm cCBD5E1, Segoe UI
+    Gui, DutyBanner:Add, Text, x15 y38 w410 Center, Замовлення закріплено за вами. Фільтр очищено.
+    Gui, DutyBanner:Font, s11 bold, Segoe UI
+    Gui, DutyBanner:Add, Button, x25 y68 w240 h36 Default gDutyContinueSearch, ▶ Продовжити пошук
+    Gui, DutyBanner:Font, s10 norm, Segoe UI
+    Gui, DutyBanner:Add, Button, x280 y68 w135 h36 gDutyStopSearch, ✖ Зупинити
+    _bX := (A_ScreenWidth - 440) // 2
+    Gui, DutyBanner:Show, x%_bX% y70 w440 h116, DutyContinueBannerWin
+return
+
+DutyContinueSearch:
+    Gui, DutyBanner:Destroy
+    dutyOn := 1
+    kcStop := 0
+    kcPaused := 0
+    kcTook := 0
+    ToolTip, ⏳ Продовжую пошук наступного замовлення... (Ctrl+F4 — стоп)
+    SetTimer, RemoveToolTip, -2500
+    SetTimer, KcDutyTick, 1500
+    SetTimer, KcDutyTickOnce, -200
+return
+
+KcDutyTickOnce:
+    GoSub, KcDutyTick
+return
+
+DutyStopSearch:
+    Gui, DutyBanner:Destroy
+    dutyOn := 0
+    kcStop := 1
+    kcPaused := 1
+    SetTimer, KcDutyTick, Off
+    ToolTip, Дежурство зупинено
+    SetTimer, RemoveToolTip, -2000
+return
+
+#IfWinActive DutyContinueBannerWin
+Space::GoSub, DutyContinueSearch
+Enter::GoSub, DutyContinueSearch
+NumpadEnter::GoSub, DutyContinueSearch
+Esc::GoSub, DutyStopSearch
+#IfWinActive
 
 #IfWinActive Rollclub PRO 33.0
 Enter::GoSub, ApplyRollclub

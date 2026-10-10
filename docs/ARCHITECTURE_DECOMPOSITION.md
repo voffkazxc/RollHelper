@@ -81,6 +81,8 @@ flowchart TD
     Server --> BrandConfigs["RollHelper/brands/*"]
 
     RC --> RCDuty["module rollclub-duty: Ctrl+F4"]
+    RC --> RCRefund["module rollclub-refund: Ctrl+F5"]
+    RC --> RCGunkan["module rollclub-first-order-gunkan: !!!ПЕРШЕМОБ"]
 
     RH --> Calls["tools/call_listener/*"]
     Calls --> PyAudio["Python + audio/ASR packages + models"]
@@ -216,6 +218,8 @@ flowchart TD
 
 - синхронизация кухонь из Google Sheets;
 - дежурство по заказам: отдельное дополнение `rollclub-duty`, горячая клавиша `Ctrl+F4`;
+- подготовка текста возврата: отдельное дополнение `rollclub-refund`, горячая клавиша `Ctrl+F5`; основные поля читаются через локальный iiko-мост, история и точная сумма дополняются точечным UIA;
+- акция «Гункан за первое заказание из приложения»: отдельное дополнение `rollclub-first-order-gunkan`; маркер `!!!ПЕРШЕМОБ` включает карточку и автоматическое пробитие PLU, отключение дополнения полностью убирает акцию;
 - диагностический сбор UIA-дерева;
 - OCR состава заказа;
 - тестовые Ctrl+F2…Ctrl+F10.

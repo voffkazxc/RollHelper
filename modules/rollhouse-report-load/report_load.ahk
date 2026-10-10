@@ -1,4 +1,4 @@
-﻿#Requires AutoHotkey v1.1
+#Requires AutoHotkey v1.1
 #NoEnv
 #SingleInstance Force
 FileEncoding, UTF-8
@@ -13,6 +13,7 @@ global ReportStatus := ""
 global ReportLogPath := A_LocalAppData . "\RollHelper\Logs\report_load.log"
 global ReportLastStats := {}
 global ReportLastOrder := []
+global ReportLastTiming := {}
 
 FileCreateDir, % A_LocalAppData . "\RollHelper\Logs"
 if (IsObject(A_Args) && A_Args[1] = "--parse-test") {
@@ -27,10 +28,14 @@ if (IsObject(A_Args) && A_Args[1] = "--parse-test") {
     ExitApp
 }
 if (IsObject(A_Args) && A_Args[1] = "--live-test") {
-    _liveTable := Report_CopyDeliveriesGrid(_liveError)
+    _liveStarted := A_TickCount
+    _liveTable := Report_CopyDeliveriesGrid(_liveError, _liveTiming)
+    _liveParseStarted := A_TickCount
     _liveOutput := _liveTable = "" ? "ERROR: " . _liveError : Report_Build(_liveTable, _liveError)
+    _liveParseMs := A_TickCount - _liveParseStarted
     if (_liveOutput = "")
         _liveOutput := "ERROR: " . _liveError
+    _liveOutput .= "`r`n`r`nTIMING`r`n" . Report_TimingText(_liveTiming, A_TickCount - _liveStarted, _liveParseMs)
     FileDelete, % A_Args[2]
     FileAppend, %_liveOutput%, % A_Args[2], UTF-8
     ExitApp, % (_liveTable = "" || SubStr(_liveOutput, 1, 6) = "ERROR:") ? 1 : 0
@@ -110,36 +115,44 @@ ReportGuiSize:
 return
 
 Report_Refresh() {
-    global ReportText
+    global ReportText, ReportLastTiming
 
+    _started := A_TickCount
     GuiControl, Report:, ReportStatusLabel, Зчитую таблицю…
-    _tableText := Report_CopyDeliveriesGrid(_error)
+    _tableText := Report_CopyDeliveriesGrid(_error, _readTiming)
     if (_tableText = "") {
         ReportText := ""
         GuiControl, Report:, ReportOutput, %_error%
         GuiControl, Report:, ReportStatusLabel, Дані не отримано
-        Report_Log("read_error", _error)
+        Report_Log("read_error", _error . ";" . Report_TimingText(_readTiming, A_TickCount - _started))
         return
     }
 
+    _parseStarted := A_TickCount
     _report := Report_Build(_tableText, _error)
+    _parseMs := A_TickCount - _parseStarted
     if (_report = "") {
         ReportText := ""
         GuiControl, Report:, ReportOutput, %_error%
         GuiControl, Report:, ReportStatusLabel, Не вдалося розібрати таблицю
-        Report_Log("parse_error", _error)
+        Report_Log("parse_error", _error . ";" . Report_TimingText(_readTiming, A_TickCount - _started, _parseMs))
         return
     }
 
+    _totalMs := A_TickCount - _started
+    ReportLastTiming := {totalMs: _totalMs, readMs: _readTiming.totalMs, lookupMs: _readTiming.lookupMs
+        , copyMs: _readTiming.copyMs, normalizeMs: _readTiming.normalizeMs, parseMs: _parseMs}
     ReportText := _report
     GuiControl, Report:, ReportOutput, %ReportText%
-    GuiControl, Report:, ReportStatusLabel, Готово. Натисніть «Копіювати»
-    Report_Log("report_ready", RegExReplace(ReportText, "[\r\n]+", " | "))
+    GuiControl, Report:, ReportStatusLabel, % "Готово за " . _totalMs . " мс: таблиця " . _readTiming.totalMs . " мс, розбір " . _parseMs . " мс"
+    Report_Log("report_ready", Report_TimingText(_readTiming, _totalMs, _parseMs) . ";" . RegExReplace(ReportText, "[\r\n]+", " | "))
 }
 
-Report_CopyDeliveriesGrid(ByRef errorText) {
+Report_CopyDeliveriesGrid(ByRef errorText, ByRef timing := "") {
     global ReportUia
 
+    _started := A_TickCount
+    timing := {lookupMs: 0, copyMs: 0, normalizeMs: 0, totalMs: 0}
     errorText := ""
     WinGet, _syrveHwnd, ID, ahk_exe BackOffice.exe
     if (!_syrveHwnd) {
@@ -161,14 +174,17 @@ Report_CopyDeliveriesGrid(ByRef errorText) {
         return ""
     }
 
+    _lookupStarted := A_TickCount
     try _grid := _window.FindFirstBy("AutomationId=gridDeliveries")
     catch e
         _grid := ""
+    timing.lookupMs := A_TickCount - _lookupStarted
     if (!IsObject(_grid)) {
         errorText := "Не бачу таблицю «Доставки».`r`n`r`nВідкрийте у Syrve вкладку зі списком доставок і натисніть «Оновити»."
         return ""
     }
 
+    _copyStarted := A_TickCount
     _clipboardBackup := ClipboardAll
     Clipboard := ""
     WinActivate, ahk_id %_syrveHwnd%
@@ -188,12 +204,27 @@ Report_CopyDeliveriesGrid(ByRef errorText) {
     Clipboard := _clipboardBackup
     VarSetCapacity(_clipboardBackup, 0)
     Gui, Report:Show
+    timing.copyMs := A_TickCount - _copyStarted
 
     if (_copiedText = "") {
         errorText := "Syrve не передав дані таблиці.`r`n`r`nПеревірте, що список доставок не порожній, і натисніть «Оновити»."
         return ""
     }
-    return Report_NormalizeGridCopy(_copiedText, _grid, errorText)
+    _normalizeStarted := A_TickCount
+    _result := Report_NormalizeGridCopy(_copiedText, _grid, errorText)
+    timing.normalizeMs := A_TickCount - _normalizeStarted
+    timing.totalMs := A_TickCount - _started
+    return _result
+}
+
+Report_TimingText(timing, totalMs := 0, parseMs := "") {
+    if !IsObject(timing)
+        return "timing=unavailable"
+    _total := totalMs != 0 ? totalMs : timing.totalMs
+    _text := "total_ms=" . _total . ";grid_lookup_ms=" . timing.lookupMs . ";copy_ms=" . timing.copyMs . ";normalize_ms=" . timing.normalizeMs
+    if (parseMs != "")
+        _text .= ";parse_ms=" . parseMs
+    return _text
 }
 
 Report_NormalizeGridCopy(copiedText, grid, ByRef errorText) {
@@ -241,13 +272,13 @@ Report_Build(tableText, ByRef errorText) {
     global ReportLastStats, ReportLastOrder
 
     errorText := ""
-    _lines := StrSplit(StrReplace(tableText, "`r", ""), "`n")
-    if (_lines.MaxIndex() < 2) {
+    _rawLines := StrSplit(StrReplace(tableText, "`r", ""), "`n")
+    if (_rawLines.MaxIndex() < 2) {
         errorText := "У таблиці немає рядків для звіту."
         return ""
     }
 
-    _headers := StrSplit(_lines[1], A_Tab)
+    _headers := StrSplit(_rawLines[1], A_Tab)
     _pointIndex := Report_FindHeader(_headers, "точка")
     _statusIndex := Report_FindHeader(_headers, "статус")
     _countIndex := Report_FindHeader(_headers, "количество|кількість")
@@ -257,16 +288,38 @@ Report_Build(tableText, ByRef errorText) {
         return ""
     }
 
+    ; Якщо таблиця плоска (зі стовпчиком №), склеюємо багаторядкові коментарі:
+    ; Будь-який рядок, який НЕ починається з нового номеру замовлення (цифри + Tab),
+    ; є перенесенням рядка всередині коментаря чи адреси попереднього замовлення.
+    _lines := []
+    _isFlatTable := Report_FindHeader(_headers, "№|номер")
+    _currentRow := ""
+    Loop, % _rawLines.MaxIndex() - 1 {
+        _line := _rawLines[A_Index + 1]
+        if (Trim(_line) = "")
+            continue
+        if (_isFlatTable) {
+            if (RegExMatch(_line, "^\d+\t")) {
+                if (_currentRow != "")
+                    _lines.Push(_currentRow)
+                _currentRow := _line
+            } else {
+                _currentRow .= " " . _line
+            }
+        } else {
+            _lines.Push(_line)
+        }
+    }
+    if (_currentRow != "")
+        _lines.Push(_currentRow)
+
     _stats := {}
     _order := []
     _totalCount := 0
     _totalSum := 0
     _cancelled := 0
 
-    Loop, % _lines.MaxIndex() - 1 {
-        _line := _lines[A_Index + 1]
-        if (Trim(_line) = "")
-            continue
+    for _idx, _line in _lines {
         _cells := StrSplit(_line, A_Tab)
         if (_cells.MaxIndex() < _sumIndex)
             continue
@@ -285,6 +338,8 @@ Report_Build(tableText, ByRef errorText) {
         if (_rowCount < 1)
             continue
         _pointName := Report_PointName(_point)
+        if (_pointName = "")
+            continue
         if (!_stats.HasKey(_pointName)) {
             _stats[_pointName] := {count: 0, sum: 0}
             _order.Push(_pointName)
@@ -406,7 +461,7 @@ Report_ParseAmount(rawValue) {
 Report_PointName(point) {
     if (InStr(point, "Чугуїв") || InStr(point, "Чугуев"))
         return "Чугуїв"
-    if (InStr(point, "Берестин"))
+    if (InStr(point, "Берестин") || InStr(point, "Красноград"))
         return "Берестин"
     if (InStr(point, "Мерефа"))
         return "Мерефа"

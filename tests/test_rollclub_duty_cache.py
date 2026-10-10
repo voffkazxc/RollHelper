@@ -104,17 +104,15 @@ class RollClubDutyCacheTests(unittest.TestCase):
         self.assertEqual(result["take"]["operator"], "")
         self.assertEqual(result["take"]["status"], "Не подтверждена")
 
-    def test_engine_keeps_original_after_take_action_chain(self):
+    def test_engine_duty_books_closes_clears_and_shows_banner(self):
         engine_path = MODULE_PATH.parents[3] / "engine_rollclub.ahk"
         source = engine_path.read_text(encoding="utf-8-sig")
         markers = [
             "dutyOn := 0",
-            "_inDutyTake := 1",
-            "GoSub, TriggerMain",
-            "GoSub, ApplyRollclub",
-            "_inDutyTake := 0",
-            "GoSub, SoundOk",
-            "kcTook := 1",
+            "SoundPlay",
+            "IikoUI_CloseForm()",
+            "targetPoiskX",
+            "ShowDutyContinueBanner",
         ]
 
         positions = [source.index(marker, source.index("; opened -> read")) for marker in markers]
@@ -226,7 +224,7 @@ class RollClubDutyCacheTests(unittest.TestCase):
         bridge = Bridge()
         row_cells = [
             Control("№ row 1", value="857847"),
-            Control("Коментар row 1", value="Дніпро Доставка кур'єром"),
+            Control("Коментар row 1", value="Пост-1 Дніпро Доставка кур'єром"),
             Control("Оператор row 1", value=""),
             Control("Статус row 1", value="Не підтверджена"),
         ]
@@ -242,7 +240,7 @@ class RollClubDutyCacheTests(unittest.TestCase):
         bridge = Bridge()
         row_cells = [
             Control("№ row 1", value="796776"),
-            Control("Коментар row 1", value="Київ Доставка"),
+            Control("Коментар row 1", value="Пост-2 Київ Доставка"),
             Control("Оператор row 1", value=""),
             Control("Статус row 1", value="Не підтверджена"),
         ]
@@ -258,7 +256,7 @@ class RollClubDutyCacheTests(unittest.TestCase):
         bridge = Bridge()
         row_cells = [
             Control("Номер row 1", value="№ 857847"),
-            Control("Коментар row 1", value="Дніпро самовивіз"),
+            Control("Коментар row 1", value="Пост Дніпро самовивіз"),
             Control("Оператор row 1", value=""),
             Control("Статус row 1", value="Не підтверджена"),
         ]
@@ -277,7 +275,7 @@ class RollClubDutyCacheTests(unittest.TestCase):
         ])
         row_cells = [
             Control("№ row 1", value="857847"),
-            Control("Коментар row 1", value="Дніпро Доставка"),
+            Control("Коментар row 1", value="Постійний клієнт Дніпро Доставка"),
             Control("Оператор row 1", value=""),
             Control("Статус row 1", value="Не підтверджена"),
         ]
@@ -303,10 +301,10 @@ class RollClubDutyCacheTests(unittest.TestCase):
         # 3. Verify rowX is prioritized over firstRowX
         self.assertIn("targetRowX := (rowX != 0) ? rowX : firstRowX", source)
 
-        # 4. Verify order card opened guard prevents TriggerMain on unopened orders
+        # 4. Verify order card opened guard prevents booking sound on unopened orders
         card_guard_pos = source.index("if (!_cardOpened)")
-        trigger_main_pos = source.index("GoSub, TriggerMain")
-        self.assertLess(card_guard_pos, trigger_main_pos)
+        sound_pos = source.index("SoundPlay", card_guard_pos)
+        self.assertLess(card_guard_pos, sound_pos)
 
     def test_callback_orders_with_note_and_comment_are_skipped(self):
         bridge = Bridge()
@@ -375,8 +373,54 @@ class RollClubDutyCacheTests(unittest.TestCase):
         # Verify Send, ^{Tab} is present in duty loop to refresh Syrve deliveries table
         self.assertIn("^{Tab}", duty_code)
 
+    def test_new_clients_without_post_are_skipped(self):
+        bridge = Bridge()
+        row_cells = [
+            Control("№ row 1", value="857847"),
+            Control("Коментар row 1", value="НОВИЙ КЛІЄНТ Доставка кур'єром"),
+            Control("Оператор row 1", value=""),
+            Control("Статус row 1", value="Не підтверджена"),
+        ]
+        target_row = Control("Строка 1", children=row_cells)
+        bridge.panel = Control("Панель данных", children=[target_row])
+        bridge.grid = Control("gridDeliveries", children=[bridge.panel])
+
+        result = MODULE.read_kc_list(bridge)
+        self.assertTrue(result["ok"])
+        self.assertIsNone(result["take"])
+        self.assertEqual(result["take_no"], 0)
+        self.assertIn("нові (без Пост) 1", result["reason"])
+
+    def test_regular_clients_with_callback_are_skipped(self):
+        bridge = Bridge()
+        row_cells = [
+            Control("№ row 1", value="857847"),
+            Control("Коментар row 1", value="Пост-5 передзвонити клієнту"),
+            Control("Оператор row 1", value=""),
+            Control("Статус row 1", value="Не підтверджена"),
+        ]
+        target_row = Control("Строка 1", children=row_cells)
+        bridge.panel = Control("Панель данных", children=[target_row])
+        bridge.grid = Control("gridDeliveries", children=[bridge.panel])
+
+        result = MODULE.read_kc_list(bridge)
+        self.assertTrue(result["ok"])
+        self.assertIsNone(result["take"])
+        self.assertEqual(result["take_no"], 0)
+        self.assertIn("передзвонити 1", result["reason"])
+
+    def test_duty_banner_subroutines_and_controls_exist(self):
+        engine_path = MODULE_PATH.parents[3] / "engine_rollclub.ahk"
+        source = engine_path.read_text(encoding="utf-8-sig")
+
+        self.assertIn("ShowDutyContinueBanner:", source)
+        self.assertIn("DutyContinueSearch:", source)
+        self.assertIn("DutyStopSearch:", source)
+        self.assertIn("DutyContinueBannerWin", source)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
 
