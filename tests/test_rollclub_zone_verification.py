@@ -126,8 +126,27 @@ class RollClubZoneVerificationTests(unittest.TestCase):
         self.assertIn("[Драгоманова] Драгоманова 38 (лівий берег)", zones_map_text)
         self.assertIn("Зона підвищеного часу проїзд Крива Липа 8", zones_map_text)
 
+    def test_zone_name_normalization_strips_nbsp_and_newlines(self):
+        self.assertIn("RcNormalizeZoneName(name)", self.source)
+        self.assertIn(r'RegExReplace(name, "[\s\x{00A0}]+", " ")', self.source)
+        self.assertIn("zoneExact := RcNormalizeZoneName(zoneName)", self.source)
 
-if __name__ == "__main__":
+    def test_dnipro_far_suburbs_detected_and_mapped_to_mudrogo_far(self):
+        self.assertIn("дослідне", self.source)
+        self.assertIn("краснопілля", self.source)
+        self.assertIn("мирне", self.source)
+        self.assertIn("дороге", self.source)
+
+    def test_increased_time_operator_warning_banner_and_tooltip(self):
+        self.assertIn('RcLastDeliveryMin > 90 || RcLastDeliveryKind == "FAR"', self.source)
+        self.assertIn("ЗБІЛЬШЕНИЙ ЧАС", self.source)
+        self.assertIn("ПОПЕРЕДИТИ КЛІЄНТА", self.source)
+        self.assertIn("ОБОВ'ЯЗКОВО ЗАТЕЛЕФОНУЙ КЛІЄНТУ", self.source)
+
+    def test_effective_delivery_time_adds_step_for_far_zones(self):
+        self.assertIn("outMinFar := centerMins + 30", self.source)
+        self.assertIn("if (farMins > centerMins)", self.source)
+
+
+if __name__ == '__main__':
     unittest.main()
-
-

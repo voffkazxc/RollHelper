@@ -276,6 +276,8 @@ global detectedCity    := ""   ; визначене місто
 global kitchenLine     := ""   ; готова рядок-плашка для пульта
 global hasKitchenAlert := 0    ; 1 якщо хоч одна точка міста ≠ ok
 global RcCurrentKitchen := ""   ; поточна кухня з RkKitchens.ini для часу/алертів
+global RcLastDeliveryMin := 0   ; останній розрахований час доставки (хв)
+global RcLastDeliveryKind := "" ; останній тип зони (STANDARD / FAR)
 global RcKitchenLastSyncTick := 0
 global RcKitchenSyncCooldownMs := 180000
 if (RcZonesModuleEnabled) {
@@ -1179,16 +1181,25 @@ RcFindKitchenFromText(text) {
     return ""
 }
 
+RcNormalizeZoneName(name) {
+    n := RegExReplace(name, "[\s\x{00A0}]+", " ")
+    return RegExReplace(n, "^[\s\x{00A0}]+|[\s\x{00A0}]+$", "")
+}
+
 RcKitchenFromKmlZone(zoneName) {
     global RcZoneMap
     if (!IsObject(RcZoneMap))
         RcLoadZoneMap()
-    zoneExact := Trim(zoneName)
+    zoneExact := RcNormalizeZoneName(zoneName)
     if (RcZoneMap.HasKey(zoneExact)) {
         return RcZoneMap[zoneExact]
     }
+    rawTrim := Trim(zoneName)
+    if (RcZoneMap.HasKey(rawTrim)) {
+        return RcZoneMap[rawTrim]
+    }
     ; fallback
-    zoneClean := Trim(RegExReplace(zoneName, "[\[\]]", ""))
+    zoneClean := Trim(RegExReplace(zoneExact, "[\[\]]", ""))
     type := RcDeliveryKindFromZone(zoneClean)
     dbgkterms := ""
     global Kitchens
@@ -1204,7 +1215,7 @@ RcKitchenFromKmlZone(zoneName) {
 RcDeliveryKindFromZone(zone) {
     z := zone
     StringLower, z, z
-    if (RegExMatch(z, "i)(даль|дал|збільш|підвищ|повыш|збільшеного|збільшена)"))
+    if (RegExMatch(z, "i)(даль|дал|збільш|підвищ|повыш|збільшеного|збільшена|пос\.|с\.|селище|село|краснопілля|дослідне|мирне|дороге|діївка|північний|придніпровськ|золоті\s*ключі|самарівка|пісочин|солоницівка|подвірки|надточії|покотилівка|бабаї|жихор|лелюки|хроли|угринів|вовчинець|угорники|микитинці)"))
         return "FAR"
     return "STANDARD"
 }
@@ -1213,14 +1224,11 @@ RcKitchenMinutes(kind, defaultMin) {
     global RcCurrentKitchen
     if (!IsObject(RcCurrentKitchen))
         return defaultMin
-    val := ""
     if (kind = "pickup")
-        val := RcCurrentKitchen.Pickup
-    else if (kind = "far")
-        val := RcCurrentKitchen.FarZone
-    else
-        val := RcCurrentKitchen.Center
-    return RcParseKitchenMinutes(val, defaultMin)
+        return RcParseKitchenMinutes(RcCurrentKitchen.Pickup, 40)
+    isFar := (kind = "far")
+    cRaw := "", fRaw := "", minFar := 0
+    return RcGetEffectiveTime(RcCurrentKitchen.Name, (isFar ? "FAR" : "STANDARD"), false, cRaw, fRaw, minFar)
 }
 
 RcParseKitchenMinutes(text, defaultMin) {
@@ -2250,11 +2258,9 @@ DrawRollclub:
     curY += 20
 
     ; Alerts
-    if (isFutureDate || hasFilaClub || hasBirthday || hasAllergy || promoFound != "" || hasCustomerReq || needCall || !isPost) {
-        Gui, Roll:Font, s8 bold c%RhC_Muted%, %RhFontName%
-        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200, ВАЖЛИВО
-        curY += 20
-    }
+    Gui, Roll:Font, s8 bold c%RhC_Muted%, %RhFontName%
+    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200, ВАЖЛИВО
+    curY += 20
     if (isFutureDate) {
         ; Сигнал — передзамовлення
         RcPlaySound("future")
@@ -2311,13 +2317,18 @@ DrawRollclub:
     }
     if (needCall) {
         Gui, Roll:Font, s9 bold cFFFFFF, %RhFontName%
-        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h22 Center +0x200 HwndhNeedCall, ПЕРЕДЗВОНИТИ КЛІЄНТУ
+        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h22 Center +0x200 HwndhNeedCall vRhCallAlert, ПЕРЕДЗВОНИТИ КЛІЄНТУ
         RhRegColor(hNeedCall, RhB_Red, RhB_White)
         curY += 28
     } else if (!isPost) {
         Gui, Roll:Font, s9 bold c%RhC_Text%, %RhFontName%
-        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h22 Center +0x200 HwndhNewClient, НОВИЙ КЛІЄНТ — зателефонуй
-        RhRegColor(hNewClient, RhB_StatusSoft, RhB_Text)
+        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h22 Center +0x200 HwndhNeedCall vRhCallAlert, НОВИЙ КЛІЄНТ — зателефонуй
+        RhRegColor(hNeedCall, RhB_StatusSoft, RhB_Text)
+        curY += 28
+    } else {
+        Gui, Roll:Font, s9 bold cFFFFFF, %RhFontName%
+        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h22 Center +0x200 HwndhNeedCall vRhCallAlert,
+        RhRegColor(hNeedCall, RhB_CardFill, RhB_Text)
         curY += 28
     }
     if (curY > 88)
@@ -4008,8 +4019,14 @@ HFinishOrder:
     }
     Sleep, 400
     kcPaused := 0
-    ToolTip, Confirmed + saved (UIA).
-    SetTimer, RemoveFinishTip, -2000
+    if (RcLastDeliveryMin > 90 || RcLastDeliveryKind == "FAR") {
+        ToolTip, ⚠ УВАГА: ЗБІЛЬШЕНИЙ ЧАС (%RcLastDeliveryMin% хв)!`nЗАМОВЛЕННЯ ЗБЕРЕЖЕНО — ОБОВ'ЯЗКОВО ЗАТЕЛЕФОНУЙ КЛІЄНТУ!, , , 2
+        SetTimer, RemoveFinishTip, -8000
+        RcPlaySound("notice")
+    } else {
+        ToolTip, Confirmed + saved (UIA).
+        SetTimer, RemoveFinishTip, -2000
+    }
 return
 
 ; ========================================================
@@ -4657,13 +4674,20 @@ FinishOrder:
     Sleep, 400
     
     kcPaused := 0
-    ToolTip, Confirmed + saved (IikoUI Driver).
-    SetTimer, RemoveFinishTip, -2000
+    if (RcLastDeliveryMin > 90 || RcLastDeliveryKind == "FAR") {
+        ToolTip, ⚠ УВАГА: ЗБІЛЬШЕНИЙ ЧАС (%RcLastDeliveryMin% хв)!`nЗАМОВЛЕННЯ ЗБЕРЕЖЕНО — ОБОВ'ЯЗКОВО ЗАТЕЛЕФОНУЙ КЛІЄНТУ!, , , 2
+        SetTimer, RemoveFinishTip, -8000
+        RcPlaySound("notice")
+    } else {
+        ToolTip, Confirmed + saved (IikoUI Driver).
+        SetTimer, RemoveFinishTip, -2000
+    }
     OpCoord_End(_opFinishToken, "ok", "finish_complete")
 return
 
 RemoveFinishTip:
     ToolTip
+    ToolTip, , , , 2
 return
 
 ; ── Пробити подарунок по PLU (кількість 1, ціна 0) ──
@@ -5552,9 +5576,21 @@ RcCheckZone:
             if (IsObject(mappedZone))
                 zType := mappedZone.Type
             _deliveryMin := RcGetEffectiveTime(RcCurrentKitchen.Name, zType, false, cRaw, fRaw, minFar)
+            RcLastDeliveryMin := _deliveryMin
+            RcLastDeliveryKind := zType
             GuiControl, Roll:, RhCalcDeliveryBtn, % "ДОСТ +" . _deliveryMin
             if (extractedTimeAuto && !hasPickup && !RcLastZoneUncertain)
                 RcSetReadyByMinutes(_deliveryMin)
+            if (_deliveryMin > 90 || zType == "FAR") {
+                _warnTime := "⚠ ЗБІЛЬШЕНИЙ ЧАС (" . _deliveryMin . " хв) — ПОПЕРЕДИТИ КЛІЄНТА!"
+                if (kAlertText != "")
+                    kAlertText := _warnTime . "   " . kAlertText
+                else
+                    kAlertText := _warnTime
+                GuiControl, Roll:, RhCallAlert, ⚠ ЗБІЛЬШЕНИЙ ЧАС (%_deliveryMin% хв) — ЗАТЕЛЕФОНУВАТИ!
+                RhRegColor(hNeedCall, RhB_Red, RhB_White)
+                DllCall("InvalidateRect", "Ptr", hNeedCall, "Ptr", 0, "Int", 1)
+            }
             if (RcLastZoneUncertain)
                 RhRegColor(hZoneBox, RhB_TintAmber, RhB_Text)
             else
@@ -5656,9 +5692,21 @@ RcApplyPointFallback(reasonText := "Адресу не знайдено") {
         kAlertText := parts
         
         _deliveryMin := RcGetEffectiveTime(RcCurrentKitchen.Name, "STANDARD", false, cRaw, fRaw, minFar)
+        RcLastDeliveryMin := _deliveryMin
+        RcLastDeliveryKind := "STANDARD"
         GuiControl, Roll:, RhCalcDeliveryBtn, % "ДОСТ +" . _deliveryMin
         if (extractedTimeAuto && !hasPickup)
             RcSetReadyByMinutes(_deliveryMin)
+        if (_deliveryMin > 90) {
+            _warnTime := "⚠ ЗБІЛЬШЕНИЙ ЧАС (" . _deliveryMin . " хв) — ПОПЕРЕДИТИ КЛІЄНТА!"
+            if (kAlertText != "")
+                kAlertText := _warnTime . "   " . kAlertText
+            else
+                kAlertText := _warnTime
+            GuiControl, Roll:, RhCallAlert, ⚠ ЗБІЛЬШЕНИЙ ЧАС (%_deliveryMin% хв) — ЗАТЕЛЕФОНУВАТИ!
+            RhRegColor(hNeedCall, RhB_Red, RhB_White)
+            DllCall("InvalidateRect", "Ptr", hNeedCall, "Ptr", 0, "Int", 1)
+        }
             
         result := "⚠ ТОЧКА: " . RcCurrentKitchen.Name . " (перевір адресу)"
         GuiControl, Roll:, MapSearch, %result%
@@ -5968,8 +6016,14 @@ RcLoadZoneMap() {
         IniRead, n, %mapPath%, %sec%, Name
         IniRead, k, %mapPath%, %sec%, Kitchen
         IniRead, t, %mapPath%, %sec%, Type
-        if (n != "" && n != "ERROR")
-            RcZoneMap[n] := {Kitchen: k, Type: t}
+        if (n != "" && n != "ERROR") {
+            normN := RcNormalizeZoneName(n)
+            normK := Trim(k)
+            normT := Trim(t)
+            RcZoneMap[normN] := {Kitchen: normK, Type: normT}
+            if (normN != n)
+                RcZoneMap[n] := {Kitchen: normK, Type: normT}
+        }
     }
 }
 
@@ -6020,7 +6074,7 @@ RcLoadKml(kmlPath) {
     Loop % placemarks.length {
         pm := placemarks.item(A_Index - 1)
         nameNode := pm.selectSingleNode(".//*[local-name()='name']")
-        zoneName := (nameNode) ? Trim(RegExReplace(nameNode.text, "[\r\n]+", " ")) : ("Зона " A_Index)
+        zoneName := (nameNode) ? RcNormalizeZoneName(nameNode.text) : ("Зона " A_Index)
         coordNode := pm.selectSingleNode(".//*[local-name()='coordinates']")
         if (!coordNode)
             continue
