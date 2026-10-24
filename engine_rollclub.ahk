@@ -1767,7 +1767,7 @@ SilentMagicClean:
     }
 
     ; --- Адресні нотатки: явні маркери ---
-    if RegExMatch(workComment, "i)(*UCP)(?:Коментар|Комментарий)\s+до?\s*адреси?:\s*(.*?)(?=\s*(?:(?:Підготувати\s+)?(?:решт[ау]|сдач[ау])|без\s+решт|без\s+здач|\b(?:Готівкою|Картою|ОПЛАЧЕНО|QR\s*code)\b|Купон:|Подарунок:|Промокод:|Прибори:|Звичайні:|Учбові:|Найближчим|Самовивіз|\b(?:Фоп|ФОП|FOP)\b|\d{4}-\d{2}-\d{2}|$))", mAddr)
+    if RegExMatch(workComment, "i)(*UCP)(?:Коментар|Комментарий)\s+(?:до?|к)\s*адрес[иу]?:\s*(.*?)(?=\s*(?:(?:Підготувати\s+)?(?:решт[ау]|сдач[ау])|без\s+решт|без\s+здач|\b(?:Готівкою|Картою|ОПЛАЧЕНО|QR\s*code)\b|Купон:|Подарунок:|Промокод:|Прибори:|Звичайні:|Учбові:|Найближчим|Самовивіз|\b(?:Фоп|ФОП|FOP)\b|\d{4}-\d{2}-\d{2}|$))", mAddr)
         addrNote := Trim(mAddr1)
     if RegExMatch(workComment, "i)(*UCP)(?<![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])доставка:\s*(.*?)(?=\s*(?:Купон:|Подарунок:|Прибори:|Найближчим|Самовивіз|\b(?:Фоп|ФОП|FOP)\b|\d{4}-\d{2}-\d{2}|$))", mDel) {
         cand := Trim(mDel1)
@@ -1783,10 +1783,11 @@ SilentMagicClean:
     textForAddr := RegExReplace(textForAddr, "i)(?<![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])(Mob|Сайт)(?![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])", " ")
     textForAddr := RegExReplace(textForAddr, "i)!!!ПЕРШЕМОБ", " ")
     textForAddr := RegExReplace(textForAddr, "i)(Передзвонити|Перетелефонувати)", " ")
-    textForAddr := RegExReplace(textForAddr, "i)---ОПЛАЧЕНО---", " ")
+    textForAddr := RegExReplace(textForAddr, "-{2,}[^-]+-{2,}|-{2,}", " ")
     textForAddr := RegExReplace(textForAddr, "i)Картою[^№\r\n]*№\s*\d+", " ")
+    textForAddr := RegExReplace(textForAddr, "i)(?:на\s+сайті|на\s+сайте)\s*№?\s*\d*", " ")
     textForAddr := RegExReplace(textForAddr, "i)Готівкою\s*№\s*\d+", " ")
-    textForAddr := RegExReplace(textForAddr, "i)ОПЛАЧЕНО\s*№\s*\d+", " ")
+    textForAddr := RegExReplace(textForAddr, "i)ОПЛАЧЕНО\s*№?\s*\d*", " ")
     textForAddr := RegExReplace(textForAddr, "i)QR\s*code\s*№?\s*\d+", " ")
     textForAddr := RegExReplace(textForAddr, "№\s*\d+", " ")
     textForAddr := RegExReplace(textForAddr, "\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2})?", " ")
@@ -1802,7 +1803,7 @@ SilentMagicClean:
     textForAddr := RegExReplace(textForAddr, "i)Найближчим\s+часом", " ")
     textForAddr := RegExReplace(textForAddr, "i)Самовивіз:\s*[^\.\r\n]+?(?=(?:Знижка|Доставка|Прибори|Купон|Подарунок|$))", " ")
     ; Прибираємо "Коментар до адреси:" — вже оброблений явним маркером, не дублюємо
-    textForAddr := RegExReplace(textForAddr, "i)(?:Коментар|Комментарий)\s+до?\s*адреси?:.*?(?=(?:\||Купон:|Подарунок:|Прибори:|Знижка|Найближчим|Самовивіз|\d{4}-\d{2}|$))", " ")
+    textForAddr := RegExReplace(textForAddr, "i)(?:Коментар|Комментарий)\s+(?:до?|к)\s*адрес[иу]?:.*?(?=(?:\||Купон:|Подарунок:|Прибори:|Знижка|Найближчим|Самовивіз|\d{4}-\d{2}|$))", " ")
     ; Прибираємо назву вулиці з кінця — вона вже пішла в перевірку адреси, тут шум
     _stTypesRegex := "вул\.?|вулиця|просп\.?|проспект|пров\.?|провулок|шосе|бульв\.?|бульвар|набережна|узвіз|площа|майдан|тупик|проїзд|алея"
     textForAddr := RegExReplace(textForAddr, "i)(*UCP)(?:\b(?:" . _stTypesRegex . ")\s+)?(?:[А-ЯІЇЄҐа-яіїєґ0-9\'\-]+\s*){1,4}(?:\b(?:" . _stTypesRegex . ")\b)?\s*(?:\([^)]*\))?\s*$", " ")
@@ -1956,7 +1957,7 @@ SilentMagicClean:
                             if (addrLow == pValLow || InStr(addrLow, pValLow)) {
                                 ; вже є в addrNote
                             } else if (InStr(pValLow, addrLow)) {
-                                addrNote := pVal
+                                ; addrNote чистіший та коротший — зберігаємо addrNote
                             } else {
                                 addrNote := addrNote . " | " . pVal
                             }
@@ -4965,11 +4966,22 @@ RcCleanAddressNote(note, rawAddress := "", commentStreet := "") {
 
         ; Зрізаємо блок ФОП (наприклад: "Фоп Пруднікова О.А. вул." або "ФОП Богатий П.О.")
         p := RegExReplace(p, "i)(*UCP)\b(?:Фоп|ФОП|FOP)\b[\s\S]*?(?=(?:\||$))", "")
+        ; Зрізаємо службові маркери, скобки, тире, Mob/Сайт
+        p := RegExReplace(p, "i)(*UCP)\bПост-\d+\b", " ")
+        p := RegExReplace(p, "i)(*UCP)(?<![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])(?:Mob|Сайт)(?![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])", " ")
+        p := RegExReplace(p, "i)(*UCP)!!!ПЕРШЕМОБ", " ")
+        p := RegExReplace(p, "-{2,}[^-]+-{2,}|-{2,}", " ")
         ; Зрізаємо коментарі оплати та решти
         p := RegExReplace(p, "i)(*UCP)\b(?:підготувати\s+)?решт[ау]\s*(?:з|с)?\s*\d+\b", " ")
         p := RegExReplace(p, "i)(*UCP)\bсдач[ау]\s*(?:з|с)?\s*\d+\b", " ")
         p := RegExReplace(p, "i)(*UCP)\bбез\s+(?:решт[аи]?|здач[іе]?)\b", " ")
         p := RegExReplace(p, "i)(*UCP)\b(?:Готівкою|Картою|ОПЛАЧЕНО|QR\s*code)\b(?:\s*№\s*\d+)?", " ")
+        p := RegExReplace(p, "i)(*UCP)(?:на\s+сайті|на\s+сайте)\s*№?\s*\d*", " ")
+        p := RegExReplace(p, "№\s*\d+", " ")
+        ; Зрізаємо службові префікси адресного коментаря
+        p := RegExReplace(p, "i)(*UCP)(?:Коментар|Комментарий)\s+(?:до?|к)\s*адрес[иу]?:?\s*", " ")
+        p := RegExReplace(p, "i)(*UCP)\bдоставка:?\s*", " ")
+        p := RegExReplace(p, "i)(*UCP)\bНайближчим\s+часом\b", " ")
         ; Зрізаємо дати та час
         p := RegExReplace(p, "\b\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2})?\b", " ")
         p := RegExReplace(p, "(?<!\d)\d{1,2}:\d{2}(?!\d)", " ")
@@ -4979,7 +4991,7 @@ RcCleanAddressNote(note, rawAddress := "", commentStreet := "") {
         p := RegExReplace(p, "i)(*UCP)^\s*(?:вул\.?|вулиця|просп\.?|проспект|пров\.?|провулок|буд\.?)\s*", "")
         p := RegExReplace(p, "i)(*UCP)\s*(?:\bвул\.?|вулиця|\bпросп\.?|проспект|\bпров\.?|провулок|\bбуд\.?)\s*$", "")
         p := RegExReplace(p, "\s+", " ")
-        p := Trim(p, " `t`r`n,.-")
+        p := Trim(p, " `t`r`n,.-–—|")
 
         if (p = "")
             continue
@@ -5001,11 +5013,16 @@ RcCleanAddressNote(note, rawAddress := "", commentStreet := "") {
         for idx, existP in cleanParts {
             exLow := existP
             StringLower, exLow, exLow
-            if (pLow == exLow || InStr(exLow, pLow)) {
+            if (pLow == exLow) {
+                isDup := 1
+                break
+            } else if (InStr(exLow, pLow)) {
+                ; p коротший та чистіший — замінюємо existP на p
+                cleanParts[idx] := p
                 isDup := 1
                 break
             } else if (InStr(pLow, exLow)) {
-                cleanParts[idx] := p
+                ; existP коротший та чистіший — зберігаємо existP
                 isDup := 1
                 break
             }

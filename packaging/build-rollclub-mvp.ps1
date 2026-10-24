@@ -172,7 +172,7 @@ $startScript = @"
 setlocal
 cd /d "%~dp0"
 for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":5000 " ^| findstr LISTENING') do taskkill /PID %%a /F >nul 2>&1
-timeout /t 1 /nobreak >nul
+ping 127.0.0.1 -n 2 >nul
 start "RollClub Server" /min "%~dp0runtime\python\pythonw.exe" "%~dp0server\app.py"
 start "RollClub" "%~dp0RollHelper\AutoHotkeyU64.exe" "%~dp0RollHelper\engine_rollclub.ahk"
 endlocal
@@ -183,7 +183,7 @@ $restartServerScript = @"
 @echo off
 setlocal
 for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":5000 " ^| findstr LISTENING') do taskkill /PID %%a /F >nul 2>&1
-timeout /t 1 /nobreak >nul
+ping 127.0.0.1 -n 2 >nul
 start "RollClub Server" /min "%~dp0runtime\python\pythonw.exe" "%~dp0server\app.py"
 endlocal
 "@

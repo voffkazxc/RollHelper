@@ -50,13 +50,25 @@ def rc_clean_address_note(note: str, raw_address: str = "", comment_street: str 
         if not p:
             continue
 
-        # Strip FOP block (e.g. "Фоп Пруднікова О.А. вул." or "ФОП Богатий П.О.")
+        # Strip FOP block (e.g. "Фоп Пруднікова О.А. вул." або "ФОП Богатий П.О.")
         p = re.sub(r'(?i)\b(?:Фоп|ФОП|FOP)\b.*?(?=\||$)', '', p).strip()
+        # Strip service tags, post numbers, mob/site
+        p = re.sub(r'(?i)\bПост-\d+\b', ' ', p)
+        p = re.sub(r'(?i)\b(?:Mob|Сайт)\b', ' ', p)
+        p = re.sub(r'(?i)!!!ПЕРШЕМОБ', ' ', p)
+        # Strip dashes / brackets ("--- ---", "---ОПЛАЧЕНО---")
+        p = re.sub(r'-{2,}[^-]+-{2,}|-{2,}', ' ', p)
         # Strip payment / cash change
         p = re.sub(r'(?i)\b(?:підготувати\s+)?решт[ау]\s*(?:з|с)?\s*\d+\b', ' ', p)
         p = re.sub(r'(?i)\bсдач[ау]\s*(?:з|с)?\s*\d+\b', ' ', p)
         p = re.sub(r'(?i)\bбез\s+(?:решт[аи]?|здач[іе]?)\b', ' ', p)
         p = re.sub(r'(?i)\b(?:готівкою|картою|оплачено|qr\s*code)\b(?:\s*№\s*\d+)?', ' ', p)
+        p = re.sub(r'(?i)(?:на\s+сайті|на\s+сайте)\s*№?\s*\d*', ' ', p)
+        p = re.sub(r'№\s*\d+', ' ', p)
+        # Strip comment prefixes
+        p = re.sub(r'(?i)(?:Коментар|Комментарий)\s+(?:до?|к)\s*адрес[иу]?:?\s*', ' ', p)
+        p = re.sub(r'(?i)\bдоставка:?\s*', ' ', p)
+        p = re.sub(r'(?i)\bНайближчим\s+часом\b', ' ', p)
         # Strip dates and times
         p = re.sub(r'\b\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2})?\b', ' ', p)
         p = re.sub(r'(?<!\d)\d{1,2}:\d{2}(?!\d)', ' ', p)
@@ -67,7 +79,7 @@ def rc_clean_address_note(note: str, raw_address: str = "", comment_street: str 
         p = re.sub(r'(?i)^\s*(?:вул\.?|вулиця|просп\.?|проспект|пров\.?|провулок|буд\.?)\s*', '', p)
         p = re.sub(r'(?i)\s*(?:\bвул\.?|вулиця|\bпросп\.?|проспект|\bпров\.?|провулок|\bбуд\.?)\s*$', '', p)
         p = re.sub(r'\s+', ' ', p)
-        p = p.strip(" \t\r\n,.-")
+        p = p.strip(" \t\r\n,.-–—|")
 
         if not p:
             continue
@@ -83,11 +95,16 @@ def rc_clean_address_note(note: str, raw_address: str = "", comment_street: str 
         is_dup = False
         for idx, exist_p in enumerate(clean_parts):
             ex_low = exist_p.lower()
-            if p_low == ex_low or p_low in ex_low:
+            if p_low == ex_low:
+                is_dup = True
+                break
+            elif p_low in ex_low:
+                # p is a shorter cleaner substring of exist_p
+                clean_parts[idx] = p
                 is_dup = True
                 break
             elif ex_low in p_low:
-                clean_parts[idx] = p
+                # exist_p is already cleaner and shorter than p
                 is_dup = True
                 break
         if not is_dup:
@@ -212,6 +229,25 @@ class TestAddressNoteClean(unittest.TestCase):
         self.assertEqual(res['kitchenNote'], '')
         self.assertEqual(res['infoText'], '')
         self.assertEqual(res['addrNote'], '')
+
+    def test_user_screenshot_order_802644_clean(self):
+        # Screenshot case: order 802644 with ---ОПЛАЧЕНО--- / --- --- and "Комментарий к адресу:"
+        comment = "Пост-6 Mob ---ОПЛАЧЕНО--- Картою на сайті №802644 Комментарий к адресу: Набрать за три минуты . Не работает домофон Найближчим часом Фоп Водолазький А.В. Днепровская набережная"
+        res = parse_comment(comment)
+        self.assertEqual(res['addrNote'], "Набрать за три минуты . Не работает домофон")
+        self.assertEqual(res['kitchenNote'], "")
+        self.assertEqual(res['isPost'], 1)
+        self.assertEqual(res['postNum'], "6")
+
+    def test_leftover_dashes_in_address_note_cleaned(self):
+        note = "Пост-6 Mob --- --- на сайті №802644 Комментарий к адресу: Набрать за три минуты . Не работает домофон"
+        cleaned = rc_clean_address_note(note)
+        self.assertEqual(cleaned, "Набрать за три минуты . Не работает домофон")
+
+    def test_dedup_does_not_overwrite_clean_with_noisy_note(self):
+        note = "Набрать за три минуты . Не работает домофон | Пост-6 Mob --- --- на сайті №802644 Комментарий к адресу: Набрать за три минуты . Не работает домофон"
+        cleaned = rc_clean_address_note(note)
+        self.assertEqual(cleaned, "Набрать за три минуты . Не работает домофон")
 
 if __name__ == '__main__':
     unittest.main()
