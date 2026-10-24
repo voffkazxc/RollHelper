@@ -254,6 +254,13 @@ global addrMismatch    := 0    ; 1 = вулиця в коменті ≠ адре
 global commentStreet   := ""   ; вулиця витягнута з коментаря
 global blockedHit      := 0    ; 1 = адреса на перекритій вулиці (brands/rollclub/BlockedStreets.txt)
 global blockedInfo     := ""   ; текст плашки: "Вулиця — ділянка"
+global timeConflictPlaque := ""
+global timeCallAlert     := ""
+global timeWarnInlineText := ""
+global RcTimeConflictWarning := ""
+global timeReqText       := ""
+global hTimeAlert        := 0
+global hTimeWarnInline   := 0
 
 OnMessage(0x0138, "WM_CTLCOLORSTATIC")
 global RhStaticColors := {}
@@ -526,6 +533,26 @@ TriggerMain:
     else
         ToolTip, % "🖱 Прочитано КЛІКОМ (UIA/Сервер недоступні)", 30, 30
     SetTimer, RcRemoveTip, -2500
+
+    ; Читання поточної точки/концепції для раннього визначення кухні
+    _curPoint := ""
+    _curConcept := ""
+    if (RH_SERVER_OK || RhPing()) {
+        _idResp := RhGet("/api/iiko/read_identity_fast", 800)
+        if (RegExMatch(_idResp, """point""\s*:\s*""([^""]*)""", _mPt))
+            _curPoint := StrReplace(Trim(_mPt1), "\u0022", """")
+        if (RegExMatch(_idResp, """concept""\s*:\s*""([^""]*)""", _mCp))
+            _curConcept := StrReplace(Trim(_mCp1), "\u0022", """")
+    }
+    if (_curPoint == "") {
+        try _curPoint := RcUiaGetText("Точка", "lookUpEditDeliveryTerminal")
+    }
+    if (_curConcept == "") {
+        try _curConcept := RcUiaGetText("Концепція", "restoCompletionConception")
+    }
+    if (_curPoint != "" || _curConcept != "") {
+        RcCurrentKitchen := RcFindKitchenFromPointOrConcept(_curPoint, _curConcept)
+    }
 
     GoSub, SilentMagicClean
     GoSub, DetectKitchenStatus
@@ -1326,6 +1353,93 @@ RcSetReadyByMinutes(minutes) {
     GuiControl, Roll:, ReadyTimeM, % Format("{:02}", MM)
 }
 
+RcApplyTimeEvaluation(minNeeded, zType := "STANDARD") {
+    global timeReqText, extractedTimeAuto, hasPickup, isFutureDate
+    global timeConflictPlaque, timeCallAlert, timeWarnInlineText, RcTimeConflictWarning, needCall
+    global hTimeAlert, hNeedCall, hTimeWarnInline, RhB_Red, RhB_White
+
+    if (isFutureDate || minNeeded == "стоп" || minNeeded <= 0)
+        return
+
+    standardThreshold := hasPickup ? 40 : 90
+    curMins := A_Hour * 60 + A_Min
+
+    if (timeReqText != "") {
+        timeParts := StrSplit(timeReqText, ":")
+        reqH := timeParts[1] + 0
+        reqM := timeParts[2] + 0
+        reqMins := reqH * 60 + reqM
+        diffMins := reqMins - curMins
+        if (diffMins < -720)
+            diffMins += 1440
+        else if (diffMins > 720)
+            diffMins -= 1440
+
+        if (diffMins < 0 || diffMins < minNeeded) {
+            RcSetReadyByMinutes(minNeeded)
+            tHH := A_Hour + 0
+            tMM := A_Min + minNeeded
+            tHH += Floor(tMM / 60)
+            tMM := Mod(tMM, 60)
+            tHH := Mod(tHH, 24)
+            targetTime := Format("{:02}:{:02}", tHH, tMM)
+
+            if (diffMins < 0) {
+                timeConflictPlaque := "⚠ ЧАС КЛІЄНТА (" . timeReqText . ") МЕНШИЙ ЗА ПОТОЧНИЙ!`nВИСТАВЛЕНО " . targetTime . " (+" . minNeeded . " хв) — УЗГОДИТИ!"
+                timeCallAlert := "⚠ УЗГОДИТИ ЧАС (" . timeReqText . " ➔ " . targetTime . ") — ЗАТЕЛЕФОНУВАТИ!"
+                timeWarnInlineText := "⚠ Час минув (" . timeReqText . ")!"
+                RcTimeConflictWarning := "Увага! Клієнт вказав час менший за поточний (" . timeReqText . "). Виставлено мінімальний час кухні: " . targetTime . " (+" . minNeeded . " хв). Обов'язково узгодьте з клієнтом!"
+            } else {
+                timeConflictPlaque := "⚠ ЧАС КЛІЄНТА (" . timeReqText . ") < КУХНІ (" . minNeeded . " хв)!`nВИСТАВЛЕНО " . targetTime . " — УЗГОДИТИ!"
+                timeCallAlert := "⚠ УЗГОДИТИ ЧАС (" . timeReqText . " ➔ " . targetTime . ") — ЗАТЕЛЕФОНУВАТИ!"
+                timeWarnInlineText := "⚠ Менше кухні (" . timeReqText . ")!"
+                RcTimeConflictWarning := "Увага! Клієнт просив на " . timeReqText . ", але кухні потрібно " . minNeeded . " хв. Виставлено: " . targetTime . ". Обов'язково узгодьте з клієнтом!"
+            }
+            needCall := 1
+            RcPlaySound("warn")
+        } else if (minNeeded > standardThreshold || zType == "FAR") {
+            timeConflictPlaque := "⚠ ЗБІЛЬШЕНИЙ ЧАС КУХНІ (" . minNeeded . " хв)!`nПОПЕРЕДИТИ КЛІЄНТА!"
+            timeCallAlert := "⚠ ЗБІЛЬШЕНИЙ ЧАС (" . minNeeded . " хв) — ЗАТЕЛЕФОНУВАТИ!"
+            timeWarnInlineText := "⚠ Збільшений (" . minNeeded . " хв)"
+            RcTimeConflictWarning := "Увага! На кухні збільшений час: " . minNeeded . " хв (клієнт вказав " . timeReqText . "). Обов'язково узгодьте з клієнтом!"
+            needCall := 1
+            RcPlaySound("warn")
+        }
+    } else {
+        if (extractedTimeAuto && !hasPickup)
+            RcSetReadyByMinutes(minNeeded)
+        tHH := A_Hour + 0
+        tMM := A_Min + minNeeded
+        tHH += Floor(tMM / 60)
+        tMM := Mod(tMM, 60)
+        tHH := Mod(tHH, 24)
+        targetTime := Format("{:02}:{:02}", tHH, tMM)
+
+        if (minNeeded > standardThreshold || zType == "FAR") {
+            timeConflictPlaque := "⚠ ЗБІЛЬШЕНИЙ ЧАС КУХНІ (" . minNeeded . " хв)!`nВИСТАВЛЕНО " . targetTime . " — УЗГОДИТИ!"
+            timeCallAlert := "⚠ ЗБІЛЬШЕНИЙ ЧАС (" . minNeeded . " хв) — ЗАТЕЛЕФОНУВАТИ!"
+            timeWarnInlineText := "⚠ Збільшений (" . minNeeded . " хв)"
+            RcTimeConflictWarning := "Увага! На кухні збільшений час: " . minNeeded . " хв. Виставлено: " . targetTime . ". Обов'язково зателефонуйте клієнту!"
+            needCall := 1
+            RcPlaySound("warn")
+        }
+    }
+
+    if (hTimeAlert) {
+        GuiControl, Roll:, RhTimeAlert, %timeConflictPlaque%
+        DllCall("InvalidateRect", "Ptr", hTimeAlert, "Ptr", 0, "Int", 1)
+    }
+    if (hNeedCall && timeCallAlert != "") {
+        GuiControl, Roll:, RhCallAlert, %timeCallAlert%
+        RhRegColor(hNeedCall, RhB_Red, RhB_White)
+        DllCall("InvalidateRect", "Ptr", hNeedCall, "Ptr", 0, "Int", 1)
+    }
+    if (hTimeWarnInline) {
+        GuiControl, Roll:, TimeWarnInline, %timeWarnInlineText%
+        DllCall("InvalidateRect", "Ptr", hTimeWarnInline, "Ptr", 0, "Int", 1)
+    }
+}
+
 DetectKitchenStatus:
     detectedCity    := ""
     kitchenLine     := ""
@@ -1418,6 +1532,13 @@ SilentMagicClean:
     infoText     := ""
     addrNote     := ""
     extractedTime:= ""
+    timeConflictPlaque := ""
+    timeCallAlert := ""
+    timeWarnInlineText := ""
+    RcTimeConflictWarning := ""
+    timeReqText  := ""
+    hTimeAlert   := 0
+    hTimeWarnInline := 0
     clientChange := ""
     cardText     := ""
     cleanComment := ""
@@ -1649,23 +1770,81 @@ SilentMagicClean:
     }
 
     ; --- Час ---
-    if (hasPickup) {
-        if (pickupPoint != "")
-            RcCurrentKitchen := RcFindKitchenFromText(pickupPoint)
-        if (!IsObject(RcCurrentKitchen))
-            RcCurrentKitchen := RcFindKitchenFromText(workComment)
+    if (!IsObject(RcCurrentKitchen)) {
+        if (hasPickup) {
+            if (pickupPoint != "")
+                RcCurrentKitchen := RcFindKitchenFromText(pickupPoint)
+            if (!IsObject(RcCurrentKitchen))
+                RcCurrentKitchen := RcFindKitchenFromText(workComment)
+        } else {
+            RcCurrentKitchen := RcFindKitchenFromText(rawAddress)
+            if (!IsObject(RcCurrentKitchen))
+                RcCurrentKitchen := RcFindKitchenFromText(workComment)
+        }
     }
+
+    minNeeded := hasPickup ? RcKitchenMinutes("pickup", 40) : RcKitchenMinutes("center", 90)
+    if (minNeeded == "стоп" || minNeeded <= 0)
+        minNeeded := hasPickup ? 40 : 90
+    standardThreshold := hasPickup ? 40 : 90
+
     if (isFutureDate) {
         extractedTime := ""   ; передзамовлення — час вже виставлений в CRM, не чіпаємо
+        extractedTimeAuto := 0
     } else {
-        ; Конкретний час у коментарі — беремо його
+        ; Конкретний час у коментарі — перевіряємо на конфлікт із поточним часом та кухнею
         RegExMatch(workComment, "(\d{2}:\d{2})", timeMatch)
         if (timeMatch1 != "") {
-            extractedTime := timeMatch1
-            extractedTimeAuto := 0
+            timeReqText := timeMatch1
+            timeParts := StrSplit(timeMatch1, ":")
+            reqH := timeParts[1] + 0
+            reqM := timeParts[2] + 0
+            curMins := A_Hour * 60 + A_Min
+            reqMins := reqH * 60 + reqM
+            diffMins := reqMins - curMins
+            if (diffMins < -720)
+                diffMins += 1440
+            else if (diffMins > 720)
+                diffMins -= 1440
+
+            if (diffMins < 0 || diffMins < minNeeded) {
+                readyOffset := minNeeded
+                tHH := A_Hour + 0
+                tMM := A_Min + readyOffset
+                tHH += Floor(tMM / 60)
+                tMM := Mod(tMM, 60)
+                tHH := Mod(tHH, 24)
+                extractedTime := Format("{:02}:{:02}", tHH, tMM)
+                extractedTimeAuto := 0
+
+                if (diffMins < 0) {
+                    timeConflictPlaque := "⚠ ЧАС КЛІЄНТА (" . timeMatch1 . ") МЕНШИЙ ЗА ПОТОЧНИЙ!`nВИСТАВЛЕНО " . extractedTime . " (+" . minNeeded . " хв) — УЗГОДИТИ!"
+                    timeCallAlert := "⚠ УЗГОДИТИ ЧАС (" . timeMatch1 . " ➔ " . extractedTime . ") — ЗАТЕЛЕФОНУВАТИ!"
+                    timeWarnInlineText := "⚠ Час минув (" . timeMatch1 . ")!"
+                    RcTimeConflictWarning := "Увага! Клієнт вказав час менший за поточний (" . timeMatch1 . "). Виставлено мінімальний час кухні: " . extractedTime . " (+" . minNeeded . " хв). Обов'язково узгодьте з клієнтом!"
+                } else {
+                    timeConflictPlaque := "⚠ ЧАС КЛІЄНТА (" . timeMatch1 . ") < КУХНІ (" . minNeeded . " хв)!`nВИСТАВЛЕНО " . extractedTime . " — УЗГОДИТИ!"
+                    timeCallAlert := "⚠ УЗГОДИТИ ЧАС (" . timeMatch1 . " ➔ " . extractedTime . ") — ЗАТЕЛЕФОНУВАТИ!"
+                    timeWarnInlineText := "⚠ Менше кухні (" . timeMatch1 . ")!"
+                    RcTimeConflictWarning := "Увага! Клієнт просив на " . timeMatch1 . ", але кухні потрібно " . minNeeded . " хв. Виставлено: " . extractedTime . ". Обов'язково узгодьте з клієнтом!"
+                }
+                needCall := 1
+                RcPlaySound("warn")
+            } else {
+                extractedTime := timeMatch1
+                extractedTimeAuto := 0
+                if (minNeeded > standardThreshold) {
+                    timeConflictPlaque := "⚠ ЗБІЛЬШЕНИЙ ЧАС КУХНІ (" . minNeeded . " хв)!`nПОПЕРЕДИТИ КЛІЄНТА!"
+                    timeCallAlert := "⚠ ЗБІЛЬШЕНИЙ ЧАС (" . minNeeded . " хв) — ЗАТЕЛЕФОНУВАТИ!"
+                    timeWarnInlineText := "⚠ Збільшений (" . minNeeded . " хв)"
+                    RcTimeConflictWarning := "Увага! На кухні збільшений час: " . minNeeded . " хв (клієнт вказав " . timeMatch1 . "). Обов'язково узгодьте з клієнтом!"
+                    needCall := 1
+                    RcPlaySound("warn")
+                }
+            }
         } else {
-            ; Самовивіз/доставка — з Google Sheet/RkKitchens.ini, якщо є; інакше старий fallback.
-            readyOffset := hasPickup ? RcKitchenMinutes("pickup", 40) : RcKitchenMinutes("center", 90)
+            ; Самовивіз/доставка — найближчий час з Google Sheet/RkKitchens.ini
+            readyOffset := minNeeded
             tHH := A_Hour + 0
             tMM := A_Min + readyOffset
             tHH += Floor(tMM / 60)
@@ -1673,6 +1852,15 @@ SilentMagicClean:
             tHH := Mod(tHH, 24)
             extractedTime := Format("{:02}:{:02}", tHH, tMM)
             extractedTimeAuto := 1
+
+            if (minNeeded > standardThreshold) {
+                timeConflictPlaque := "⚠ ЗБІЛЬШЕНИЙ ЧАС КУХНІ (" . minNeeded . " хв)!`nВИСТАВЛЕНО " . extractedTime . " — УЗГОДИТИ!"
+                timeCallAlert := "⚠ ЗБІЛЬШЕНИЙ ЧАС (" . minNeeded . " хв) — ЗАТЕЛЕФОНУВАТИ!"
+                timeWarnInlineText := "⚠ Збільшений (" . minNeeded . " хв)"
+                RcTimeConflictWarning := "Увага! На кухні збільшений час: " . minNeeded . " хв. Виставлено: " . extractedTime . ". Обов'язково зателефонуйте клієнту!"
+                needCall := 1
+                RcPlaySound("warn")
+            }
         }
     }
 
@@ -2303,6 +2491,12 @@ DrawRollclub:
         RhRegColor(hAllergy, RhB_Red, RhB_White)
         curY += 28
     }
+    if (timeConflictPlaque != "") {
+        Gui, Roll:Font, s8 bold cFFFFFF, %RhFontName%
+        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h30 Center HwndhTimeAlert vRhTimeAlert, %timeConflictPlaque%
+        RhRegColor(hTimeAlert, RhB_Red, RhB_White)
+        curY += 34
+    }
     if (hasFilaClub) {
         Gui, Roll:Font, s8 bold c%RhC_Text%, %RhFontName%
         Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h22 Center +0x200 HwndhFila, FILA CLUB
@@ -2340,13 +2534,17 @@ DrawRollclub:
     }
     if (needCall) {
         Gui, Roll:Font, s9 bold cFFFFFF, %RhFontName%
-        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h22 Center +0x200 HwndhNeedCall vRhCallAlert, ПЕРЕДЗВОНИТИ КЛІЄНТУ
+        _callTxt := (timeCallAlert != "") ? timeCallAlert : "ПЕРЕДЗВОНИТИ КЛІЄНТУ"
+        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h22 Center +0x200 HwndhNeedCall vRhCallAlert, %_callTxt%
         RhRegColor(hNeedCall, RhB_Red, RhB_White)
         curY += 28
     } else if (!isPost) {
         Gui, Roll:Font, s9 bold c%RhC_Text%, %RhFontName%
-        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h22 Center +0x200 HwndhNeedCall vRhCallAlert, НОВИЙ КЛІЄНТ — зателефонуй
-        RhRegColor(hNeedCall, RhB_StatusSoft, RhB_Text)
+        _callTxt := (timeCallAlert != "") ? timeCallAlert : "НОВИЙ КЛІЄНТ — зателефонуй"
+        _callColor := (timeCallAlert != "") ? RhB_Red : RhB_StatusSoft
+        _callFg := (timeCallAlert != "") ? RhB_White : RhB_Text
+        Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h22 Center +0x200 HwndhNeedCall vRhCallAlert, %_callTxt%
+        RhRegColor(hNeedCall, _callColor, _callFg)
         curY += 28
     } else {
         Gui, Roll:Font, s9 bold cFFFFFF, %RhFontName%
@@ -2466,8 +2664,11 @@ DrawRollclub:
 
     ; Time block
     Gui, Roll:Font, s8 bold c%RhC_Muted%, %RhFontName%
-    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200 vLblTime HwndhC3, ЧАС ГОТОВНОСТІ
+    Gui, Roll:Add, Text, x%x0% y%curY% w130 h16 +0x200 vLblTime HwndhC3, ЧАС ГОТОВНОСТІ
     ControlsToMove.Push(hC3)
+    Gui, Roll:Font, s8 bold cRed, %RhFontName%
+    Gui, Roll:Add, Text, x150 y%curY% w194 h16 +0x200 Right vTimeWarnInline HwndhTimeWarnInline, %timeWarnInlineText%
+    ControlsToMove.Push(hTimeWarnInline)
     curY += 20
     timeParts := StrSplit(extractedTime, ":")
     timeH := timeParts[1]
@@ -4042,10 +4243,11 @@ HFinishOrder:
     }
     Sleep, 400
     kcPaused := 0
-    if (RcLastDeliveryMin > 90 || RcLastDeliveryKind == "FAR") {
-        ToolTip, ⚠ УВАГА: ЗБІЛЬШЕНИЙ ЧАС (%RcLastDeliveryMin% хв)!`nЗАМОВЛЕННЯ ЗБЕРЕЖЕНО — ОБОВ'ЯЗКОВО ЗАТЕЛЕФОНУЙ КЛІЄНТУ!, , , 2
+    if (RcTimeConflictWarning != "" || RcLastDeliveryMin > 90 || RcLastDeliveryKind == "FAR" || (hasPickup && RcLastDeliveryMin > 40)) {
+        _warnTip := (RcTimeConflictWarning != "") ? RcTimeConflictWarning : ("⚠ УВАГА: ЗБІЛЬШЕНИЙ ЧАС (" . RcLastDeliveryMin . " хв)!`nЗАМОВЛЕННЯ ЗБЕРЕЖЕНО — ОБОВ'ЯЗКОВО ЗАТЕЛЕФОНУЙ КЛІЄНТУ!")
+        ToolTip, %_warnTip%, , , 2
         SetTimer, RemoveFinishTip, -8000
-        RcPlaySound("notice")
+        RcPlaySound("warn")
     } else {
         ToolTip, Confirmed + saved (UIA).
         SetTimer, RemoveFinishTip, -2000
@@ -4698,6 +4900,13 @@ ApplyRollclub:
     rhPunchBusy := 0
     FileAppend, % "[" . A_Now . "] APPLY_LOCK off`n", %A_ScriptDir%\parse_debug.log
     OpCoord_End(_opEnterToken, "ok", "apply_complete")
+
+    if (RcTimeConflictWarning != "" || RcLastDeliveryMin > 90 || (hasPickup && RcLastDeliveryMin > 40)) {
+        _warnTip := (RcTimeConflictWarning != "") ? RcTimeConflictWarning : ("⚠ УВАГА: ЗБІЛЬШЕНИЙ ЧАС (" . RcLastDeliveryMin . " хв)! ОБОВ'ЯЗКОВО ЗАТЕЛЕФОНУЙ КЛІЄНТУ!")
+        ToolTip, %_warnTip%, , , 2
+        SetTimer, RemoveFinishTip, -8000
+        RcPlaySound("warn")
+    }
 return
 
 ; ── ФІНІШ: Подтвердить → Зберегти на точку (Ctrl+Enter). Окремо, безпечно. ──
@@ -4717,10 +4926,11 @@ FinishOrder:
     Sleep, 400
     
     kcPaused := 0
-    if (RcLastDeliveryMin > 90 || RcLastDeliveryKind == "FAR") {
-        ToolTip, ⚠ УВАГА: ЗБІЛЬШЕНИЙ ЧАС (%RcLastDeliveryMin% хв)!`nЗАМОВЛЕННЯ ЗБЕРЕЖЕНО — ОБОВ'ЯЗКОВО ЗАТЕЛЕФОНУЙ КЛІЄНТУ!, , , 2
+    if (RcTimeConflictWarning != "" || RcLastDeliveryMin > 90 || RcLastDeliveryKind == "FAR" || (hasPickup && RcLastDeliveryMin > 40)) {
+        _warnTip := (RcTimeConflictWarning != "") ? RcTimeConflictWarning : ("⚠ УВАГА: ЗБІЛЬШЕНИЙ ЧАС (" . RcLastDeliveryMin . " хв)!`nЗАМОВЛЕННЯ ЗБЕРЕЖЕНО — ОБОВ'ЯЗКОВО ЗАТЕЛЕФОНУЙ КЛІЄНТУ!")
+        ToolTip, %_warnTip%, , , 2
         SetTimer, RemoveFinishTip, -8000
-        RcPlaySound("notice")
+        RcPlaySound("warn")
     } else {
         ToolTip, Confirmed + saved (IikoUI Driver).
         SetTimer, RemoveFinishTip, -2000
@@ -5480,6 +5690,8 @@ RcCheckZone:
         GuiControl, Roll:, MapSearch, %_pTxt%
         GuiControl, Roll:, KitchenStatusText, % (IsObject(RcCurrentKitchen) ? RcCurrentKitchen.Name : "")
         RhRegColor(hZoneBox, RhB_Green, RhB_White)
+        _pickupMin := RcKitchenMinutes("pickup", 40)
+        RcApplyTimeEvaluation(_pickupMin, "PICKUP")
         return
     }
     if (addr = "") {
@@ -5685,17 +5897,13 @@ RcCheckZone:
             RcLastDeliveryMin := _deliveryMin
             RcLastDeliveryKind := zType
             GuiControl, Roll:, RhCalcDeliveryBtn, % "ДОСТ +" . _deliveryMin
-            if (extractedTimeAuto && !hasPickup && !RcLastZoneUncertain)
-                RcSetReadyByMinutes(_deliveryMin)
+            RcApplyTimeEvaluation(_deliveryMin, zType)
             if (_deliveryMin > 90 || zType == "FAR") {
                 _warnTime := "⚠ ЗБІЛЬШЕНИЙ ЧАС (" . _deliveryMin . " хв) — ПОПЕРЕДИТИ КЛІЄНТА!"
                 if (kAlertText != "")
                     kAlertText := _warnTime . "   " . kAlertText
                 else
                     kAlertText := _warnTime
-                GuiControl, Roll:, RhCallAlert, ⚠ ЗБІЛЬШЕНИЙ ЧАС (%_deliveryMin% хв) — ЗАТЕЛЕФОНУВАТИ!
-                RhRegColor(hNeedCall, RhB_Red, RhB_White)
-                DllCall("InvalidateRect", "Ptr", hNeedCall, "Ptr", 0, "Int", 1)
             }
             if (RcLastZoneUncertain)
                 RhRegColor(hZoneBox, RhB_TintAmber, RhB_Text)
@@ -5801,17 +6009,13 @@ RcApplyPointFallback(reasonText := "Адресу не знайдено") {
         RcLastDeliveryMin := _deliveryMin
         RcLastDeliveryKind := "STANDARD"
         GuiControl, Roll:, RhCalcDeliveryBtn, % "ДОСТ +" . _deliveryMin
-        if (extractedTimeAuto && !hasPickup)
-            RcSetReadyByMinutes(_deliveryMin)
+        RcApplyTimeEvaluation(_deliveryMin, "STANDARD")
         if (_deliveryMin > 90) {
             _warnTime := "⚠ ЗБІЛЬШЕНИЙ ЧАС (" . _deliveryMin . " хв) — ПОПЕРЕДИТИ КЛІЄНТА!"
             if (kAlertText != "")
                 kAlertText := _warnTime . "   " . kAlertText
             else
                 kAlertText := _warnTime
-            GuiControl, Roll:, RhCallAlert, ⚠ ЗБІЛЬШЕНИЙ ЧАС (%_deliveryMin% хв) — ЗАТЕЛЕФОНУВАТИ!
-            RhRegColor(hNeedCall, RhB_Red, RhB_White)
-            DllCall("InvalidateRect", "Ptr", hNeedCall, "Ptr", 0, "Int", 1)
         }
             
         result := "⚠ ТОЧКА: " . RcCurrentKitchen.Name . " (перевір адресу)"
