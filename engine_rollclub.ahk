@@ -3635,7 +3635,6 @@ return
 
 ; ── Звуки для авто-режиму (чути в навушниках) ──
 RcPlaySound(type := "ok") {
-    global A_ScriptDir
     static s_lastPlayTime := 0
     static s_lastType := ""
 
