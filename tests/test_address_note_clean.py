@@ -205,5 +205,13 @@ class TestAddressNoteClean(unittest.TestCase):
         cleaned = rc_clean_address_note(note, "вул. Миру 1", "Миру")
         self.assertEqual(cleaned, "")
 
+    def test_reshta_bez_not_kitchen_note(self):
+        comment = "Пост-24 Сайт Готівкою №861297 Найближчим часом Решта з: Без вул. Філософська"
+        res = parse_comment(comment)
+        self.assertEqual(res['RestChange'], '0')
+        self.assertEqual(res['kitchenNote'], '')
+        self.assertEqual(res['infoText'], '')
+        self.assertEqual(res['addrNote'], '')
+
 if __name__ == '__main__':
     unittest.main()

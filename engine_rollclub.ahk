@@ -1687,8 +1687,8 @@ SilentMagicClean:
             autoCash     := 1
             if (paymentMethod == "")
                 paymentMethod := "Готівкою"
-        } else if RegExMatch(workComment, "i)(?:[Рр]ешт[уа]|[Сс]дач[ау])\s+з[:\s]+(ні|нет|без\s+решти|без\s+сдачи|no|0)") {
-            clientChange := ""
+        } else if RegExMatch(workComment, "i)(?:[Рр]ешт[уа]|[Сс]дач[ау])\s+з[:\s]+(ні|нет|без(?:\s+решти|\s+сдачи)?|no|0)") {
+            clientChange := "0"
             autoCash     := 1
             if (paymentMethod == "")
                 paymentMethod := "Готівкою"
@@ -1725,12 +1725,16 @@ SilentMagicClean:
     textForKitchen := RegExReplace(textForKitchen, "i)Пост-\d+", " ")
     textForKitchen := RegExReplace(textForKitchen, "i)---ОПЛАЧЕНО---", " ")
     textForKitchen := RegExReplace(textForKitchen, "i)Картою[^№\r\n]*№\s*\d+", " ")
-    textForKitchen := RegExReplace(textForKitchen, "i)Готівкою\s*№\s*\d+", " ")
-    textForKitchen := RegExReplace(textForKitchen, "i)QR\s*code\s*№?\s*\d+", " ")
+    textForKitchen := RegExReplace(textForKitchen, "i)Готівкою\s*№?\s*\d*", " ")
+    textForKitchen := RegExReplace(textForKitchen, "i)QR\s*code\s*№?\s*\d*", " ")
     textForKitchen := RegExReplace(textForKitchen, "i)(*UCP)\b(?:Фоп|ФОП|FOP)\b[\s\S]*?(?=(?:\||$|\d{4}-\d{2}-\d{2}))", " ")
     textForKitchen := RegExReplace(textForKitchen, "\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2})?", " ")
+    textForKitchen := RegExReplace(textForKitchen, "i)(*UCP)\b(?:Сайт|Mob|Моб)\b", " ")
+    textForKitchen := RegExReplace(textForKitchen, "i)Найближчим\s+часом", " ")
+    textForKitchen := RegExReplace(textForKitchen, "i)(?:[Рр]ешт[уа]|[Сс]дач[ау])\s+з[:\s]+[^\s.,;!?]+", " ")
+    textForKitchen := RegExReplace(textForKitchen, "i)(*UCP)\b(?:вул|пров|просп|бул|наб|майдан|площ|шосе|тупик|проїзд|заїзд)\.?\s+[^\s.,;!?]+", " ")
     Loop {
-        if (!RegExMatch(textForKitchen, "i)([^.,;!?\r\n]*(?:без\s+(?!решт|здач|дзвін|звонк|прибор|палич|контакт)[а-яіїєґa-z]+|не\s+(?:додавати|додавайте|кладіть|класти|клас[ьт]и|ложите|кладите|клад[іиь]|положить|положите)|алерг|аллерг|(?:менше|меньше)\s+[а-яіїєґ]+|добре\s+просмаж|хрумткими|хрусткими|хрустящ|покласти|більше\s+[а-яіїєґ]+|(?<![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])(?:не\s+)?(?:по|на|роз|раз)?(?:різат|ріж|резат|резан|реж)[а-яіїєґa-z]*(?![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])|соус[ауи]?\s+(?:окремо|отдельно)|підпиш[іи]|підписати\s+бокс|подпиш[ит]|гостр[оаиі]|острый)[^.,;!?\r\n]*)", kMatch))
+        if (!RegExMatch(textForKitchen, "i)(*UCP)((?:(?:дуже|сильно|трохи|трішки|будь\s*ласка)\s+)?(?:без\s+(?!решт|здач|дзвін|звонк|прибор|палич|контакт|вул|буд|кв|під|домофон|поверх|код)[а-яіїєґa-z]+|не\s+(?:додавати|додавайте|кладіть|класти|клас[ьт]и|ложите|кладите|клад[іиь]|положить|положите)|алерг|аллерг|(?:менше|меньше)\s+[а-яіїєґ]+|добре\s+просмаж|хрумткими|хрусткими|хрустящ|покласти|більше\s+[а-яіїєґ]+|(?<![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])(?:не\s+)?(?:по|на|роз|раз)?(?:різат|ріж|резат|резан|реж)[а-яіїєґa-z]*(?![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z])|соус[ауи]?\s+(?:окремо|отдельно)|підпиш[іи]|підписати\s+бокс|подпиш[ит]|гостр[оаиіе]|острый)[^.,;!?\r\n]*)", kMatch))
             break
         candidate := Trim(kMatch1)
         if (kitchenNote != "")
@@ -2030,7 +2034,7 @@ SilentMagicClean:
     for i, part in cleanParts
         cleanComment .= (cleanComment != "" ? " " : "") . part
 
-    if (isPaidOrder)
+    if (isPaidOrder || clientChange == "0")
         calcChange := 0
     else if (clientChange != "" && clientChange >= orderSum)
         calcChange := clientChange
@@ -2412,7 +2416,12 @@ DrawRollclub:
     if (isPaidOrder) {
         _payText := "✓ " . paymentMethod . (paymentNum != "" ? " №" . paymentNum : "")
     } else if (autoCash) {
-        _payText := (clientChange != "" ? "Готівка — решта з " . clientChange : "Готівка — решта з " . calcChange)
+        if (clientChange == "0")
+            _payText := "Готівка — без решти"
+        else if (clientChange != "")
+            _payText := "Готівка — решта з " . clientChange
+        else
+            _payText := "Готівка — решта з " . calcChange
     } else {
         _payText := (paymentMethod != "" ? paymentMethod : "Оплата не змінюється")
     }
@@ -2533,7 +2542,12 @@ return
 ToggleAutoCash:
     autoCash := !autoCash
     if (autoCash) {
-        _payText := (clientChange != "" ? "Готівка — решта з " . clientChange : "Готівка — решта з " . calcChange)
+        if (clientChange == "0")
+            _payText := "Готівка — без решти"
+        else if (clientChange != "")
+            _payText := "Готівка — решта з " . clientChange
+        else
+            _payText := "Готівка — решта з " . calcChange
     } else if (isPaidOrder) {
         _payText := "✓ " . paymentMethod . (paymentNum != "" ? " №" . paymentNum : "")
     } else {
@@ -4272,7 +4286,9 @@ ApplyRollclub:
         if (RcUiaFocusOrClick("Інформація про клієнта", "memoEditCustomerComment")) {
             Sleep, 150
             try {
-                _existingCust := RcUiaGetText("Інформація про клієнта", "memoEditCustomerComment")
+                _existingCust := Trim(RcUiaGetText("Інформація про клієнта", "memoEditCustomerComment"))
+                if (_existingCust == "-" || _existingCust == "- |" || _existingCust == "-|")
+                    _existingCust := ""
                 if (_existingCust != "" && !InStr(_existingCust, _infoToSet))
                     _infoToSet := _existingCust . " | " . _infoToSet
             }
