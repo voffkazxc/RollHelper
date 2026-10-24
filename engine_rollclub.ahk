@@ -1581,11 +1581,33 @@ SilentMagicClean:
     ; --- Самовивіз (детект до парсингу адресних нотаток) ---
     if RegExMatch(workComment, "i)(*UCP)(?<![\wа-яА-ЯіїєґІЇЄҐёЁ])(Самовивіз|Самовывоз|Самовынос)(?![\wа-яА-ЯіїєґІЇЄҐёЁ])") {
         hasPickup := 1
-        if RegExMatch(workComment, "i)(*UCP)(?:Самовивіз|Самовывоз|Самовынос)\s*[:\-—]?\s*([^\.\r\n]+?)(?=\s*(?:Знижка|Скидка|Доставка|Прибори|Приборы|Купон|Подарунок|Подарок|Найближчим|Ближайш|\d{4}-\d{2}|$))", mPick)
-            pickupPoint := Trim(mPick1)
+        pickupPoint := ""
+        stopPat := "(?=\s*(?:Знижка|Скидка|Доставка|Прибори|Приборы|Купон|Подарунок|Подарок|Найближчим|Ближайш|\d{4}-\d{2}|\b(?:Фоп|ФОП|FOP)\b|\||$))"
+        
+        ; 1. Шукаємо всі входження "Самовивіз: [адреса/точка]" (з двокрапкою або тире, ігноруючи "Знижка самовивіз")
+        pos := 1
+        candList := []
+        while (pos := RegExMatch(workComment, "i)(*UCP)(?<!Знижка\s)(?<!Скидка\s)(?:Самовивіз|Самовывоз|Самовынос)\s*[:\-—]\s*([^\r\n|]+?)" . stopPat, mPick, pos)) {
+            cand := Trim(mPick1, " `t,.-–—")
+            if (cand != "" && !RegExMatch(cand, "i)^(?:\d{1,2}:\d{2}|Найближчим|Ближайш|Прибори|Приборы|Купон|Подарунок|Подарок)"))
+                candList.Push(cand)
+            pos += StrLen(mPick)
+        }
+        if (candList.MaxIndex() > 0)
+            pickupPoint := candList[candList.MaxIndex()]
+
+        ; 2. Якщо не знайдено з двокрапкою — шукаємо без двокрапки: "Самовивіз [адреса/точка]"
         if (pickupPoint = "") {
-            if RegExMatch(workComment, "i)(*UCP)(?:Самовивіз|Самовывоз|Самовынос)\s+([^\.\r\n,]+)", mPick2)
-                pickupPoint := Trim(mPick21)
+            pos := 1
+            candList2 := []
+            while (pos := RegExMatch(workComment, "i)(*UCP)(?<!Знижка\s)(?<!Скидка\s)(?:Самовивіз|Самовывоз|Самовынос)\s+([^\r\n|]+?)" . stopPat, mPick2, pos)) {
+                cand := Trim(mPick21, " `t,.-–—")
+                if (cand != "" && !RegExMatch(cand, "i)^(?:\d{1,2}:\d{2}|Найближчим|Ближайш|Прибори|Приборы|Купон|Подарунок|Подарок)"))
+                    candList2.Push(cand)
+                pos += StrLen(mPick2)
+            }
+            if (candList2.MaxIndex() > 0)
+                pickupPoint := candList2[candList2.MaxIndex()]
         }
     }
 
@@ -4346,11 +4368,31 @@ ApplyRollclub:
     ; --- Самовивіз: авто Концепція + Точка за точкою з коментаря (1:1) ---
     ; ВАЖЛИВО: для самовивозу спочатку перемикаємо Концепцію та Точку в Syrve,
     ; і лише потім вбиваємо час, щоб Syrve не скидав наш розрахунковий час на дефолтний!
-    if (hasPickup && kontsX != 0) {  ; завжди ставимо точку для самовивозу (незалежно від autoMode)
+    if (hasPickup && (kontsX != 0 || RcHasUiaMap("Концепція (самовивіз)"))) {  ; завжди ставимо точку для самовивозу (незалежно від autoMode)
         pickKonts := PickupConcept(pickupPoint)
+        if (pickKonts = "")
+            pickKonts := PickupConcept(workComment)
+        if (pickKonts = "" && IsObject(RcCurrentKitchen))
+            pickKonts := RcConceptByKitchenName(RcCurrentKitchen.Name)
+
         if (pickKonts != "") {
             Sleep, 400
-            Click, %kontsX%, %kontsY%        ; поле "Концепція"
+            kontsFocused := 0
+            elKonts := RcUiaFind("Концепція (самовивіз)", "restoCompletionConception")
+            if (IsObject(elKonts)) {
+                try {
+                    rect := elKonts.CurrentBoundingRectangle
+                    if (rect.r > rect.l && rect.b > rect.t && rect.l >= 0 && rect.t >= 0) {
+                        clickX := Round((rect.l + rect.r) / 2)
+                        clickY := Round((rect.t + rect.b) / 2)
+                        Click, %clickX%, %clickY%
+                        kontsFocused := 1
+                    }
+                }
+            }
+            if (!kontsFocused && kontsX != 0) {
+                Click, %kontsX%, %kontsY%        ; поле "Концепція"
+            }
             Sleep, 300
             SetKeyDelay, 40
             Send, ^a{BackSpace}
@@ -4711,42 +4753,89 @@ PunchGiftPlu(plu) {
 ; ── Концепція самовивозу за точкою з коментаря (1:1). Точку обираємо тією ж назвою. ──
 ; Підправляти тут, якщо для якоїсь точки назва Точки в iiko ≠ назві Концепції.
 PickupConcept(pt) {
-    ; ── КИЇВ ──
-    if (InStr(pt, "Драгоманова"))
+    if (pt == "")
+        return ""
+    p := pt
+    StringLower, p, p
+
+    ; ── КИЇВ (5 кухонь) ──
+    if (InStr(p, "драгоманов") || InStr(p, "позняк") || InStr(p, "осокорк"))
         return "Київ Драгоманова"
-    if (InStr(pt, "Антонова") || InStr(pt, "Солом'янськ") || InStr(pt, "Соломянськ"))
+    if (InStr(p, "антонов") || InStr(p, "солом'ян") || InStr(p, "соломян") || InStr(p, "соломен") || InStr(p, "авіаконструктор") || InStr(p, "авиаконструктор") || InStr(p, "чоколів") || InStr(p, "чоколов") || InStr(p, "севастопольськ"))
         return "Київ Антонова"
-    if (InStr(pt, "Нова Англія") || InStr(pt, "Новая Англия") || InStr(pt, "Максимовича") || InStr(pt, "Максимович"))
+    if (InStr(p, "нова англія") || InStr(p, "новая англия") || InStr(p, "максимович") || InStr(p, "васильківськ") || InStr(p, "васильковск") || InStr(p, "голосіїв") || InStr(p, "голосеев"))
         return "Київ Нова Англія"
-    if (InStr(pt, "Стрільців") || InStr(pt, "Стрильц") || InStr(pt, "Лук'янівка") || InStr(pt, "Лукьяновка") || InStr(pt, "Лукянівка"))
+    if (InStr(p, "стрільців") || InStr(p, "стрильц") || InStr(p, "стрельцов") || InStr(p, "січових") || InStr(p, "сечевых") || InStr(p, "лук'янів") || InStr(p, "лукьянов") || InStr(p, "лукянів"))
         return "Київ Стрільців"
-    if (InStr(pt, "Лаврухіна") || InStr(pt, "Лаврухина") || InStr(pt, "Троєщина") || InStr(pt, "Троещина"))
+    if (InStr(p, "лаврухін") || InStr(p, "лаврухин") || InStr(p, "троєщин") || InStr(p, "троещин") || InStr(p, "деснянськ"))
         return "Київ Лаврухіна"
-    ; ── ХАРКІВ ──
-    if (InStr(pt, "Конституції") || InStr(pt, "Конституции") || InStr(pt, "Ресторан"))
-        return "РК Харків Конституції Доставка"
-    if (InStr(pt, "Садовий") || InStr(pt, "Садовый") || InStr(pt, "Нові") || InStr(pt, "Нови") || InStr(pt, "Новые") || InStr(pt, "Новы") || InStr(pt, "НД"))
+
+    ; ── ХАРКІВ (2 кухні) ──
+    if (InStr(p, "садови") || InStr(p, "нові дом") || InStr(p, "нови дом") || InStr(p, "новые дом") || InStr(p, "нового дом") || InStr(p, "посад") || RegExMatch(p, "i)\bнд\b"))
         return "Харків Нові Дома"
-    ; ── ЛЬВІВ ──
-    if (InStr(pt, "Липа") || InStr(pt, "Крива Липа") || InStr(pt, "Кривая Липа"))
+    if (InStr(p, "конституц") || InStr(p, "ресторан") || InStr(p, "нікольськ") || InStr(p, "никольск") || InStr(p, "короленк"))
+        return "РК Харків Конституції Доставка"
+
+    ; ── ЛЬВІВ (єдина кухня) ──
+    if (InStr(p, "липа") || InStr(p, "крива липа") || InStr(p, "кривая липа") || InStr(p, "львів") || InStr(p, "львов"))
         return "Львов Липа"
-    ; ── ДНІПРО ──
-    if (InStr(pt, "Мудрого") || InStr(pt, "Авіаторськ") || InStr(pt, "Авиаторск") || InStr(pt, "Ярослава"))
+
+    ; ── ДНІПРО (єдина кухня) ──
+    if (InStr(p, "мудрог") || InStr(p, "ярослав") || InStr(p, "авіаторськ") || InStr(p, "авиаторск") || InStr(p, "дніпро") || InStr(p, "днепр"))
         return "Дніпро Мудрого"
-    ; ── БІЛА ЦЕРКВА ──
-    if (InStr(pt, "Вернадського") || InStr(pt, "Вернадского") || InStr(pt, "Біла Церква") || InStr(pt, "Белая Церковь") || InStr(pt, "БЦ"))
+
+    ; ── БІЛА ЦЕРКВА (єдина кухня) ──
+    if (InStr(p, "вернадськ") || InStr(p, "біла церква") || InStr(p, "белая церковь") || RegExMatch(p, "i)\bбц\b"))
         return "Біла Церква"
-    ; ── ОДЕСА ──
-    if (InStr(pt, "Незалежності") || InStr(pt, "Независимости") || InStr(pt, "Приморська") || InStr(pt, "Приморская") || InStr(pt, "Котовського") || InStr(pt, "Котовского") || InStr(pt, "Пересипськ"))
+
+    ; ── ОДЕСА (єдина кухня) ──
+    if (InStr(p, "незалежност") || InStr(p, "независимост") || InStr(p, "приморськ") || InStr(p, "котовськ") || InStr(p, "пересипськ") || InStr(p, "одеса") || InStr(p, "одесса") || InStr(p, "поскот"))
         return "Приморська"
-    ; ── ІВАНО-ФРАНКІВСЬК ──
-    if (InStr(pt, "Фудотека") || InStr(pt, "Промприлад") || InStr(pt, "Промприбор") || InStr(pt, "Перемоги") || InStr(pt, "Победы") || InStr(pt, "Франківськ") || InStr(pt, "Франковск") || InStr(pt, "ІФ"))
+
+    ; ── ІВАНО-ФРАНКІВСЬК (єдина кухня) ──
+    if (InStr(p, "фудотека") || InStr(p, "промприлад") || InStr(p, "промприбор") || InStr(p, "перемог") || InStr(p, "побед") || InStr(p, "франківськ") || InStr(p, "франковск") || RegExMatch(p, "i)\bіф\b"))
         return "Франківськ Фудотека"
-    ; ── РІВНЕ ──
-    if (InStr(pt, "Кулика") || InStr(pt, "Екватор") || InStr(pt, "Экватор") || InStr(pt, "Рівне") || InStr(pt, "Ровно"))
+
+    ; ── РІВНЕ (єдина кухня) ──
+    if (InStr(p, "кулик") || InStr(p, "гудачек") || InStr(p, "макаров") || InStr(p, "екватор") || InStr(p, "экватор") || InStr(p, "рівне") || InStr(p, "ровно"))
         return "Рівне"
-    ; ── ВІННИЦЯ ──
-    if (InStr(pt, "600") || InStr(pt, "Мегамолл") || InStr(pt, "Вінниц") || InStr(pt, "Винниц"))
+
+    ; ── ВІННИЦЯ (єдина кухня) ──
+    if (InStr(p, "600") || InStr(p, "мегамол") || InStr(p, "вінниц") || InStr(p, "винниц"))
+        return "Вінниця"
+
+    return ""
+}
+
+RcConceptByKitchenName(kitchenName) {
+    k := Trim(kitchenName)
+    if (k = "Драгоманова")
+        return "Київ Драгоманова"
+    if (k = "Антонова")
+        return "Київ Антонова"
+    if (k = "Нова Англія")
+        return "Київ Нова Англія"
+    if (k = "Лук'янівка" || k = "Лукьяновка" || k = "Стрільців")
+        return "Київ Стрільців"
+    if (k = "Троєщина" || k = "Троещина" || k = "Лаврухіна")
+        return "Київ Лаврухіна"
+    if (k = "РЕСТОРАН" || k = "Конституції")
+        return "РК Харків Конституції Доставка"
+    if (k = "НД" || k = "Нові Дома")
+        return "Харків Нові Дома"
+    if (k = "Крива Липа" || k = "Липа")
+        return "Львов Липа"
+    if (k = "Мудрого")
+        return "Дніпро Мудрого"
+    if (k = "БЦ" || k = "Біла Церква")
+        return "Біла Церква"
+    if (k = "Приморська")
+        return "Приморська"
+    if (k = "Фудотека" || k = "Франківськ")
+        return "Франківськ Фудотека"
+    if (k = "ТРЦ Екватор" || k = "Екватор" || k = "Рівне")
+        return "Рівне"
+    if (k = "Мегамолл" || k = "Вінниця")
         return "Вінниця"
     return ""
 }
@@ -5941,6 +6030,10 @@ RcPickupVerifyPoint:
         return
         
     pickKonts := PickupConcept(pickupPoint)
+    if (pickKonts = "")
+        pickKonts := PickupConcept(workComment)
+    if (pickKonts = "" && IsObject(RcCurrentKitchen))
+        pickKonts := RcConceptByKitchenName(RcCurrentKitchen.Name)
     expectedKey := RcFindKitchenByConcept(pickKonts)
     
     ToolTip, Перевірка самовивозу...
