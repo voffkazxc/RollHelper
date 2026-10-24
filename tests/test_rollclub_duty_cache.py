@@ -107,9 +107,10 @@ class RollClubDutyCacheTests(unittest.TestCase):
     def test_engine_duty_books_closes_clears_and_shows_banner(self):
         engine_path = MODULE_PATH.parents[3] / "engine_rollclub.ahk"
         source = engine_path.read_text(encoding="utf-8-sig")
+        sound_marker = "RcPlaySound" if "RcPlaySound" in source else "SoundPlay"
         markers = [
             "dutyOn := 0",
-            "SoundPlay",
+            sound_marker,
             "IikoUI_CloseForm()",
             "targetPoiskX",
             "ShowDutyContinueBanner",

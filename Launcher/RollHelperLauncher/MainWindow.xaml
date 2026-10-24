@@ -205,6 +205,11 @@
                         Margin="0,0,10,0"
                         Style="{StaticResource HeaderCompactButtonStyle}"
                         Click="OpenLogButton_Click" />
+                <Button x:Name="SoundSettingsButton"
+                        Content="🔊 Звуки"
+                        Margin="0,0,10,0"
+                        Style="{StaticResource HeaderCompactButtonStyle}"
+                        Click="SoundSettingsButton_Click" />
                 <Button x:Name="UpdateLauncherButton"
                         Content="Проверить обновление лаунчера"
                         Style="{StaticResource HeaderCompactButtonStyle}"

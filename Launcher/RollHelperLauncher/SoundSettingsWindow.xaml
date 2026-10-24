@@ -1,0 +1,143 @@
+<Window x:Class="RollHelperLauncher.SoundSettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Налаштування звуків"
+        Width="540"
+        Height="470"
+        MinWidth="500"
+        MinHeight="440"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Background="{StaticResource WindowBackgroundBrush}">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock Text="🔊 Налаштування звуків"
+                       FontSize="20"
+                       FontWeight="Bold"
+                       Foreground="{StaticResource PrimaryTextBrush}" />
+            <TextBlock Text="Оберіть комфортну тему та гучність сигналів для роботи в навушниках"
+                       FontSize="13"
+                       Margin="0,4,0,0"
+                       Foreground="{StaticResource SecondaryTextBrush}" />
+        </StackPanel>
+
+        <!-- Main settings card -->
+        <Border Grid.Row="1"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="#E2E8F0"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="20">
+            <StackPanel>
+                <!-- Theme selection -->
+                <TextBlock Text="Звукова схема:"
+                           FontWeight="SemiBold"
+                           FontSize="14"
+                           Foreground="{StaticResource PrimaryTextBrush}" />
+                <ComboBox x:Name="ThemeComboBox"
+                          Margin="0,8,0,20"
+                          Height="38"
+                          FontSize="14"
+                          VerticalContentAlignment="Center"
+                          SelectionChanged="ThemeComboBox_SelectionChanged">
+                    <ComboBoxItem Content="🌟 М'який передзвін (Soft Chime) — рекомендується" Tag="0" />
+                    <ComboBoxItem Content="🔔 Сучасний дінг (Modern Ping) — легкий та короткий" Tag="1" />
+                    <ComboBoxItem Content="🪵 Приглушений (Subtle) — тихий м'який клік" Tag="2" />
+                    <ComboBoxItem Content="🔊 Класичний (тихий) — знайомий сигнал на помірній гучності" Tag="3" />
+                    <ComboBoxItem Content="🔇 Без звуку (Вимкнено) — повна тиша" Tag="4" />
+                </ComboBox>
+
+                <!-- Volume slider -->
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Гучність сповіщень:"
+                               FontWeight="SemiBold"
+                               FontSize="14"
+                               Foreground="{StaticResource PrimaryTextBrush}" />
+                    <TextBlock x:Name="VolumeValueText"
+                               Grid.Column="1"
+                               Text="30%"
+                               FontWeight="Bold"
+                               FontSize="14"
+                               Foreground="{StaticResource AccentBrush}" />
+                </Grid>
+
+                <Slider x:Name="VolumeSlider"
+                        Margin="0,4,0,20"
+                        Minimum="5"
+                        Maximum="100"
+                        Value="30"
+                        SmallChange="5"
+                        LargeChange="10"
+                        TickFrequency="5"
+                        IsSnapToTickEnabled="True"
+                        ValueChanged="VolumeSlider_ValueChanged" />
+
+                <!-- Audio preview buttons -->
+                <TextBlock Text="Перевірка звучання:"
+                           FontWeight="SemiBold"
+                           FontSize="14"
+                           Margin="0,0,0,10"
+                           Foreground="{StaticResource PrimaryTextBrush}" />
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button x:Name="TestOkButton"
+                            Grid.Column="0"
+                            Content="▶ Тест «Успіх» (Ок)"
+                            Background="#EFF6FF"
+                            Foreground="#1D4ED8"
+                            BorderBrush="#BFDBFE"
+                            FontWeight="SemiBold"
+                            Click="TestOkButton_Click" />
+
+                    <Button x:Name="TestErrButton"
+                            Grid.Column="2"
+                            Content="▶ Тест «Помилка»"
+                            Background="#FEF2F2"
+                            Foreground="#DC2626"
+                            BorderBrush="#FECACA"
+                            FontWeight="SemiBold"
+                            Click="TestErrButton_Click" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- Bottom Action Buttons -->
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,16,0,0">
+            <Button x:Name="CancelButton"
+                    Content="Скасувати"
+                    Background="#F1F5F9"
+                    Foreground="{StaticResource PrimaryTextBrush}"
+                    BorderBrush="#CBD5E1"
+                    Margin="0,0,12,0"
+                    Click="CancelButton_Click" />
+
+            <Button x:Name="SaveButton"
+                    Content="Зберегти та застосувати"
+                    Background="{StaticResource AccentBrush}"
+                    Foreground="#FFFFFF"
+                    BorderThickness="0"
+                    FontWeight="SemiBold"
+                    Click="SaveButton_Click" />
+        </StackPanel>
+    </Grid>
+</Window>

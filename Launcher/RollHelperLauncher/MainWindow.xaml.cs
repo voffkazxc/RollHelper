@@ -41,6 +41,14 @@ public partial class MainWindow : Window
         ModulesGrid.ItemsSource = _modules;
         LauncherVersionText.Text = $"• версия {_launcherUpdater.CurrentVersion}";
         ApplyUiSettings(_uiSettingsStore.Load());
+        try
+        {
+            SoundService.ApplySoundFiles(SoundService.LoadSettings());
+        }
+        catch
+        {
+            // ignore
+        }
 
         Loaded += async (_, _) =>
         {
@@ -210,6 +218,18 @@ public partial class MainWindow : Window
             Owner = this
         };
         window.ShowDialog();
+    }
+
+    private void SoundSettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        var window = new SoundSettingsWindow
+        {
+            Owner = this
+        };
+        if (window.ShowDialog() == true)
+        {
+            SetStatus("Звукові налаштування збережено та застосовано!");
+        }
     }
 
     private async Task RefreshManifestAsync()

@@ -31,6 +31,7 @@ Copy-Item -LiteralPath (Join-Path $repoRoot "engine_rollclub.ahk") -Destination 
 Copy-Item -LiteralPath "C:\Program Files\AutoHotkey\v1.1.37.02\AutoHotkeyU64.exe" -Destination (Join-Path $rollHelperRoot "AutoHotkeyU64.exe")
 Copy-Item -LiteralPath (Join-Path $repoRoot "beep_ok.wav") -Destination $rollHelperRoot
 Copy-Item -LiteralPath (Join-Path $repoRoot "beep_err.wav") -Destination $rollHelperRoot
+Copy-Item -LiteralPath (Join-Path $repoRoot "beep_future.wav") -Destination $rollHelperRoot
 Copy-Item -LiteralPath (Join-Path $repoRoot "config") -Destination $rollHelperRoot -Recurse
 Copy-Item -LiteralPath (Join-Path $repoRoot "core") -Destination $rollHelperRoot -Recurse
 Copy-Item -LiteralPath (Join-Path $repoRoot "lib") -Destination $rollHelperRoot -Recurse

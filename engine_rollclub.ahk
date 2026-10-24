@@ -667,12 +667,8 @@ LoopWaitOrder:
         Sleep, 100
         Click, %foundX%, %foundY%, 2
 
-        ; Короткий звуковий сигнал
-        if FileExist(A_WinDir "\Media\Alarm01.wav") {
-            SoundPlay, %A_WinDir%\Media\Alarm01.wav
-        } else {
-            SoundBeep, 800, 300
-        }
+        ; Звуковий сигнал про знайдений заказ
+        RcPlaySound("ok")
 
         SetTimer, RemoveWaitToolTip, -3000
     }
@@ -1559,12 +1555,7 @@ SilentMagicClean:
             futureTime := Format("{:02}:{:02}", mHt1, mHt2)
         if (futureTime = "" && RegExMatch(workComment, "(?<!\d)(\d{1,2}):(\d{2})(?!\d)", mHt2x))
             futureTime := Format("{:02}:{:02}", mHt2x1, mHt2x2)
-        ; тричі писк — гучно
-        SoundBeep, 1500, 300
-        Sleep, 60
-        SoundBeep, 1500, 300
-        Sleep, 60
-        SoundBeep, 1500, 400
+        RcPlaySound("future")
         logFile := A_ScriptDir "\siv_debug.log"
         FileAppend, `n[DEBUG] %A_Now% - Event: FUTURE-DATE detected (%warnReason%) time=%futureTime%`n, %logFile%
     }
@@ -1572,9 +1563,7 @@ SilentMagicClean:
     ; --- FilaClub (старий детект, залишаємо для гучного попередження) ---
     if RegExMatch(workComment, "i)(?:Промокод\s*:\s*)?(?<![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z0-9])(FilaClub|Филоклаб)(?![а-яА-ЯіїєґІЇЄҐёЁa-zA-Z0-9])", mFila) {
         hasFilaClub := 1
-        SoundBeep, 1100, 250
-        Sleep, 80
-        SoundBeep, 1100, 250
+        RcPlaySound("notice")
         ToolTip, ⚠ ПРОМОКОД FILACLUB`nНе забудь пробити!, 20, 20, 4
         SetTimer, RemoveFilaClubToolTip, -7000
         logFile := A_ScriptDir "\siv_debug.log"
@@ -1616,7 +1605,7 @@ SilentMagicClean:
             cardText := "ДН " . A_DD . "." . A_MM . "." . A_YYYY
         else
             cardText .= " | ДН " . A_DD . "." . A_MM . "." . A_YYYY
-        SoundBeep, 900, 300
+        RcPlaySound("notice")
         logFile := A_ScriptDir "\siv_debug.log"
         FileAppend, `n[DEBUG] %A_Now% - Event: Birthday detected (card+=DN)`n, %logFile%
     }
@@ -1624,7 +1613,7 @@ SilentMagicClean:
     ; --- Алергія (окремий флаг + червона плашка) ---
     if RegExMatch(workComment, "i)(алерг|аллерг)") {
         hasAllergy := 1
-        SoundBeep, 1200, 400
+        RcPlaySound("warn")
         logFile := A_ScriptDir "\siv_debug.log"
         FileAppend, `n[DEBUG] %A_Now% - Event: ALLERGY detected`n, %logFile%
     }
@@ -2168,11 +2157,7 @@ SilentMagicClean:
             rcDebugLog .= "[7] nameInAddr=" . nameInAddr . " typeOk=" . typeOk . "`n"
             if (!nameInAddr || !typeOk) {
                 addrMismatch := 1
-                SoundPlay, %A_ScriptDir%\beep_err.wav
-                Sleep, 550
-                SoundPlay, %A_ScriptDir%\beep_err.wav
-                Sleep, 550
-                SoundPlay, %A_ScriptDir%\beep_err.wav
+                RcPlaySound("err")
             }
         }
         rcDebugLog .= "[8] addrMismatch=" . addrMismatch . "`n"
@@ -2187,7 +2172,7 @@ SilentMagicClean:
         blockedInfo := RcBlockedStreetHit(rawAddress)
         if (blockedInfo != "") {
             blockedHit := 1
-            SoundPlay, %A_ScriptDir%\beep_err.wav
+            RcPlaySound("err")
         }
     }
     ; --- Фінальна санітизація addrNote: видаляємо дублювання самої вулиці / адреси ---
@@ -2267,10 +2252,8 @@ DrawRollclub:
         curY += 20
     }
     if (isFutureDate) {
-        ; Противний сигнал — передзамовлення не можна пропустити!
-        SoundPlay, %A_ScriptDir%\beep_future.wav
-        Sleep, 300
-        SoundPlay, %A_ScriptDir%\beep_future.wav
+        ; Сигнал — передзамовлення
+        RcPlaySound("future")
         Gui, Roll:Font, s9 bold cFFFFFF, %RhFontName%
         _fdLabel := "ПЕРЕДЗАМОВЛЕННЯ"
         if (futureTime != "")
@@ -2731,7 +2714,7 @@ return
 
 LoudAlarm:
     ; Резервна звукова індикація
-    SoundPlay, %A_ScriptDir%\beep_ok.wav
+    RcPlaySound("ok")
 return
 
 KcTakeOnce:
@@ -3057,13 +3040,8 @@ KcMonitor:
     SetTimer, KcDutyTick, Off
     SetTimer, KcMonitor, Off
     
-    ; 1. Надійний звуковий сигнал
-    SoundPlay, %A_ScriptDir%\beep_ok.wav
-    Sleep, 400
-    SoundPlay, %A_ScriptDir%\beep_ok.wav
-    Sleep, 400
-    SoundPlay, %A_ScriptDir%\beep_ok.wav
-    Sleep, 300
+    ; 1. Звуковий сигнал про замовлення
+    RcPlaySound("ok")
     
     ; 2. Закриваємо картку замовлення (замовлення заброньовано за оператором)
     ToolTip, 🔄 Замовлення №%takeNo% заброньовано. Закриваю картку...
@@ -3656,13 +3634,59 @@ SetRowTarget:
 return
 
 ; ── Звуки для авто-режиму (чути в навушниках) ──
+RcPlaySound(type := "ok") {
+    global A_ScriptDir
+    static s_lastPlayTime := 0
+    static s_lastType := ""
+
+    ; Захист від занадто частого спаму однакового звуку (мін. 200мс)
+    now := A_TickCount
+    if (type == s_lastType && (now - s_lastPlayTime < 200))
+        return
+    s_lastPlayTime := now
+    s_lastType := type
+
+    fileName := "beep_ok.wav"
+    if (type = "err" || type = "error" || type = "fail")
+        fileName := "beep_err.wav"
+    else if (type = "future" || type = "warn" || type = "alert")
+        fileName := "beep_future.wav"
+    else if (type = "notice" || type = "info")
+        fileName := "beep_ok.wav"
+
+    EnvGet, localAppData, LOCALAPPDATA
+    if (!localAppData)
+        localAppData := RegExReplace(A_AppData, "i)Roaming$", "Local")
+
+    soundPath := ""
+    candidates := [ localAppData . "\Programs\RollHelper\UserData\sounds\" . fileName
+                  , localAppData . "\Programs\RollHelper\UserData\rollclub\" . fileName
+                  , A_ScriptDir . "\..\..\..\UserData\sounds\" . fileName
+                  , A_ScriptDir . "\UserData\sounds\" . fileName
+                  , A_ScriptDir . "\" . fileName ]
+
+    for idx, cand in candidates {
+        if (FileExist(cand)) {
+            soundPath := cand
+            break
+        }
+    }
+
+    if (soundPath != "") {
+        SoundPlay, %soundPath%
+    } else {
+        if (type = "err" || type = "error" || type = "fail")
+            SoundBeep, 440, 100
+        else
+            SoundBeep, 880, 80
+    }
+}
+
 SoundOk:        ; усе зійшлось → підійди й тисни Ctrl+Enter
-    SoundBeep, 880, 90
-    SoundBeep, 1318, 130
+    RcPlaySound("ok")
 return
 SoundErr:       ; щось не зійшлось / увага
-    SoundBeep, 440, 180
-    SoundBeep, 311, 280
+    RcPlaySound("err")
 return
 
 ; ========================================================
@@ -5167,7 +5191,7 @@ RcPunchPluInOpenEditor(pluCode, qty) {
     FileAppend, % "[" . A_Now . "] VERIFY exp=" . qty . " got=[" . _got . "] raw=[" . Clipboard . "]`n", %rcLogPath%
 
     if (_got + 0 = qty + 0) {
-        SoundPlay, %A_ScriptDir%\beep_ok.wav
+        RcPlaySound("ok")
         ToolTip, % "✓ OK  PLU:" . pluCode . "  x" . _got, 600, 400, 2
         Send, {Enter}                 ; коміт рядку
         Sleep, 400
@@ -5176,11 +5200,7 @@ RcPunchPluInOpenEditor(pluCode, qty) {
         ToolTip, % "❌ ERR  PLU:" . pluCode . "  exp:" . qty . "  got:" . _got, 600, 400, 2
         Send, {Escape}
         Sleep, 150
-        SoundPlay, %A_ScriptDir%\beep_err.wav
-        Sleep, 550
-        SoundPlay, %A_ScriptDir%\beep_err.wav
-        Sleep, 550
-        SoundPlay, %A_ScriptDir%\beep_err.wav
+        RcPlaySound("err")
         SetTimer, RcClearOkTip, -2500
     }
     return 1
@@ -5496,7 +5516,7 @@ RcCheckZone:
                 kAlertText := parts
             }
             if (kAlertBeep)
-                SoundBeep, 600, 250
+                RcPlaySound("notice")
             result := zone
             if (RcLastZoneUncertain) {
                 if (RcLastGeocodeApprox)
@@ -5630,10 +5650,7 @@ RcApplyPointFallback(reasonText := "Адресу не знайдено") {
         GuiControl, Roll:, KitchenStatusText, %kAlertText%
         RhRegColor(hZoneBox, RhB_TintAmber, RhB_Text)
         DllCall("InvalidateRect", "Ptr", hZoneBox, "Ptr", 0, "Int", 1)
-        if (kAlertBeep)
-            SoundBeep, 600, 250
-        else
-            SoundPlay, %A_ScriptDir%\beep_ok.wav
+        RcPlaySound("ok")
         return 1
     }
     
@@ -5642,9 +5659,7 @@ RcApplyPointFallback(reasonText := "Адресу не знайдено") {
     GuiControl, Roll:, KitchenStatusText, Натисни «Знайти точку» в Syrve і знову ~ (Тільду)
     RhRegColor(hZoneBox, RhB_Red, RhB_White)
     DllCall("InvalidateRect", "Ptr", hZoneBox, "Ptr", 0, "Int", 1)
-    SoundBeep, 750, 180
-    Sleep, 80
-    SoundBeep, 750, 180
+    RcPlaySound("warn")
     return 0
 }
 
@@ -5763,7 +5778,7 @@ RcVerifyPoint:
         return
     }
     ToolTip, Звірка доставки: підготовка...
-    SoundBeep, 700, 90
+    RcPlaySound("notice")
     
     _prepRes := RhGet("/api/iiko/diagnose_point_prepare", 10000)
     isOk := false
@@ -5830,14 +5845,12 @@ RcVerifyPoint:
     
     if (matched) {
         ToolTip, % "✅ Доставка ОК: " . actualKey
-        SoundPlay, %A_ScriptDir%\beep_ok.wav
+        RcPlaySound("ok")
         SetTimer, RemoveToolTip, -3000
     } else {
         _msg := "⚠ ДОСТАВКА РІЗНИТЬСЯ!`nExpected: " . expectedKey . "`nActual:  " . actualKey
         ToolTip, %_msg%
-        SoundPlay, %A_ScriptDir%\beep_err.wav
-        Sleep, 550
-        SoundPlay, %A_ScriptDir%\beep_err.wav
+        RcPlaySound("err")
         SetTimer, RemoveToolTip, -8000
     }
 return
@@ -5883,14 +5896,12 @@ RcPickupVerifyPoint:
     
     if (matched) {
         ToolTip, % "✅ Самовивіз ОК: " . actualKey
-        SoundPlay, %A_ScriptDir%\beep_ok.wav
+        RcPlaySound("ok")
         SetTimer, RemoveToolTip, -3000
     } else {
         _msg := "⚠ САМОВИВІЗ РІЗНИТЬСЯ!`nExpected: " . expectedKey . "`nActual:  " . actualKey . "`n[Точка: " . iikoPoint . "]"
         ToolTip, %_msg%
-        SoundPlay, %A_ScriptDir%\beep_err.wav
-        Sleep, 550
-        SoundPlay, %A_ScriptDir%\beep_err.wav
+        RcPlaySound("err")
         SetTimer, RemoveToolTip, -8000
     }
 return

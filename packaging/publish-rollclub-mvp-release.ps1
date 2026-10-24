@@ -1,13 +1,13 @@
 param(
-    [string]$CatalogVersion = "0.1.91",
-    [string]$RollClubVersion = "0.1.50",
+    [string]$CatalogVersion = "0.1.104",
+    [string]$RollClubVersion = "0.1.62",
     [string]$DutyVersion = "0.1.2",
-    [string]$ZonesVersion = "0.1.1",
+    [string]$ZonesVersion = "0.1.2",
     [string]$RefundVersion = "0.1.8",
     [string]$GunkanVersion = "0.1.0",
     [string]$CallAutoAcceptVersion = "0.1.2",
-    [string]$LauncherVersion = "0.1.73",
-    [string]$SourceRelease = "0.1.90",
+    [string]$LauncherVersion = "0.1.74",
+    [string]$SourceRelease = "0.1.103",
     [string]$Repository = "voffkazxc/RollHelper",
     [string]$OutputDirectory = (Join-Path $env:TEMP "RollHelperRollClubRelease"),
     [switch]$RebuildDuty,
@@ -314,6 +314,10 @@ if ($Publish) {
 - координати, калібрування та пошук картинки дзвінка більше не використовуються
 - прибрано частий обхід UIA-дерева під час очікування дзвінка, який гальмував ручне редагування замовлення в Syrve
 - після одноразового пошуку кнопки автоприйом перевіряє її стан легким WinAPI-викликом, а повторний UIA-пошук робить не частіше одного разу на 2 секунди
+- додано керування звуками в лаунчер (кнопка «🔊 Звуки»): вибір звукової теми, регулятор гучності 5%-100%, прев'ю-кнопки
+- приємні м'які теми звуків (Soft Chime, Modern Ping, Subtle, Classic Gentle) замість гучних та різких писків
+- підтримка повного вимкнення звукових сигналів (режим «Без звуку»)
+- централізовано всі звукові сигнали RollClub через RcPlaySound із читанням налаштувань користувача
 "@ | Set-Content -LiteralPath $notesPath -Encoding UTF8
 
     $assetsToPublish = @($rollClubBuild.AssetPath, $manifestPath)
