@@ -1,4 +1,4 @@
-#Requires AutoHotkey v1.1
+﻿#Requires AutoHotkey v1.1
 #NoEnv
 #SingleInstance Force
 #Persistent
@@ -1025,8 +1025,11 @@ RcRefreshZonesDataIfChanged() {
 
 OpenZonesModule:
     RcRefreshZonesModuleState()
-    if (!ModuleRegistry_RunExternal("zones"))
-        MsgBox, 48, Зони доставки, Доповнення «Зони доставки RollClub» не встановлено або вимкнено в лаунчері.
+    if (!ModuleRegistry_RunExternal("zones")) {
+        MsgBox, 36, Зони доставки, Доповнення «Зони доставки RollClub» не знайдено або вимкнено в лаунчері.`n`nБажаєте завантажити KML-файл напряму?
+        IfMsgBox, Yes
+            GoSub, RcLoadKmlFile
+    }
 return
 
 LoadKitchens:
@@ -4631,6 +4634,8 @@ PickupConcept(pt) {
         return "Київ Драгоманова"
     if (InStr(pt, "Антонова") || InStr(pt, "Солом'янськ") || InStr(pt, "Соломянськ"))
         return "Київ Антонова"
+    if (InStr(pt, "Нова Англія") || InStr(pt, "Новая Англия") || InStr(pt, "Максимовича") || InStr(pt, "Максимович"))
+        return "Київ Нова Англія"
     if (InStr(pt, "Стрільців") || InStr(pt, "Стрильц") || InStr(pt, "Лук'янівка") || InStr(pt, "Лукьяновка") || InStr(pt, "Лукянівка"))
         return "Київ Стрільців"
     if (InStr(pt, "Лаврухіна") || InStr(pt, "Лаврухина") || InStr(pt, "Троєщина") || InStr(pt, "Троещина"))
@@ -5911,6 +5916,8 @@ RcKitchenFromIikoPoint(point) {
         return "Антонова"
     if InStr(point, "РК Київ Драгоманова")
         return "Драгоманова"
+    if (InStr(point, "Нова Англія") || InStr(point, "Новая Англия") || InStr(point, "Максимовича"))
+        return "Нова Англія"
     if InStr(point, "РК Київ Стрільців")
         return "Лук'янівка"
     if InStr(point, "РК Київ Лаврухіна")
@@ -6486,6 +6493,8 @@ RcFindKitchenByConcept(concept) {
         return "Драгоманова"
     if (concept = "Київ Антонова")
         return "Антонова"
+    if (concept = "Київ Нова Англія")
+        return "Нова Англія"
     if (concept = "Київ Стрільців")
         return "Лук'янівка"
     if (concept = "Київ Лаврухіна")

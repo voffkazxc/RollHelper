@@ -112,6 +112,21 @@ class RollClubZoneVerificationTests(unittest.TestCase):
         self.assertIn('"zones_map.BEFORE_NEW_MAPPINGS_20260726_215931.ini"', build_script)
 
 
+    def test_nova_anglia_kitchen_and_point_mapping(self):
+        self.assertIn('return "Київ Нова Англія"', self.source)
+        self.assertIn('if (concept = "Київ Нова Англія")', self.source)
+        self.assertIn('return "Нова Англія"', self.source)
+        self.assertIn('InStr(point, "Нова Англія")', self.source)
+
+    def test_zones_map_contains_updated_kyiv_and_lviv_zones(self):
+        data_dir = ENGINE_PATH.parent / "modules" / "rollclub-zones" / "data"
+        zones_map_text = (data_dir / "zones_map.ini").read_text(encoding="utf-16")
+        self.assertIn("[Нова Англія] Михайла Максимовича 32б (правий берег)", zones_map_text)
+        self.assertIn("[Антонова] Авіаконструктора Антонова 43 (правий берег)", zones_map_text)
+        self.assertIn("[Драгоманова] Драгоманова 38 (лівий берег)", zones_map_text)
+        self.assertIn("Зона підвищеного часу проїзд Крива Липа 8", zones_map_text)
+
+
 if __name__ == "__main__":
     unittest.main()
 
