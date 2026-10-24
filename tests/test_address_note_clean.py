@@ -1,5 +1,16 @@
 import unittest
 import re
+import sys
+import os
+
+# Add server to sys.path so we can import parse_comment directly
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "server")))
+try:
+    from parser import parse_comment
+except ImportError:
+    # fallback to local server path if needed
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "server")))
+    from parser import parse_comment
 
 def rc_is_street_or_address(text: str, raw_address: str = "") -> bool:
     clean = text.strip()
@@ -41,9 +52,21 @@ def rc_clean_address_note(note: str, raw_address: str = "", comment_street: str 
 
         # Strip FOP block (e.g. "Фоп Пруднікова О.А. вул." or "ФОП Богатий П.О.")
         p = re.sub(r'(?i)\b(?:Фоп|ФОП|FOP)\b.*?(?=\||$)', '', p).strip()
+        # Strip payment / cash change
+        p = re.sub(r'(?i)\b(?:підготувати\s+)?решт[ау]\s*(?:з|с)?\s*\d+\b', ' ', p)
+        p = re.sub(r'(?i)\bсдач[ау]\s*(?:з|с)?\s*\d+\b', ' ', p)
+        p = re.sub(r'(?i)\bбез\s+(?:решт[аи]?|здач[іе]?)\b', ' ', p)
+        p = re.sub(r'(?i)\b(?:готівкою|картою|оплачено|qr\s*code)\b(?:\s*№\s*\d+)?', ' ', p)
+        # Strip dates and times
+        p = re.sub(r'\b\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2})?\b', ' ', p)
+        p = re.sub(r'(?<!\d)\d{1,2}:\d{2}(?!\d)', ' ', p)
+        # Strip districts / microdistricts
+        districts = r'(?i)\b(?:Тополь|Тополя|Перемога|Победа|Сокіл|Сокол|Парус|Покровський|Комунар|Червоний\s+Камінь|Красный\s+Камень|Лівобережний|Левобережный|Сонячний|Солнечный|Придніпровськ|Приднепровск|Ігрень|Игрень|Північний|Северный|Західний|Западный|12\s*квартал|Мирний|Мирный|Клочко|Калиновський|Калиновский|Діївка|Диевка|Таромське|Таромское|Правий\s+берег|Лівий\s+берег)(?:[\s\-]*\d+)?\b'
+        p = re.sub(districts, ' ', p)
         # Strip stray street markers at beginning or end
         p = re.sub(r'(?i)^\s*(?:вул\.?|вулиця|просп\.?|проспект|пров\.?|провулок|буд\.?)\s*', '', p)
         p = re.sub(r'(?i)\s*(?:\bвул\.?|вулиця|\bпросп\.?|проспект|\bпров\.?|провулок|\bбуд\.?)\s*$', '', p)
+        p = re.sub(r'\s+', ' ', p)
         p = p.strip(" \t\r\n,.-")
 
         if not p:
@@ -54,19 +77,70 @@ def rc_clean_address_note(note: str, raw_address: str = "", comment_street: str 
             sub = re.sub(re.escape(comment_street), '', p, flags=re.IGNORECASE).strip()
             if not sub or len(sub) < 3:
                 continue
-        clean_parts.append(p)
+
+        # Deduplication
+        p_low = p.lower()
+        is_dup = False
+        for idx, exist_p in enumerate(clean_parts):
+            ex_low = exist_p.lower()
+            if p_low == ex_low or p_low in ex_low:
+                is_dup = True
+                break
+            elif ex_low in p_low:
+                clean_parts[idx] = p
+                is_dup = True
+                break
+        if not is_dup:
+            clean_parts.append(p)
 
     return " | ".join(clean_parts)
 
 class TestAddressNoteClean(unittest.TestCase):
+    def test_user_reported_comment_parser(self):
+        # Exact string reported by the user
+        raw = "Пост-11 Mob !!!ПЕРШЕМОБ Передзвонити Готівкою №961278 Коментар до адреси: Корпус 4 під'їзд виходить в сторону дороги Підготувати решту з 2000 2026-10-24 19:30 Тополь 3"
+        res = parse_comment(raw)
+        self.assertEqual(res.get("addrNote"), "Корпус 4 під'їзд виходить в сторону дороги")
+        self.assertEqual(res.get("RestChange"), "2000")
+        self.assertEqual(res.get("isPost"), 1)
+        self.assertEqual(res.get("postNum"), "11")
+        self.assertEqual(res.get("needCall"), 1)
+        # Ensure 'реж' was NOT matched as kitchen note
+        self.assertEqual(res.get("kitchenNote", ""), "")
+
+    def test_street_naberezhna_not_kitchen_note(self):
+        raw = "вул. Набережна Перемоги 5, кв 22"
+        res = parse_comment(raw)
+        self.assertEqual(res.get("kitchenNote", ""), "")
+
+    def test_comment_oberezhno_not_kitchen_note(self):
+        raw = "Коментар до адреси: обережно з дверима, зламана ручка"
+        res = parse_comment(raw)
+        self.assertEqual(res.get("kitchenNote", ""), "")
+        self.assertIn("обережно з дверима", res.get("addrNote", ""))
+
+    def test_actual_cut_instructions_still_work(self):
+        raw1 = "порізати на 4 частини"
+        self.assertIn("порізати", parse_comment(raw1).get("kitchenNote", ""))
+
+        raw2 = "не різати роли"
+        self.assertIn("не різати", parse_comment(raw2).get("kitchenNote", ""))
+
+        raw3 = "наріжте пополам"
+        k3 = parse_comment(raw3).get("kitchenNote", "")
+        self.assertIn("наріжте", k3)
+
+    def test_deduplication_of_address_note_with_change_and_district(self):
+        dup_note = "Корпус 4 під'їзд виходить в сторону дороги Підготувати решту з 2000 2026-10-24 19:30 Тополь 3 | Корпус 4 під'їзд виходить в сторону дороги Підготувати решту з 2000"
+        cleaned = rc_clean_address_note(dup_note)
+        self.assertEqual(cleaned, "Корпус 4 під'їзд виходить в сторону дороги")
+
     def test_strip_trailing_street_from_note(self):
-        # Note with real instruction + duplicate street at the end
         note = "Набрать - спущусь к подъезду | Богатирська"
         cleaned = rc_clean_address_note(note, "Богатирська 10, кв. 5", "Богатирська")
         self.assertEqual(cleaned, "Набрать - спущусь к подъезду")
 
     def test_pure_street_in_note_becomes_empty(self):
-        # Only street name was passed after FOP
         note = "пр. Петра Калнишевського"
         cleaned = rc_clean_address_note(note, "пр. Петра Калнишевського 15", "Петра Калнишевського")
         self.assertEqual(cleaned, "")
