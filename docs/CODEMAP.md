@@ -20,6 +20,8 @@
 |---|---|---|
 | RollHouse из исходников | `main.ahk` | Основной рабочий AHK v1-файл бренда |
 | RollClub из исходников | `engine_rollclub.ahk` | Отдельный AHK v1-файл; из RollHouse не переключается |
+| Карточка кухни RollClub | `lib/RollClubKitchenStatus.ahk` | Режимы, часы предзаказов, стопы; отдельное окно рядом с пультом |
+| Синхронизация кухонь RollClub | `brands/rollclub/server/sync_rollclub_kitchens.py` | Версионируемый источник; в пакете размещается в `server/` |
 | RollHouse из пакета | `start_rollhouse.bat` | Создаётся скриптом `packaging/build-rollhouse-mvp.ps1` |
 | Локальный сервер | `../server/app.py` | В исходной рабочей копии лежит рядом с репозиторием |
 | Launcher | `Launcher/RollHelperLauncher/RollHelperLauncher.csproj` | WPF, .NET 8, универсален для brand/module/tool |

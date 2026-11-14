@@ -23,7 +23,7 @@ class RollClubPointFallbackTests(unittest.TestCase):
 
     def test_point_fallback_sets_warning_and_kitchen_status_text(self):
         self.assertIn('"⚠ ТОЧКА: " . RcCurrentKitchen.Name . " (перевір адресу)"', self.engine_source)
-        self.assertIn('GuiControl, Roll:, KitchenStatusText, %kAlertText%', self.engine_source)
+        self.assertIn('RcKitchenPresent(RcCurrentKitchen, kAlertText)', self.engine_source)
         self.assertIn('Натисни «Знайти точку» в Syrve і знову ~ (Тільду)', self.engine_source)
 
     def test_rc_check_zone_invokes_fallback_on_empty_and_failed_address(self):

@@ -20,6 +20,8 @@ READ_CALL = "_rollclub_kc.read_kc_list(_bridge, brand=brand)"
 BACKGROUND_CALL = ('(_rollclub_kc.read_kc_list_background(_bridge, int(request.args["background_hwnd"])) '
                    'if "background_hwnd" in request.args else ' + READ_CALL + ')')
 SOURCE_FILES = {
+    "RollHelper/lib/RollClubKitchenStatus.ahk": "lib/RollClubKitchenStatus.ahk",
+    "server/sync_rollclub_kitchens.py": "brands/rollclub/server/sync_rollclub_kitchens.py",
     "RollHelper/engine_rollclub.ahk": "engine_rollclub.ahk",
     "RollHelper/lib/RollClubDutyBackground.ahk": "lib/RollClubDutyBackground.ahk",
     "server/rollclub_kc_legacy.py": "brands/rollclub/server/rollclub_kc_legacy.py",
@@ -76,6 +78,7 @@ def build(args):
             replacements["server/app.py"] = app.replace(READ_CALL, BACKGROUND_CALL).encode("utf-8")
         compile(replacements["server/app.py"], "app.py", "exec")
         compile(replacements["server/rollclub_kc_legacy.py"], "rollclub_kc_legacy.py", "exec")
+        compile(replacements["server/sync_rollclub_kitchens.py"], "sync_rollclub_kitchens.py", "exec")
         package = json.loads(old.read("package.json"))
         if package["id"] != "rollclub" or package["version"] != source["version"]:
             raise ValueError("Baseline package identity mismatch")
