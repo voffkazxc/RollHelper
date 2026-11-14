@@ -14,7 +14,12 @@ RcDutyBgHwnd() {
             return -1  ; ambiguous: never guess between two offices
         found := hwnd
     }
-    return found
+    return RcDutyBgHandleNumber(found)
+}
+
+RcDutyBgHandleNumber(hwnd) {
+    ; WinGet returns hexadecimal strings; the HTTP/JSON contract is decimal.
+    return Format("{:d}", hwnd + 0)
 }
 
 RcDutyBgLog(event, detail := "") {
@@ -175,6 +180,7 @@ RcDutyBgAttach(hwnd) {
 
 RcDutyBgRead(hwnd) {
     global RH_SERVER
+    hwnd := RcDutyBgHandleNumber(hwnd)
     RcDutyBgCheck(hwnd)
     ; Async HTTP keeps Ctrl+F4/manual hotkeys responsive during a cold UIA read.
     request := ComObjCreate("WinHttp.WinHttpRequest.5.1")

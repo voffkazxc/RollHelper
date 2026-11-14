@@ -4,6 +4,7 @@
 #Include %A_ScriptDir%\..\lib\RollClubDutyBackground.ahk
 
 try {
+    Assert(RcDutyBgHandleNumber("0x001234") == "4660", "HWND encoded as decimal for HTTP and JSON")
     panel := new FakeElement("data")
     row1 := new FakeElement("Строка 1")
     row2 := new FakeElement("Строка 2")
@@ -56,7 +57,7 @@ try {
     catch error
         stopped := (error.Message = "STOP")
     Assert(stopped, "operator stop blocks window operations")
-    FileAppend, PASS: 16 background UIA assertions`n, *
+    FileAppend, PASS: 17 background UIA assertions`n, *
     ExitApp, 0
 } catch error {
     FileAppend, % "FAIL: " . error.Message . " line=" . error.Line . "`n", *
