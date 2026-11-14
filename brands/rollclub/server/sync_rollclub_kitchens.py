@@ -1,6 +1,7 @@
 import argparse
 import csv
 import datetime as dt
+import io
 import os
 import re
 import shutil
@@ -109,17 +110,25 @@ def parse_existing_kml_keys(path: Path) -> dict[str, str]:
 
 
 def parse_sheet_rows(text: str, existing_kml: dict[str, str]) -> list[dict[str, str]]:
-    rows = list(csv.reader(text.splitlines()))
+    rows = list(csv.reader(io.StringIO(text)))
     if not rows:
         return []
 
     header = [clean_cell(c).lower() for c in rows[0]]
-    col_map = {"center": 4, "pickup": 5, "far": 6, "stop": 3, "admin": 1, "remark": 2, "terminal": 8}
+    col_map = {}
+    hours = {}
     for i, h in enumerate(header):
-        if re.search(r"адмін|admin", h):
+        hour = re.fullmatch(r"([01]?\d|2[0-3])(?::([0-5]\d))?", h)
+        if hour:
+            hours.setdefault(f"{int(hour[1]):02d}:{hour[2] or '00'}", []).append(i)
+        elif re.search(r"місто|город|city", h):
+            col_map["name"] = i
+        elif re.search(r"адмін|admin", h):
             col_map["admin"] = i
         elif re.search(r"примітк|примечан|note", h):
             col_map["remark"] = i
+        elif re.search(r"(?:стоп|stop).*?(?:цех|workshop)|workshop", h):
+            col_map["workshop"] = i
         elif re.search(r"стоп|stop", h):
             col_map["stop"] = i
         elif re.search(r"центр|center", h):
@@ -131,17 +140,24 @@ def parse_sheet_rows(text: str, existing_kml: dict[str, str]) -> list[dict[str, 
         elif re.search(r"терминал|термінал|terminal", h):
             col_map["terminal"] = i
 
+    required = {"name", "center", "pickup", "far", "stop", "workshop"}
+    if missing := required - col_map.keys():
+        raise ValueError(f"Kitchen sheet headers missing: {', '.join(sorted(missing))}")
+
+    updated = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d%H%M%S")
+
     kitchens: list[dict[str, str]] = []
     current_city = ""
     known_names = set(existing_kml.keys()) | set(DEFAULT_KML_KEYS.keys())
 
     for row in rows[1:]:
-        row = list(row) + [""] * 12
-        first = clean_cell(row[0])
+        row = list(row) + [""] * len(header)
+        cell = lambda key: clean_cell(row[col_map[key]]) if key in col_map else ""
+        first = cell("name")
         if not first:
             continue
 
-        other_cells = [clean_cell(c) for c in row[1:] if clean_cell(c)]
+        other_cells = [clean_cell(c) for i, c in enumerate(row) if i != col_map["name"] and clean_cell(c)]
         if not other_cells and not first.startswith("[") and not any(alias.lower() in first.lower() for alias in NAME_ALIASES):
             current_city = first.title()
             continue
@@ -158,16 +174,24 @@ def parse_sheet_rows(text: str, existing_kml: dict[str, str]) -> list[dict[str, 
                 name = canon
                 break
 
-        admin = clean_cell(row[col_map["admin"]])
-        note = clean_cell(row[col_map["remark"]])
+        admin = cell("admin")
+        note = cell("remark")
         rem_parts = [p for p in (admin, note) if p]
         remark = " | ".join(rem_parts)
 
-        center = clean_cell(row[col_map["center"]]) or "Стандарт"
-        pickup = clean_cell(row[col_map["pickup"]]) or "Стандарт"
-        far = clean_cell(row[col_map["far"]]) or "Стандарт"
-        stop = clean_cell(row[col_map["stop"]])
-        terminal = clean_cell(row[col_map["terminal"]])
+        center = cell("center") or "Стандарт"
+        pickup = cell("pickup") or "Стандарт"
+        far = cell("far") or "Стандарт"
+        stop = clean_stop(cell("stop"))
+        terminal = cell("terminal")
+        available, limited = [], []
+        for time, columns in sorted(hours.items()):
+            states = [slot_state(row[i]) for i in columns]
+            # Conflicting/unknown duplicates cannot advertise capacity.
+            if all(s == "available" for s in states):
+                available.append(time)
+            elif all(s in ("available", "limited") for s in states):
+                limited.append(time)
 
         kml = existing_kml.get(name) or DEFAULT_KML_KEYS.get(name, "")
 
@@ -183,10 +207,36 @@ def parse_sheet_rows(text: str, existing_kml: dict[str, str]) -> list[dict[str, 
                 "FarZone": far,
                 "StopList": stop,
                 "Terminal": terminal,
+                "StopWorkshop": clean_stop(cell("workshop")),
+                "PreorderAvailable": ", ".join(available),
+                "PreorderLimited": ", ".join(limited),
+                "SlotsLoaded": "1" if hours else "0",
+                "DataVersion": "2",
+                "UpdatedUTC": updated,
             }
         )
 
     return kitchens
+
+
+def clean_stop(value: str) -> str:
+    if value.casefold() in ("стандарт", "standard", "нет", "немає", "нема", "-", "—"):
+        return ""
+    return value
+
+
+def slot_state(value: str) -> str:
+    markers = set(value) & set("🟢🟡🔴⚪⚫🔘🟠")
+    if markers == {"🟢"}:
+        return "available"
+    if markers == {"🟡"}:
+        return "limited"
+    return "unavailable"
+
+
+INI_FIELDS = ("City", "Address", "KmlKey", "Remark", "Center", "Pickup", "FarZone",
+              "StopList", "Terminal", "StopWorkshop", "PreorderAvailable", "PreorderLimited",
+              "SlotsLoaded", "DataVersion", "UpdatedUTC")
 
 
 def write_ini_file(path: Path, kitchens: list[dict[str, str]]) -> None:
@@ -204,7 +254,7 @@ def write_ini_file(path: Path, kitchens: list[dict[str, str]]) -> None:
 
     for kitchen in kitchens:
         lines.append(f"[{kitchen['Name']}]")
-        for key in ("City", "Address", "KmlKey", "Remark", "Center", "Pickup", "FarZone", "StopList", "Terminal"):
+        for key in INI_FIELDS:
             value = kitchen.get(key, "")
             if key == "KmlKey" and not value:
                 continue
@@ -226,9 +276,9 @@ def main() -> int:
     target_paths = kitchens_paths()
     existing_kml = dict(DEFAULT_KML_KEYS)
     for p in target_paths:
-        existing_kml.update(parse_existing_kml_keys(p))
         backup_path = p.with_suffix(p.suffix + ".bak_sheet")
         existing_kml.update(parse_existing_kml_keys(backup_path))
+        existing_kml.update(parse_existing_kml_keys(p))
 
     with urllib.request.urlopen(CSV_URL, timeout=15) as response:
         text = response.read().decode("utf-8-sig")

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Version = "0.1.0",
     [string]$OutputDirectory = (Join-Path $env:TEMP "RollHelperRelease")
 )
@@ -141,6 +141,7 @@ if ($iikoBridgeText -notmatch "_rollclub_point_dialogs\.is_known_find_point_dial
 [IO.File]::WriteAllText($iikoBridgePath, $iikoBridgeText, [Text.Encoding]::UTF8)
 
 $syncScriptPath = Join-Path $serverRoot "sync_rollclub_kitchens.py"
+Copy-Item -LiteralPath (Join-Path $repoRoot "brands\rollclub\server\sync_rollclub_kitchens.py") -Destination $syncScriptPath
 $syncScriptText = [IO.File]::ReadAllText($syncScriptPath, [Text.Encoding]::UTF8)
 if ($syncScriptText -notmatch "ROLLHELPER_ROLLCLUB_USERDATA") {
     $syncScriptText = $syncScriptText -replace "import datetime as dt\r?\n", "import datetime as dt`r`nimport os`r`n"

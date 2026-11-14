@@ -28,3 +28,13 @@ KML preservation, actual current CSV, AHK formatting and real GUI geometry at
 100/125/150% scale and small work areas. Verify owned-card visibility/close,
 source syntax, package contents/checksum and protected manifest entries. Keep
 live Sheet read-only. Do not start operational RollHelper or change orders.
+
+Verification completed: 13 new tests (11 real sync-parser/cache tests and two
+native AHK tests); full RollClub discovery 111 tests / 107 pass / four known
+baseline issues listed in STATUS.md. Native tab component passes separately
+and in the final suite. Packaged Python parses the read-only source fixture;
+packaged AHK syntax passes. Reviewed real card captures at 100/125/150%.
+Only engine_rollclub.ahk, sync_rollclub_kitchens.py and package.json differ
+from the published baseline; one new kitchen UI include is added. The duty
+helper and every other existing ZIP member are byte-identical. Real Syrve
+order-card validation remains with the operator after launcher update.

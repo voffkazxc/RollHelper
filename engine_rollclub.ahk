@@ -6,6 +6,7 @@ SetWorkingDir %A_ScriptDir%\brands\rollclub   ; дані Roll Club (конфіг
 FileEncoding, UTF-8
 #Include %A_ScriptDir%\lib\IikoUI.ahk
 #Include %A_ScriptDir%\lib\RollClubDutyBackground.ahk
+#Include %A_ScriptDir%\lib\RollClubKitchenStatus.ahk
 #Include %A_ScriptDir%\core\orchestration\OperationCoordinator.ahk
 #Include %A_ScriptDir%\core\modules\ModuleRegistry.ahk
 
@@ -358,6 +359,8 @@ RollFocusWatcher:
     if !WinExist("Rollclub PRO 33.0")
         return
     if WinActive("Rollclub PRO 33.0")
+        return
+    if (IsObject(RcKC) && WinActive("ahk_id " . RcKC.hwnd))
         return
     if WinActive("Налаштування RollClub")
         return
@@ -1083,7 +1086,7 @@ LoadKitchens:
             if (curObj)
                 Kitchens.Push(curObj)
             curSec := SubStr(line, 2, StrLen(line) - 2)
-            curObj := {Name: curSec, City: "", Address: "", KmlKey: "", Remark: "", Center: "Стандарт", Pickup: "Стандарт", FarZone: "Стандарт", StopList: ""}
+            curObj := {Name: curSec, City: "", Address: "", KmlKey: "", Remark: "", Center: "Стандарт", Pickup: "Стандарт", FarZone: "Стандарт", StopList: "", StopWorkshop: "", Terminal: "", PreorderAvailable: "", PreorderLimited: "", SlotsLoaded: "0", DataVersion: "", UpdatedUTC: ""}
             continue
         }
         ; key=value
@@ -1108,10 +1111,21 @@ LoadKitchens:
             curObj.FarZone := v
         else if (k == "StopList")
             curObj.StopList := v
+        else if (k == "StopWorkshop" || k == "Terminal" || k == "PreorderAvailable" || k == "PreorderLimited" || k == "SlotsLoaded" || k == "DataVersion" || k == "UpdatedUTC")
+            curObj[k] := v
     }
     if (curObj)
         Kitchens.Push(curObj)
     logFile := A_ScriptDir "\siv_debug.log"
+    if (IsObject(RcKC) && IsObject(RcKC.k)) {
+        for _, refreshedKitchen in Kitchens {
+            if (refreshedKitchen.Name == RcKC.k.Name) {
+                RcCurrentKitchen := refreshedKitchen
+                RcKitchenPresent(refreshedKitchen, RcKC.extra)
+                break
+            }
+        }
+    }
     kCnt := Kitchens.MaxIndex() ? Kitchens.MaxIndex() : 0
     FileAppend, `n[DEBUG] %A_Now% - Event: Kitchens loaded = %kCnt%`n, %logFile%
 return
@@ -1122,8 +1136,10 @@ SyncKitchensFromSheet:
         return
     global RcKitchenLastSyncTick
     syncScript := A_ScriptDir "\..\server\sync_rollclub_kitchens.py"
-    if !FileExist(syncScript)
+    if !FileExist(syncScript) {
+        RcKitchenSyncFailed := true
         return
+    }
     _userDataDir := RcUserDataDir()
     EnvSet, ROLLHELPER_ROLLCLUB_USERDATA, %_userDataDir%
     _pythonExe := A_ScriptDir "\..\runtime\python\python.exe"
@@ -1131,6 +1147,7 @@ SyncKitchensFromSheet:
         _pythonExe := "python"
     _syncCmd := """" . _pythonExe . """ sync_rollclub_kitchens.py --quiet"
     RunWait, %ComSpec% /c %_syncCmd%, %A_ScriptDir%\..\server, Hide UseErrorLevel
+    RcKitchenSyncFailed := ErrorLevel ? true : false
     if (ErrorLevel) {
         logFile := A_ScriptDir "\siv_debug.log"
         FileAppend, `n[DEBUG] %A_Now% - Event: Kitchens sheet sync failed, ErrorLevel=%ErrorLevel%`n, %logFile%
@@ -2408,6 +2425,8 @@ return
 ; ПУЛЬТ КЕРУВАННЯ
 ; ========================================================
 DrawRollclub:
+    RcKitchenCardHide()
+    RcKC := {dismissed:false}
     RhStaticColors := {}
     Gui, Roll:Destroy
     Gui, Roll:+AlwaysOnTop -MaximizeBox -MinimizeBox +ToolWindow
@@ -2466,7 +2485,7 @@ DrawRollclub:
     curY += 30
     _kitchInitTxt := (hasPickup && IsObject(RcCurrentKitchen)) ? RcCurrentKitchen.Name : ""
     Gui, Roll:Font, s8 norm c%RhC_Muted%, %RhFontName%
-    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200 vKitchenStatusText, %_kitchInitTxt%
+    Gui, Roll:Add, Text, x%x0% y%curY% w%w0% h16 +0x200 +0x4000 gRcShowKitchenCard vKitchenStatusText, %_kitchInitTxt%
     curY += 20
 
     ; Alerts
@@ -2721,6 +2740,7 @@ DrawRollclub:
     Gui, Roll:Show, x350 y20 w360 h%GuiBaseHeight%, Rollclub PRO 33.0
     Gui, Roll:+LastFound
     RollHwnd := WinExist()
+    RcKitchenPresent(RcCurrentKitchen)
     GoSub, RhRepaintRollPult
     GoSub, RhSivInlineUpdate
 
@@ -4252,7 +4272,10 @@ WriteKitchensFile:
         out .= "Center=" . k.Center . "`n"
         out .= "Pickup=" . k.Pickup . "`n"
         out .= "FarZone=" . k.FarZone . "`n"
-        out .= "StopList=" . k.StopList . "`n`n"
+        out .= "StopList=" . k.StopList . "`n"
+        for _, field in ["StopWorkshop", "Terminal", "PreorderAvailable", "PreorderLimited", "SlotsLoaded", "DataVersion", "UpdatedUTC"]
+            out .= field . "=" . k[field] . "`n"
+        out .= "`n"
     }
     ; записуємо через FileObject у UTF-8 з BOM
     FileDelete, %KitchensPath%
@@ -5735,6 +5758,7 @@ RcCheckZone:
     global RcZoneBoundaryWarnMeters, RcLastZoneBoundaryMeters, RcLastZoneUncertain, RcLastGeocodeApprox, RcLastZoneOverlap
     global RcLastZone, RcCurrentZoneMapped, RcCurrentDeliveryType, lastZoneName
     SetTimer, RcCheckZone, Off
+    RcKitchenPresent("")
     RcLastZoneBoundaryMeters := -1
     RcLastZoneUncertain := 0
     RcLastGeocodeApprox := 0
@@ -5755,7 +5779,10 @@ RcCheckZone:
     if (hasPickup) {
         _pTxt := "САМОВИВІЗ" . (pickupPoint != "" ? (": " . pickupPoint) : "")
         GuiControl, Roll:, MapSearch, %_pTxt%
-        GuiControl, Roll:, KitchenStatusText, % (IsObject(RcCurrentKitchen) ? RcCurrentKitchen.Name : "")
+        RcCurrentKitchen := RcFindKitchenFromPointOrConcept(_curPoint, _curConcept)
+        if (!IsObject(RcCurrentKitchen))
+            RcCurrentKitchen := RcFindKitchenFromText(pickupPoint)
+        RcKitchenPresent(RcCurrentKitchen)
         RhRegColor(hZoneBox, RhB_Green, RhB_White)
         _pickupMin := RcKitchenMinutes("pickup", 40)
         RcApplyTimeEvaluation(_pickupMin, "PICKUP")
@@ -5928,16 +5955,16 @@ RcCheckZone:
                     parts .= "Самовивіз: " . k.Pickup
                     kAlertBeep := 1
                 }
-                if (k.StopList != "") {
+                if (k.StopList != "" || k.StopWorkshop != "") {
                     if (parts != "") parts .= "   "
-                    parts .= "СТОП: " . k.StopList
+                    parts .= "СТОП: " . k.StopList . (k.StopWorkshop != "" ? " / " . k.StopWorkshop : "")
                     kAlertBeep := 1
                 }
                 if (k.Remark != "") {
                     if (parts != "") parts .= "   "
                     parts .= k.Remark
                 }
-                kAlertText := parts
+                kAlertText := ""
             }
             if (kAlertBeep)
                 RcPlaySound("notice")
@@ -5977,7 +6004,7 @@ RcCheckZone:
             else
                 RhRegColor(hZoneBox, RhB_Green, RhB_White)
             DllCall("InvalidateRect", "Ptr", hZoneBox, "Ptr", 0, "Int", 1)
-            GuiControl, Roll:, KitchenStatusText, %kAlertText%
+            RcKitchenPresent(RcCurrentKitchen, kAlertText)
         } else {
             RcLastZone := ""
             if (RcApplyPointFallback("Точку не знайдено в зонах"))
@@ -6061,16 +6088,16 @@ RcApplyPointFallback(reasonText := "Адресу не знайдено") {
             parts .= "Самовивіз: " . k.Pickup
             kAlertBeep := 1
         }
-        if (k.StopList != "") {
+        if (k.StopList != "" || k.StopWorkshop != "") {
             if (parts != "") parts .= "   "
-            parts .= "СТОП: " . k.StopList
+            parts .= "СТОП: " . k.StopList . (k.StopWorkshop != "" ? " / " . k.StopWorkshop : "")
             kAlertBeep := 1
         }
         if (k.Remark != "") {
             if (parts != "") parts .= "   "
             parts .= k.Remark
         }
-        kAlertText := parts
+        kAlertText := ""
         
         _deliveryMin := RcGetEffectiveTime(RcCurrentKitchen.Name, "STANDARD", false, cRaw, fRaw, minFar)
         RcLastDeliveryMin := _deliveryMin
@@ -6087,7 +6114,7 @@ RcApplyPointFallback(reasonText := "Адресу не знайдено") {
             
         result := "⚠ ТОЧКА: " . RcCurrentKitchen.Name . " (перевір адресу)"
         GuiControl, Roll:, MapSearch, %result%
-        GuiControl, Roll:, KitchenStatusText, %kAlertText%
+        RcKitchenPresent(RcCurrentKitchen, kAlertText)
         RhRegColor(hZoneBox, RhB_TintAmber, RhB_Text)
         DllCall("InvalidateRect", "Ptr", hZoneBox, "Ptr", 0, "Int", 1)
         RcPlaySound("ok")
