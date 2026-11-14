@@ -2956,7 +2956,9 @@ KcDutyTick:
     kcForce := 1
     kcPaused := 0
     kcTook := 0
+    _rcDutyTickBackground := 1
     GoSub, KcMonitor
+    _rcDutyTickBackground := 0
     if (kcTook)
     {
         dutyOn := 0
@@ -3029,22 +3031,25 @@ KcMonitor:
     kcForce := 0
     kcBusy := 1
     kcStop := 0                     ; свіжий захід — скинути прапор стопу
-    ; A minimized Office gets a separate UIA-only path. It never falls through
-    ; to the legacy screen clicks on failure or after a partially completed take.
+    ; Ctrl+F4 always uses UIA. Window state must never select WinActivate/Send.
+    _bgRequested := (dutyOn || _rcDutyTickBackground)
     _bgHwnd := RcDutyBgHwnd()
-    if (_bgHwnd = -1) {
+    if (_bgRequested && _bgHwnd <= 0) {
+        RcDutyBgLog("route_failed", "hwnd=" . _bgHwnd)
         dutyOn := 0
         kcStop := 1
         kcBusy := 0
         SetTimer, KcDutyTick, Off
         SetTimer, KcMonitor, Off
-        ToolTip, Ctrl+F4: відкрито кілька вікон Syrve Office. Залиште одне.
+        ToolTip, Ctrl+F4: не вдалося однозначно знайти Syrve Office. Деталі у фоновому журналі.
         SetTimer, RemoveToolTip, -8000
         return
     }
-    if (_bgHwnd) {
+    if (_bgRequested) {
         WinGet, _bgState, MinMax, ahk_id %_bgHwnd%
-        if (_bgState = -1) {
+        RcDutyBgLog("route", "background_only hwnd=" . _bgHwnd . " state=" . _bgState)
+        RcDutyBgWasMinimized := (_bgState = -1)
+        {
             RcDutyBgRunGeneration := RcDutyBgGeneration
             _bgBookedNo := 0
             try {

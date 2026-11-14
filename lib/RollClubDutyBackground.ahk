@@ -28,15 +28,17 @@ RcDutyBgLog(event, detail := "") {
 
 RcDutyBgCheck(hwnd) {
     global kcStop, dutyOn, rhPunchBusy, _inDutyTake
-    global RcDutyBgGeneration, RcDutyBgRunGeneration
+    global RcDutyBgGeneration, RcDutyBgRunGeneration, RcDutyBgWasMinimized
     Sleep, -1  ; dispatch a pending stop/manual hotkey before the next UIA action
     if (kcStop || !dutyOn || rhPunchBusy || _inDutyTake || RcDutyBgGeneration != RcDutyBgRunGeneration)
         throw Exception("STOP")
     if (!DllCall("IsWindow", "Ptr", hwnd))
         throw Exception("Вікно Syrve закрито. Запустіть його знову.")
     WinGet, state, MinMax, ahk_id %hwnd%
-    if (state != -1)
-        throw Exception("Syrve більше не згорнуто. Перезапустіть дежурство Ctrl+F4.")
+    if (state = -1)
+        RcDutyBgWasMinimized := true
+    else if (RcDutyBgWasMinimized)
+        throw Exception("Syrve було розгорнуто. Фонове дежурство зупинено.")
 }
 
 RcDutyBgWait(hwnd, milliseconds) {
@@ -133,7 +135,9 @@ RcDutyBgAttach(hwnd) {
     if (!IikoDriver_InitEngine())
         throw Exception("UI Automation недоступна.")
     window := IikoDriver_UiaInstance.ElementFromHandle(hwnd)
-    grid := RcDutyBgFindId(window, "gridDeliveries")
+    ; One native cold lookup; a generic bounded walk may exhaust its budget on
+    ; unrelated controls before reaching the actual delivery workspace.
+    grid := window.FindFirstBy("AutomationId=gridDeliveries")
     if (!IsObject(grid))
         throw Exception("Відкрийте вкладку Доставки перед згортанням Syrve.")
     panel := ""
@@ -145,36 +149,8 @@ RcDutyBgAttach(hwnd) {
     }
     if (!IsObject(panel))
         throw Exception("Syrve не надає таблицю згорнутого вікна через UIA.")
-    ; Find the tab control that actually contains this delivery grid. This is a
-    ; bounded ancestor walk once per attachment, not a whole-window tree scan.
-    parent := grid
-    tabControl := ""
-    Loop, 12 {
-        parent := IikoDriver_UiaInstance.ControlViewWalker.GetParentElement(parent)
-        if (!IsObject(parent) || parent.CurrentProcessId != pid)
-            break
-        RcDutyBgLog("ancestor", "id=" . parent.CurrentAutomationId . " type=" . parent.CurrentControlType . " class=" . parent.CurrentClassName)
-        if (parent.CurrentControlType = 50018) {
-            tabControl := parent
-            break
-        }
-    }
-    current := "", alternate := ""
-    if IsObject(tabControl) {
-        for _, tab in tabControl.FindAllBy("ControlType=TabItem", 2) {
-            try {
-                pattern := tab.GetCurrentPatternAs("SelectionItem")
-                if (pattern.CurrentIsSelected)
-                    current := tab
-                else if (tab.CurrentIsEnabled && !IsObject(alternate))
-                    alternate := tab
-            }
-        }
-    }
-    if (!IsObject(current) || !IsObject(alternate))
-        throw Exception("Syrve не надає фонове перемикання вкладок UIA. Деталі: rollclub_duty_background.log.")
-    cached := {hwnd: hwnd, pid: pid, window: window, grid: grid, panel: panel, current: current, alternate: alternate}
-    RcDutyBgLog("attached", "hwnd=" . hwnd . " pid=" . pid . " tab=" . current.CurrentName)
+    cached := {hwnd: hwnd, pid: pid, window: window, grid: grid, panel: panel}
+    RcDutyBgLog("attached", "hwnd=" . hwnd . " pid=" . pid . " mode=read_only_poll")
     return cached
 }
 
@@ -245,18 +221,10 @@ RcDutyBgCycle(hwnd, ByRef bookedNo) {
         throw Exception("У Syrve відкрита картка. Закрийте її перед дежурством.")
     if (RcDutyBgConflict(hwnd))
         throw Exception("У Syrve відкрито підтвердження. Закрийте його перед дежурством.")
-    ; Same refresh as Ctrl+Tab twice, using selection patterns without keys.
-    if (!context.current.GetCurrentPatternAs("SelectionItem").CurrentIsSelected)
-        throw Exception("Вкладку Syrve змінено. Відкрийте Доставки і повторіть.")
-    RcDutyBgCheck(hwnd)
-    context.alternate.GetCurrentPatternAs("SelectionItem").Select()
-    ; Always return to Deliveries even if stop arrived between selections.
-    Sleep, 220
-    context.current.GetCurrentPatternAs("SelectionItem").Select()
-    RcDutyBgWait(hwnd, 330)
-    context := RcDutyBgAttach(hwnd)
+    ; Poll delivery values without changing the visible UI or selected tab.
     response := RcDutyBgRead(hwnd)
     orderNo := RcDutyBgNumber(response, "take_no")
+    RcDutyBgLog("scan", "hwnd=" . hwnd . " take_no=" . orderNo)
     if (!orderNo)
         return 0
     ; Resolve the exact row after the refresh; do not filter or use first-row XY.
@@ -267,6 +235,7 @@ RcDutyBgCycle(hwnd, ByRef bookedNo) {
     if (!IsObject(target))
         throw Exception("Рядок замовлення змінився. Перезапустіть дежурство.")
     RcDutyBgCheck(hwnd)
+    RcDutyBgLog("opening", "order=" . orderNo . " hwnd=" . hwnd)
     if (!RcDutyBgInvoke(target.cell) && !RcDutyBgInvoke(target.row))
         throw Exception("Syrve не надає відкриття рядка через UIA. Деталі: rollclub_duty_background.log.")
     RcDutyBgLog("open_requested", "order=" . orderNo)
@@ -299,6 +268,7 @@ RcDutyBgCycle(hwnd, ByRef bookedNo) {
     }
     close := RcDutyBgFindId(card, "buttonClose", 8)
     RcDutyBgCheck(hwnd)
+    RcDutyBgLog("closing", "order=" . orderNo . " hwnd=" . hwnd)
     if (!IsObject(close) || !RcDutyBgInvoke(close))
         throw Exception("Не вдалося закрити картку через UIA. Перевірте Syrve.")
     deadline := A_TickCount + 3500

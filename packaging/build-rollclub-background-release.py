@@ -61,13 +61,19 @@ def build(args):
                 raise ValueError(f"Published {packaged} differs from baseline source")
 
         replacements = {packaged: (ROOT / tracked).read_bytes() for packaged, tracked in SOURCE_FILES.items()}
+        for name in list(replacements):
+            if name in names and normalized(replacements[name]) == normalized(old.read(name)):
+                replacements[name] = old.read(name)
         for name, data in replacements.items():
             if name.endswith(".ahk") and not data.startswith(b"\xef\xbb\xbf"):
                 raise ValueError(f"AHK UTF-8 BOM missing: {name}")
         app = normalized(old.read("server/app.py"))
-        if app.count(READ_CALL) != 1:
-            raise ValueError("Expected exactly one legacy duty route to extend")
-        replacements["server/app.py"] = app.replace(READ_CALL, BACKGROUND_CALL).encode("utf-8")
+        if "_rollclub_kc.read_kc_list_background(" in app:
+            replacements["server/app.py"] = old.read("server/app.py")
+        else:
+            if app.count(READ_CALL) != 1:
+                raise ValueError("Expected exactly one legacy duty route to extend")
+            replacements["server/app.py"] = app.replace(READ_CALL, BACKGROUND_CALL).encode("utf-8")
         compile(replacements["server/app.py"], "app.py", "exec")
         compile(replacements["server/rollclub_kc_legacy.py"], "rollclub_kc_legacy.py", "exec")
         package = json.loads(old.read("package.json"))
