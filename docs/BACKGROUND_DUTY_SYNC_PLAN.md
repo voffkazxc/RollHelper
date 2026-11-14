@@ -28,5 +28,26 @@ activations. Native fixtures verify mouse/filter cleanup and rejecting a
 non-WinForms refresh target. The installed RestoGrid test verifies active vs
 hidden cached grids and the existing Enter activation. Full live application
 navigation still needs verification; no claim of a complete live booking is
-made. Do not publish a new operator update before choosing the live check or
-receiving the operator's preference to test from the launcher himself.
+made.
+
+## Authorized live validation
+
+The operator authorized exactly the outward/return navigation and minimized
+Syrve. The initial read-only preflight could not find the tab through the UIA
+root: mainControl/panelContainer do not expose their descendants when minimized.
+Direct HWND-based UIA attachment still exposes the actual tab and grid.
+
+Added bounded cold native HWND discovery by stable AutomationId, in AHK and the
+background Python reader. Native cache validation does not use IsOffscreen or
+Exists. Card/close lookup also gets the same native fallback when descendants
+are suppressed. No absolute HWND is configured in production.
+
+The authorized live check then returned:
+
+    before=Доставки| middle=Клиенты доставки| after=Доставки|
+    state_before=-1 state_after=-1 foreground_unchanged=1
+
+No order was opened or modified. A separate read-only cold-reader check with a
+fresh in-memory bridge succeeded while that actual window was minimized,
+reading five rows through the native grid binding. Installed code/server files
+were not patched or restarted. Full live booking remains unverified.

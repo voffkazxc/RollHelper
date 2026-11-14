@@ -5,11 +5,38 @@ from pathlib import Path
 import re
 import subprocess
 import tempfile
+from unittest.mock import patch
 
 from test_rollclub_duty_cache import Bridge, Control, MODULE
 
 
 class BackgroundDutyTests(unittest.TestCase):
+    def test_native_grid_cold_bind_does_not_require_uia_ancestors(self):
+        bridge = self.bridge()
+        bridge._find_by_id = lambda *args, **kwargs: self.fail("minimized ancestor traversal")
+        with patch.object(MODULE, "_native_control", return_value=bridge.grid) as lookup:
+            first = MODULE.read_kc_list_background(bridge, 123)
+            second = MODULE.read_kc_list_background(bridge, 123)
+        self.assertEqual(first["take_no"], 741877)
+        self.assertEqual(second["take_no"], 741877)
+        lookup.assert_called_once_with(bridge, 123, "gridDeliveries")
+
+    def test_cold_minimized_reader_uses_native_tab_when_root_is_blind(self):
+        bridge = self.bridge()
+        native_tab = Control("native tab")
+        original = bridge._find_by_id
+        def find(control, automation_id, max_depth=0):
+            if automation_id == "gridDeliveries":
+                self.assertIs(control, native_tab)
+            return original(control, automation_id, max_depth)
+        bridge._find_by_id = find
+        with patch.object(MODULE, "_native_tab_window", return_value=native_tab) as lookup:
+            first = MODULE.read_kc_list_background(bridge, 123)
+            second = MODULE.read_kc_list_background(bridge, 123)
+        self.assertEqual(first["take_no"], 741877)
+        self.assertEqual(second["take_no"], 741877)
+        self.assertEqual(lookup.call_count, 1, "native discovery only on cold bind")
+
     def test_ctrl_f4_never_routes_to_legacy_for_any_window_state(self):
         executable = Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "AutoHotkey/v1.1.37.02/AutoHotkeyU64.exe"
         if not executable.exists():

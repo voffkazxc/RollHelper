@@ -136,7 +136,14 @@ RcDutyBgAttach(hwnd) {
     window := IikoDriver_UiaInstance.ElementFromHandle(hwnd)
     ; One native cold lookup; a generic bounded walk may exhaust its budget on
     ; unrelated controls before reaching the actual delivery workspace.
-    grid := window.FindFirstBy("AutomationId=gridDeliveries")
+    workspace := window.FindFirstBy("AutomationId=tabControlMain")
+    if (!IsObject(workspace))
+        workspace := RcDutyBgNativeFind(IikoDriver_UiaInstance, hwnd, "tabControlMain")
+    if (!IsObject(workspace))
+        throw Exception("Не знайдено робочу область Syrve tabControlMain.")
+    grid := workspace.FindFirstBy("AutomationId=gridDeliveries")
+    if (!IsObject(grid))
+        grid := RcDutyBgNativeFind(IikoDriver_UiaInstance, workspace.CurrentNativeWindowHandle, "gridDeliveries")
     if (!IsObject(grid))
         throw Exception("Відкрийте вкладку Доставки перед згортанням Syrve.")
     panel := ""
@@ -148,12 +155,46 @@ RcDutyBgAttach(hwnd) {
     }
     if (!IsObject(panel))
         throw Exception("Syrve не надає таблицю згорнутого вікна через UIA.")
-    workspace := window.FindFirstBy("AutomationId=tabControlMain")
-    if (!IsObject(workspace))
-        throw Exception("Не знайдено робочу область Syrve tabControlMain.")
     cached := {hwnd: hwnd, pid: pid, window: window, grid: grid, panel: panel, workspace: workspace}
     RcDutyBgLog("attached", "hwnd=" . hwnd . " pid=" . pid . " mode=native_scenario")
     return cached
+}
+
+RcDutyBgNativeFind(uia, hwnd, automationId, depth := 12, ByRef budget := "") {
+    if (budget = "")
+        budget := 512
+    if (!hwnd || depth <= 0 || budget <= 0)
+        return ""
+    child := DllCall("GetWindow", "Ptr", hwnd, "UInt", 5, "Ptr")
+    while (child && budget > 0) {
+        budget--
+        if (DllCall("GetWindowLong", "Ptr", child, "Int", -16, "UInt") & 0x10000000) {
+            skipChildren := false
+            try {
+                element := uia.ElementFromHandle(child)
+                childId := element.CurrentAutomationId
+                if (childId = automationId)
+                    return element
+                skipChildren := (childId = "gridDeliveries")
+            }
+            if (!skipChildren) {
+                found := RcDutyBgNativeFind(uia, child, automationId, depth - 1, budget)
+                if IsObject(found)
+                    return found
+            }
+        }
+        child := DllCall("GetWindow", "Ptr", child, "UInt", 2, "Ptr")
+    }
+    return ""
+}
+
+RcDutyBgWorkspaceElement(context, automationId) {
+    global IikoDriver_UiaInstance
+    element := context.workspace.FindFirstBy("AutomationId=" . automationId)
+    if IsObject(element)
+        return element
+    budget := 128
+    return RcDutyBgNativeFind(IikoDriver_UiaInstance, context.workspace.CurrentNativeWindowHandle, automationId, 8, budget)
 }
 
 RcDutyBgTabSnapshot(workspace) {
@@ -446,7 +487,7 @@ RcDutyBgCycle(hwnd, ByRef bookedNo) {
     global IikoDriver_UiaInstance
     RcDutyBgCheck(hwnd)
     context := RcDutyBgAttach(hwnd)
-    if IsObject(context.workspace.FindFirstBy("AutomationId=DeliveryOrderEditControl"))
+    if IsObject(RcDutyBgWorkspaceElement(context, "DeliveryOrderEditControl"))
         throw Exception("У Syrve відкрита картка. Закрийте її перед дежурством.")
     if (RcDutyBgConflict(hwnd))
         throw Exception("У Syrve відкрито підтвердження. Закрийте його перед дежурством.")
@@ -491,7 +532,7 @@ RcDutyBgCycle(hwnd, ByRef bookedNo) {
             RcDutyBgLog("operator_conflict", "order=" . orderNo . " rejected=" . rejected)
             throw Exception("Замовлення зайняв інший оператор. Дежурство зупинено.")
         }
-        card := context.workspace.FindFirstBy("AutomationId=DeliveryOrderEditControl")
+        card := RcDutyBgWorkspaceElement(context, "DeliveryOrderEditControl")
         if IsObject(card)
             break
         RcDutyBgWait(hwnd, 100)
@@ -512,6 +553,8 @@ RcDutyBgCycle(hwnd, ByRef bookedNo) {
         }
     }
     close := card.FindFirstBy("AutomationId=buttonClose")
+    if (!IsObject(close))
+        close := RcDutyBgNativeFind(IikoDriver_UiaInstance, card.CurrentNativeWindowHandle, "buttonClose", 8)
     RcDutyBgCheck(hwnd)
     RcDutyBgLog("closing", "order=" . orderNo . " hwnd=" . hwnd)
     if (!IsObject(close) || !RcDutyBgInvoke(close))
@@ -520,7 +563,7 @@ RcDutyBgCycle(hwnd, ByRef bookedNo) {
     filterCleared := false
     while (A_TickCount < deadline) {
         RcDutyBgWait(hwnd, 100)
-        if (!IsObject(context.workspace.FindFirstBy("AutomationId=DeliveryOrderEditControl"))) {
+        if (!IsObject(RcDutyBgWorkspaceElement(context, "DeliveryOrderEditControl"))) {
             if (!filterCleared) {
                 RcDutyBgFilter(hwnd, context, "")
                 filterCleared := true

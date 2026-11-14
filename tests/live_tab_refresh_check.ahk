@@ -15,6 +15,8 @@ try {
     uia := UIA_Interface()
     window := uia.ElementFromHandle(hwnd)
     workspace := window.FindFirstBy("AutomationId=tabControlMain")
+    if (!IsObject(workspace))
+        workspace := RcDutyBgNativeFind(uia, hwnd, "tabControlMain")
     beforePage := RcDutyBgTabSnapshot(workspace)
     FileAppend, % "PREFLIGHT hwnd=" . hwnd . " state=" . beforeState . " page=" . beforePage . "`n", *
     if (A_Args[1] != "--execute")
@@ -29,6 +31,8 @@ try {
     if (popup != hwnd && DllCall("IsWindowVisible", "Ptr", popup))
         throw Exception("A modal window is open; no navigation was attempted")
     grid := workspace.FindFirstBy("AutomationId=gridDeliveries")
+    if (!IsObject(grid))
+        grid := RcDutyBgNativeFind(uia, workspace.CurrentNativeWindowHandle, "gridDeliveries")
     if (!IsObject(grid) || !RcDutyBgGridIsActive({grid: grid, workspace: workspace}))
         throw Exception("Delivery grid is not active; no navigation was attempted")
     foreground := WinActive("A")

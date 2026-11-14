@@ -46,7 +46,9 @@ dutyOn := 1, kcStop := 0, rhPunchBusy := 0, _inDutyTake := 0
 RcDutyBgGeneration := 1, RcDutyBgRunGeneration := 1, RcDutyBgWasMinimized := true
 try {{
     uia := UIA_Interface()
-    grid := uia.ElementFromHandle(gridHwnd)
+    grid := RcDutyBgNativeFind(uia, hwnd, "gridDeliveries")
+    if (!IsObject(grid) || grid.CurrentNativeWindowHandle != gridHwnd)
+        throw Exception("cold native grid lookup failed while minimized")
     panel := ""
     for _, child in grid.FindAllBy("TrueCondition", 2) {{
         if RegExMatch(child.CurrentName, "i)(данных|даних|data)")
