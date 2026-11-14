@@ -168,6 +168,22 @@ RcDutyBgTabSnapshot(workspace) {
     return snapshot
 }
 
+RcDutyBgCtrlTab(tabHwnd) {
+    ; The entrypoint sets -1/-1 for foreground SendInput. ControlSend uses
+    ; these settings too, but DevExpress loses the Ctrl+Tab key event when
+    ; the whole posted sequence is delivered with no press duration/delay.
+    previousDelay := A_KeyDelay, previousDuration := A_KeyDuration
+    try {
+        SetKeyDelay, 30, 30
+        ControlSend, ahk_parent, {Ctrl down}{Tab}{Ctrl up}, ahk_id %tabHwnd%
+        if (ErrorLevel)
+            throw Exception("Не вдалося надіслати фоновий Ctrl+Tab у Syrve.")
+        RcDutyBgLog("ctrl_tab_sent", "tab=" . tabHwnd . " delay=30 duration=30 previous=" . previousDelay . "/" . previousDuration)
+    } finally {
+        SetKeyDelay, %previousDelay%, %previousDuration%
+    }
+}
+
 RcDutyBgRefresh(hwnd, workspace) {
     RcDutyBgCheck(hwnd)
     tabHwnd := workspace.CurrentNativeWindowHandle
@@ -176,16 +192,12 @@ RcDutyBgRefresh(hwnd, workspace) {
     beforeTab := RcDutyBgTabSnapshot(workspace)
     RcDutyBgLog("refresh_begin", "hwnd=" . hwnd . " tab=" . tabHwnd . " page=" . beforeTab)
     ; Explicit modifiers are addressed messages, not global Ctrl presses.
-    ControlSend, ahk_parent, {Ctrl down}{Tab}{Ctrl up}, ahk_id %tabHwnd%
-    if (ErrorLevel)
-        throw Exception("Не вдалося надіслати фоновий Ctrl+Tab у Syrve.")
+    RcDutyBgCtrlTab(tabHwnd)
     ; Complete the round trip even if stop arrives after the first tab.
     Sleep, 220
     middleTab := ""
     try middleTab := RcDutyBgTabSnapshot(workspace)
-    ControlSend, ahk_parent, {Ctrl down}{Tab}{Ctrl up}, ahk_id %tabHwnd%
-    if (ErrorLevel)
-        throw Exception("Не вдалося повернути вкладку Доставки.")
+    RcDutyBgCtrlTab(tabHwnd)
     RcDutyBgWait(hwnd, 330)
     afterTab := RcDutyBgTabSnapshot(workspace)
     RcDutyBgLog("refresh_result", "before=" . beforeTab . " middle=" . middleTab . " after=" . afterTab)
