@@ -24,6 +24,9 @@ try {
     button.CurrentIsEnabled := false
     Assert(!RcDutyBgInvoke(button), "disabled button must not execute")
     Assert(button.invoke.calls = 1, "disabled button had no side effect")
+    button.CurrentIsEnabled := true
+    button.invoke.result := false
+    Assert(!RcDutyBgInvoke(button), "a failed Invoke must not count as success")
 
     row := new FakeElement("row")
     row.legacy := new FakePattern("Выбрать")
@@ -57,7 +60,7 @@ try {
     catch error
         stopped := (error.Message = "STOP")
     Assert(stopped, "operator stop blocks window operations")
-    FileAppend, PASS: 17 background UIA assertions`n, *
+    FileAppend, PASS: 18 background UIA assertions`n, *
     ExitApp, 0
 } catch error {
     FileAppend, % "FAIL: " . error.Message . " line=" . error.Line . "`n", *
@@ -78,12 +81,15 @@ class FakePattern {
     __New(action := "") {
         this.CurrentDefaultAction := action
         this.calls := 0
+        this.result := true
     }
     Invoke() {
         this.calls++
+        return this.result
     }
     DoDefaultAction() {
         this.calls++
+        return true
     }
 }
 

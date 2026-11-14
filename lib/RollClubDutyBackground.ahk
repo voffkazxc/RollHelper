@@ -105,16 +105,15 @@ RcDutyBgInvoke(element) {
     try {
         pattern := element.GetCurrentPatternAs("Invoke")
         if IsObject(pattern) {
-            pattern.Invoke()
-            return true
+            if (pattern.Invoke())
+                return true
         }
     }
     try {
         pattern := element.GetCurrentPatternAs("LegacyIAccessible")
         action := pattern.CurrentDefaultAction
         if (RegExMatch(action, "i)(open|edit|press|click|откр|редакт|наж|відкр|натис)")) {
-            pattern.DoDefaultAction()
-            return true
+            return pattern.DoDefaultAction() ? true : false
         }
     }
     RcDutyBgLog("unsupported_action", "id=" . element.CurrentAutomationId . " name=" . element.CurrentName . " default=" . action)
@@ -149,9 +148,153 @@ RcDutyBgAttach(hwnd) {
     }
     if (!IsObject(panel))
         throw Exception("Syrve не надає таблицю згорнутого вікна через UIA.")
-    cached := {hwnd: hwnd, pid: pid, window: window, grid: grid, panel: panel}
-    RcDutyBgLog("attached", "hwnd=" . hwnd . " pid=" . pid . " mode=read_only_poll")
+    workspace := window.FindFirstBy("AutomationId=tabControlMain")
+    if (!IsObject(workspace))
+        throw Exception("Не знайдено робочу область Syrve tabControlMain.")
+    cached := {hwnd: hwnd, pid: pid, window: window, grid: grid, panel: panel, workspace: workspace}
+    RcDutyBgLog("attached", "hwnd=" . hwnd . " pid=" . pid . " mode=native_scenario")
     return cached
+}
+
+RcDutyBgTabSnapshot(workspace) {
+    snapshot := ""
+    for _, pane in workspace.FindAllBy("TrueCondition", 2) {
+        name := Trim(pane.CurrentName)
+        if (name != "")
+            snapshot .= name . "|"
+    }
+    if (snapshot = "")
+        throw Exception("Syrve не надав стан активної вкладки.")
+    return snapshot
+}
+
+RcDutyBgRefresh(hwnd, workspace) {
+    RcDutyBgCheck(hwnd)
+    tabHwnd := workspace.CurrentNativeWindowHandle
+    if (!tabHwnd || !DllCall("IsChild", "Ptr", hwnd, "Ptr", tabHwnd))
+        throw Exception("Не знайдено нативний tabControlMain для оновлення.")
+    beforeTab := RcDutyBgTabSnapshot(workspace)
+    RcDutyBgLog("refresh_begin", "hwnd=" . hwnd . " tab=" . tabHwnd . " page=" . beforeTab)
+    ; Explicit modifiers are addressed messages, not global Ctrl presses.
+    ControlSend, ahk_parent, {Ctrl down}{Tab}{Ctrl up}, ahk_id %tabHwnd%
+    if (ErrorLevel)
+        throw Exception("Не вдалося надіслати фоновий Ctrl+Tab у Syrve.")
+    ; Complete the round trip even if stop arrives after the first tab.
+    Sleep, 220
+    middleTab := ""
+    try middleTab := RcDutyBgTabSnapshot(workspace)
+    ControlSend, ahk_parent, {Ctrl down}{Tab}{Ctrl up}, ahk_id %tabHwnd%
+    if (ErrorLevel)
+        throw Exception("Не вдалося повернути вкладку Доставки.")
+    RcDutyBgWait(hwnd, 330)
+    afterTab := RcDutyBgTabSnapshot(workspace)
+    RcDutyBgLog("refresh_result", "before=" . beforeTab . " middle=" . middleTab . " after=" . afterTab)
+    if (middleTab = "" || middleTab = beforeTab || afterTab != beforeTab)
+        throw Exception("Фоновий Ctrl+Tab не підтверджено. Перевірте журнал refresh_result.")
+    RcDutyBgLog("refresh_complete", "hwnd=" . hwnd)
+}
+
+RcDutyBgClientPoint(element, controlHwnd) {
+    previousDpi := DllCall("SetThreadDpiAwarenessContext", "Ptr", -4, "Ptr")
+    try {
+        rect := element.CurrentBoundingRectangle
+        if (rect.r <= rect.l || rect.b <= rect.t)
+            throw Exception("Syrve не надав геометрію елемента згорнутого вікна.")
+        VarSetCapacity(point, 8, 0)
+        NumPut(Floor((rect.l + rect.r) / 2), point, 0, "Int")
+        NumPut(Floor((rect.t + rect.b) / 2), point, 4, "Int")
+        if (!DllCall("ScreenToClient", "Ptr", controlHwnd, "Ptr", &point))
+            throw Exception("Не вдалося визначити координати всередині таблиці.")
+        VarSetCapacity(client, 16, 0)
+        if (!DllCall("GetClientRect", "Ptr", controlHwnd, "Ptr", &client))
+            throw Exception("Таблиця Syrve недоступна.")
+        x := NumGet(point, 0, "Int"), y := NumGet(point, 4, "Int")
+        if (x < 0 || y < 0 || x >= NumGet(client, 8, "Int") || y >= NumGet(client, 12, "Int"))
+            throw Exception("Координати поза таблицею. Фоновий клік скасовано.")
+        return {x: x, y: y, packed: (x & 0xFFFF) | ((y & 0xFFFF) << 16)}
+    } finally {
+        if (previousDpi)
+            DllCall("SetThreadDpiAwarenessContext", "Ptr", previousDpi, "Ptr")
+    }
+}
+
+RcDutyBgMouseMessage(controlHwnd, point, doubleClick := false) {
+    ; Exact native click/double-click sequence; no desktop cursor movement.
+    messages := doubleClick ? [0x201, 0x202, 0x203, 0x202] : [0x201, 0x202]
+    for _, message in messages {
+        buttons := (message = 0x201 || message = 0x203) ? 1 : 0
+        if (!DllCall("PostMessage", "Ptr", controlHwnd, "UInt", message, "Ptr", buttons, "Ptr", point.packed))
+            throw Exception("Syrve відхилив фонову команду миші.")
+    }
+}
+
+RcDutyBgEditorContains(editorHwnd, gridHwnd, point) {
+    previousDpi := DllCall("SetThreadDpiAwarenessContext", "Ptr", -4, "Ptr")
+    try {
+        VarSetCapacity(rect, 16)
+        if (!DllCall("GetWindowRect", "Ptr", editorHwnd, "Ptr", &rect))
+            return false
+        DllCall("MapWindowPoints", "Ptr", 0, "Ptr", gridHwnd, "Ptr", &rect, "UInt", 2)
+        return point.x >= NumGet(rect, 0, "Int") && point.x < NumGet(rect, 8, "Int")
+            && point.y >= NumGet(rect, 4, "Int") && point.y < NumGet(rect, 12, "Int")
+    } finally {
+        if (previousDpi)
+            DllCall("SetThreadDpiAwarenessContext", "Ptr", previousDpi, "Ptr")
+    }
+}
+
+RcDutyBgFilter(hwnd, context, value) {
+    gridHwnd := context.grid.CurrentNativeWindowHandle
+    if (!gridHwnd || !DllCall("IsChild", "Ptr", hwnd, "Ptr", gridHwnd))
+        throw Exception("Не знайдено нативну таблицю Syrve.")
+    filter := ""
+    for _, row in context.panel.FindAllBy("TrueCondition", 2) {
+        if (!RegExMatch(row.CurrentName, "i)(фильтр|фільтр|filter)"))
+            continue
+        for _, cell in row.FindAllBy("TrueCondition", 2) {
+            if RegExMatch(cell.CurrentName, "i)^(№|номер|number)") {
+                filter := cell
+                break
+            }
+        }
+        break
+    }
+    if (!IsObject(filter))
+        throw Exception("Не знайдено фільтр номера замовлення.")
+    point := RcDutyBgClientPoint(filter, gridHwnd)
+    RcDutyBgCheck(hwnd)
+    RcDutyBgMouseMessage(gridHwnd, point)
+    RcDutyBgWait(hwnd, 150)
+    editorHwnd := 0
+    for _, editor in context.grid.FindAllBy("ControlType=Edit") {
+        candidate := editor.CurrentNativeWindowHandle
+        if (!candidate || !editor.CurrentIsEnabled || !DllCall("IsChild", "Ptr", gridHwnd, "Ptr", candidate))
+            continue
+        ; Test the editor's own visible style, not IsOffscreen or parent state.
+        if (!(DllCall("GetWindowLong", "Ptr", candidate, "Int", -16, "UInt") & 0x10000000))
+            continue
+        if (!RcDutyBgEditorContains(candidate, gridHwnd, point))
+            continue
+        if (editorHwnd) {
+            ; DevExpress can expose both a wrapper and its native inner Edit.
+            if (DllCall("IsChild", "Ptr", candidate, "Ptr", editorHwnd))
+                continue
+            if (!DllCall("IsChild", "Ptr", editorHwnd, "Ptr", candidate))
+                throw Exception("Неоднозначний редактор фільтра. Введення скасовано.")
+        }
+        editorHwnd := candidate
+    }
+    if (!editorHwnd)
+        throw Exception("Syrve не відкрив нативний редактор фільтра.")
+    RcDutyBgCheck(hwnd)
+    ControlSetText,, %value%, ahk_id %editorHwnd%
+    if (ErrorLevel)
+        throw Exception("Не вдалося змінити фільтр номера.")
+    ControlSend, ahk_parent, {Enter}, ahk_id %editorHwnd%
+    if (ErrorLevel)
+        throw Exception("Не вдалося застосувати фільтр номера.")
+    RcDutyBgWait(hwnd, 200)
+    RcDutyBgLog("filter_applied", "number=" . value . " editor=" . editorHwnd)
 }
 
 RcDutyBgRead(hwnd) {
@@ -217,27 +360,41 @@ RcDutyBgCycle(hwnd, ByRef bookedNo) {
     global IikoDriver_UiaInstance
     RcDutyBgCheck(hwnd)
     context := RcDutyBgAttach(hwnd)
-    if IsObject(RcDutyBgFindId(context.window, "DeliveryOrderEditControl"))
+    if IsObject(context.workspace.FindFirstBy("AutomationId=DeliveryOrderEditControl"))
         throw Exception("У Syrve відкрита картка. Закрийте її перед дежурством.")
     if (RcDutyBgConflict(hwnd))
         throw Exception("У Syrve відкрито підтвердження. Закрийте його перед дежурством.")
-    ; Poll delivery values without changing the visible UI or selected tab.
+    RcDutyBgRefresh(hwnd, context.workspace)
+    context := RcDutyBgAttach(hwnd)
     response := RcDutyBgRead(hwnd)
     orderNo := RcDutyBgNumber(response, "take_no")
     RcDutyBgLog("scan", "hwnd=" . hwnd . " take_no=" . orderNo)
     if (!orderNo)
         return 0
-    ; Resolve the exact row after the refresh; do not filter or use first-row XY.
+    RcDutyBgFilter(hwnd, context, orderNo)
+    ; Preserve the original filter-and-verify barrier before opening anything.
+    deadline := A_TickCount + 2500
+    while (A_TickCount < deadline) {
+        response := RcDutyBgRead(hwnd)
+        if (RcDutyBgNumber(response, "count") = 1 && RcDutyBgNumber(response, "take_no") = orderNo)
+            break
+        RcDutyBgWait(hwnd, 150)
+    }
     response := RcDutyBgRead(hwnd)
-    if (RcDutyBgNumber(response, "take_no") != orderNo)
-        return 0  ; eligibility changed before opening: no action
+    if (RcDutyBgNumber(response, "count") != 1 || RcDutyBgNumber(response, "take_no") != orderNo)
+    {
+        RcDutyBgFilter(hwnd, context, "")
+        throw Exception("Список не звузився до потрібного номера. Замовлення не відкриваю.")
+    }
     target := RcDutyBgRow(context.panel, orderNo)
     if (!IsObject(target))
         throw Exception("Рядок замовлення змінився. Перезапустіть дежурство.")
     RcDutyBgCheck(hwnd)
     RcDutyBgLog("opening", "order=" . orderNo . " hwnd=" . hwnd)
-    if (!RcDutyBgInvoke(target.cell) && !RcDutyBgInvoke(target.row))
-        throw Exception("Syrve не надає відкриття рядка через UIA. Деталі: rollclub_duty_background.log.")
+    gridHwnd := context.grid.CurrentNativeWindowHandle
+    point := RcDutyBgClientPoint(target.cell, gridHwnd)
+    RcDutyBgLog("double_click", "grid=" . gridHwnd . " x=" . point.x . " y=" . point.y)
+    RcDutyBgMouseMessage(gridHwnd, point, true)
     RcDutyBgLog("open_requested", "order=" . orderNo)
     deadline := A_TickCount + 4000
     card := ""
@@ -249,13 +406,16 @@ RcDutyBgCycle(hwnd, ByRef bookedNo) {
             RcDutyBgLog("operator_conflict", "order=" . orderNo . " rejected=" . rejected)
             throw Exception("Замовлення зайняв інший оператор. Дежурство зупинено.")
         }
-        card := RcDutyBgFindId(context.window, "DeliveryOrderEditControl")
+        card := context.workspace.FindFirstBy("AutomationId=DeliveryOrderEditControl")
         if IsObject(card)
             break
         RcDutyBgWait(hwnd, 100)
     }
-    if (!IsObject(card))
-        throw Exception("Картка не відкрилася. Бронювання не підтверджено.")
+    if (!IsObject(card)) {
+        RcDutyBgLog("card_timeout", "order=" . orderNo)
+        RcDutyBgFilter(hwnd, context, "")
+        throw Exception("Відкриття картки не підтверджено. Перевірте Syrve.")
+    }
     ; Give the operator-conflict dialog the same grace period as the legacy path.
     deadline := A_TickCount + 2000
     while (A_TickCount < deadline) {
@@ -266,16 +426,21 @@ RcDutyBgCycle(hwnd, ByRef bookedNo) {
             throw Exception("Замовлення зайняв інший оператор. Дежурство зупинено.")
         }
     }
-    close := RcDutyBgFindId(card, "buttonClose", 8)
+    close := card.FindFirstBy("AutomationId=buttonClose")
     RcDutyBgCheck(hwnd)
     RcDutyBgLog("closing", "order=" . orderNo . " hwnd=" . hwnd)
     if (!IsObject(close) || !RcDutyBgInvoke(close))
         throw Exception("Не вдалося закрити картку через UIA. Перевірте Syrve.")
     deadline := A_TickCount + 3500
+    filterCleared := false
     while (A_TickCount < deadline) {
         RcDutyBgWait(hwnd, 100)
-        if (!IsObject(RcDutyBgFindId(context.window, "DeliveryOrderEditControl"))) {
-            ; No search filter was entered, so none needs clearing.
+        if (!IsObject(context.workspace.FindFirstBy("AutomationId=DeliveryOrderEditControl"))) {
+            if (!filterCleared) {
+                RcDutyBgFilter(hwnd, context, "")
+                filterCleared := true
+                RcDutyBgLog("filter_cleared", "order=" . orderNo)
+            }
             target := RcDutyBgRow(context.panel, orderNo)
             if (IsObject(target)) {
                 for _, cell in target.row.FindAllBy("TrueCondition", 2) {
