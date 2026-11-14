@@ -240,6 +240,35 @@ RcDutyBgMouseMessage(controlHwnd, point, doubleClick := false) {
     }
 }
 
+RcDutyBgOpenRow(hwnd, grid, cell, expectedNumber) {
+    RcDutyBgCheck(hwnd)
+    gridHwnd := grid.CurrentNativeWindowHandle
+    if (!gridHwnd || !DllCall("IsChild", "Ptr", hwnd, "Ptr", gridHwnd))
+        throw Exception("Таблиця замовлень недоступна.")
+    if (RcDutyBgValue(cell) != expectedNumber)
+        throw Exception("Номер рядка змінився. Відкриття скасовано.")
+    point := RcDutyBgClientPoint(cell, gridHwnd)
+    ; RestoGrid's double-click handler hit-tests Cursor.Position, ignoring the
+    ; message's client point. A single click selects the row, then its existing
+    ; Enter/ContextAction EDIT handler opens it without moving the cursor.
+    RcDutyBgLog("row_select", "order=" . expectedNumber . " grid=" . gridHwnd . " x=" . point.x . " y=" . point.y)
+    RcDutyBgMouseMessage(gridHwnd, point)
+    RcDutyBgWait(hwnd, 150)
+    if (RcDutyBgValue(cell) != expectedNumber)
+        throw Exception("Рядок замовлення змінився після вибору.")
+    previousDelay := A_KeyDelay, previousDuration := A_KeyDuration
+    try {
+        RcDutyBgCheck(hwnd)
+        SetKeyDelay, 30, 30
+        ControlSend, ahk_parent, {Enter}, ahk_id %gridHwnd%
+        if (ErrorLevel)
+            throw Exception("Syrve не прийняв команду відкриття рядка.")
+        RcDutyBgLog("row_enter_sent", "order=" . expectedNumber . " grid=" . gridHwnd)
+    } finally {
+        SetKeyDelay, %previousDelay%, %previousDuration%
+    }
+}
+
 RcDutyBgEditorContains(editorHwnd, gridHwnd, point) {
     previousDpi := DllCall("SetThreadDpiAwarenessContext", "Ptr", -4, "Ptr")
     try {
@@ -403,10 +432,7 @@ RcDutyBgCycle(hwnd, ByRef bookedNo) {
         throw Exception("Рядок замовлення змінився. Перезапустіть дежурство.")
     RcDutyBgCheck(hwnd)
     RcDutyBgLog("opening", "order=" . orderNo . " hwnd=" . hwnd)
-    gridHwnd := context.grid.CurrentNativeWindowHandle
-    point := RcDutyBgClientPoint(target.cell, gridHwnd)
-    RcDutyBgLog("double_click", "grid=" . gridHwnd . " x=" . point.x . " y=" . point.y)
-    RcDutyBgMouseMessage(gridHwnd, point, true)
+    RcDutyBgOpenRow(hwnd, context.grid, target.cell, orderNo)
     RcDutyBgLog("open_requested", "order=" . orderNo)
     deadline := A_TickCount + 4000
     card := ""
