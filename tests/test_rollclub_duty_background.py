@@ -66,7 +66,7 @@ RcPlaySound(name) {
         source = (Path(__file__).resolve().parents[1] / "lib/RollClubDutyBackground.ahk").read_text(encoding="utf-8-sig")
         self.assertNotIn(".Select()", source)
         self.assertNotIn("SelectionItem", source)
-        self.assertEqual(source.count("ControlSend, ahk_parent, {Ctrl down}{Tab}{Ctrl up}, ahk_id %tabHwnd%"), 1)
+        self.assertEqual(source.count("ControlSend, ahk_parent, {Ctrl down}{Tab}{Ctrl up}, ahk_id %tabHwnd%"), 0)
         self.assertEqual(source.count("    RcDutyBgCtrlTab(tabHwnd)"), 2)
 
     def test_background_counts_every_row_for_filter_verification(self):

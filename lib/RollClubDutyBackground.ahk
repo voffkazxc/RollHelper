@@ -158,6 +158,24 @@ RcDutyBgAttach(hwnd) {
 
 RcDutyBgTabSnapshot(workspace) {
     snapshot := ""
+    tabHwnd := workspace.CurrentNativeWindowHandle
+    ; Read active native page windows directly. RestoTabControl deliberately
+    ; suppresses accessible tab headers, and a cached UIA page can lag behind.
+    child := DllCall("GetWindow", "Ptr", tabHwnd, "UInt", 5, "Ptr")
+    Loop, 64 {
+        if (!child)
+            break
+        if (DllCall("GetWindowLong", "Ptr", child, "Int", -16, "UInt") & 0x10000000) {
+            VarSetCapacity(title, 1024, 0)
+            DllCall("GetWindowTextW", "Ptr", child, "Ptr", &title, "Int", 512)
+            name := Trim(StrGet(&title, "UTF-16"))
+            if (name != "")
+                snapshot .= name . "|"
+        }
+        child := DllCall("GetWindow", "Ptr", child, "UInt", 2, "Ptr")
+    }
+    if (snapshot != "")
+        return snapshot
     for _, pane in workspace.FindAllBy("TrueCondition", 2) {
         name := Trim(pane.CurrentName)
         if (name != "")
@@ -169,19 +187,47 @@ RcDutyBgTabSnapshot(workspace) {
 }
 
 RcDutyBgCtrlTab(tabHwnd) {
-    ; The entrypoint sets -1/-1 for foreground SendInput. ControlSend uses
-    ; these settings too, but DevExpress loses the Ctrl+Tab key event when
-    ; the whole posted sequence is delivered with no press duration/delay.
-    previousDelay := A_KeyDelay, previousDuration := A_KeyDuration
-    try {
-        SetKeyDelay, 30, 30
-        ControlSend, ahk_parent, {Ctrl down}{Tab}{Ctrl up}, ahk_id %tabHwnd%
-        if (ErrorLevel)
-            throw Exception("Не вдалося надіслати фоновий Ctrl+Tab у Syrve.")
-        RcDutyBgLog("ctrl_tab_sent", "tab=" . tabHwnd . " delay=30 duration=30 previous=" . previousDelay . "/" . previousDuration)
-    } finally {
-        SetKeyDelay, %previousDelay%, %previousDuration%
+    VarSetCapacity(className, 512, 0)
+    DllCall("GetClassNameW", "Ptr", tabHwnd, "Ptr", &className, "Int", 256)
+    if (!RegExMatch(StrGet(&className, "UTF-16"), "^WindowsForms10\."))
+        throw Exception("Команда Ctrl+Tab дозволена лише для WinForms Syrve.")
+    ; WinForms-specific adapter, not a general virtual-key message:
+    ; Control.ProcessKeyEventArgs constructs KeyEventArgs from WParam.
+    ; Keys.Control|Keys.Tab (0x20009) invokes the existing KeyDown handler
+    ; synchronously without posting modifier messages or changing keyboard state.
+    result := 0
+    if (!DllCall("SendMessageTimeoutW", "Ptr", tabHwnd, "UInt", 0x100, "Ptr", 0x20009, "Ptr", 0x000F0001, "UInt", 3, "UInt", 1500, "PtrP", result, "Ptr"))
+        throw Exception("Syrve не підтвердив обробку Ctrl+Tab. Дежурство зупинено.")
+    if (!DllCall("SendMessageTimeoutW", "Ptr", tabHwnd, "UInt", 0x101, "Ptr", 0x20009, "Ptr", 0xC00F0001, "UInt", 3, "UInt", 1500, "PtrP", result, "Ptr"))
+        throw Exception("Syrve не підтвердив завершення Ctrl+Tab.")
+    RcDutyBgLog("ctrl_tab_ack", "tab=" . tabHwnd . " mode=winforms_sync")
+}
+
+RcDutyBgAwaitTab(workspace, before, wantOriginal) {
+    deadline := A_TickCount + 1500
+    while (A_TickCount < deadline) {
+        current := RcDutyBgTabSnapshot(workspace)
+        if ((wantOriginal && current = before) || (!wantOriginal && current != before))
+            return current
+        Sleep, 30
     }
+    RcDutyBgLog("refresh_wait_timeout", "original=" . before . " current=" . current . " returning=" . wantOriginal)
+    throw Exception("Syrve не підтвердив перехід вкладки. Перевірте журнал refresh_result.")
+}
+
+RcDutyBgGridIsActive(context) {
+    child := context.grid.CurrentNativeWindowHandle
+    workspaceHwnd := context.workspace.CurrentNativeWindowHandle
+    Loop, 20 {
+        if (!child)
+            return false
+        if (child = workspaceHwnd)
+            return true
+        if (!(DllCall("GetWindowLong", "Ptr", child, "Int", -16, "UInt") & 0x10000000))
+            return false
+        child := DllCall("GetParent", "Ptr", child, "Ptr")
+    }
+    return false
 }
 
 RcDutyBgRefresh(hwnd, workspace) {
@@ -191,18 +237,17 @@ RcDutyBgRefresh(hwnd, workspace) {
         throw Exception("Не знайдено нативний tabControlMain для оновлення.")
     beforeTab := RcDutyBgTabSnapshot(workspace)
     RcDutyBgLog("refresh_begin", "hwnd=" . hwnd . " tab=" . tabHwnd . " page=" . beforeTab)
-    ; Explicit modifiers are addressed messages, not global Ctrl presses.
     RcDutyBgCtrlTab(tabHwnd)
-    ; Complete the round trip even if stop arrives after the first tab.
-    Sleep, 220
-    middleTab := ""
-    try middleTab := RcDutyBgTabSnapshot(workspace)
+    ; Do not issue the return until the outward transition is actually visible.
+    ; Finish the UI-only round trip before honoring a stop (never leave a tab
+    ; switch queued to execute later during the operator's next action).
+    middleTab := RcDutyBgAwaitTab(workspace, beforeTab, false)
     RcDutyBgCtrlTab(tabHwnd)
-    RcDutyBgWait(hwnd, 330)
-    afterTab := RcDutyBgTabSnapshot(workspace)
+    afterTab := RcDutyBgAwaitTab(workspace, beforeTab, true)
     RcDutyBgLog("refresh_result", "before=" . beforeTab . " middle=" . middleTab . " after=" . afterTab)
     if (middleTab = "" || middleTab = beforeTab || afterTab != beforeTab)
         throw Exception("Фоновий Ctrl+Tab не підтверджено. Перевірте журнал refresh_result.")
+    RcDutyBgCheck(hwnd)
     RcDutyBgLog("refresh_complete", "hwnd=" . hwnd)
 }
 
@@ -405,6 +450,8 @@ RcDutyBgCycle(hwnd, ByRef bookedNo) {
         throw Exception("У Syrve відкрита картка. Закрийте її перед дежурством.")
     if (RcDutyBgConflict(hwnd))
         throw Exception("У Syrve відкрито підтвердження. Закрийте його перед дежурством.")
+    if (!RcDutyBgGridIsActive(context))
+        throw Exception("Відкрийте Доставки перед запуском дежурства. Інша вкладка не змінюється.")
     RcDutyBgRefresh(hwnd, context.workspace)
     context := RcDutyBgAttach(hwnd)
     response := RcDutyBgRead(hwnd)

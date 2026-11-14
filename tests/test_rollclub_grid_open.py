@@ -76,6 +76,12 @@ try {{
     positive := StrSplit(positiveState, ",")
     if (positive[5] != "1" || positive[7] != "741877")
         throw Exception("native Enter did not activate the exact filtered order")
+    activeContext := {{grid: grid, workspace: {{CurrentNativeWindowHandle: hwnd}}}}
+    if (!RcDutyBgGridIsActive(activeContext))
+        throw Exception("visible grid in minimized window was rejected")
+    DllCall("ShowWindow", "Ptr", gridHwnd, "Int", 0)
+    if (RcDutyBgGridIsActive(activeContext))
+        throw Exception("hidden stale grid was accepted as an active page")
     if (A_KeyDelay != -1 || A_KeyDuration != -1)
         throw Exception("key settings changed")
     WinGet, stateAfter, MinMax, ahk_id %hwnd%
