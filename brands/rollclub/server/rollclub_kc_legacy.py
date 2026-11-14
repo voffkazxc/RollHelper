@@ -48,17 +48,67 @@ def _read_cell(control):
     return column, value
 
 
+def _native_control(bridge, hwnd, automation_id):
+    """Cold minimized attach: visible native handles still expose their IDs."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        user32 = ctypes.WinDLL("user32")
+        user32.GetWindow.argtypes = [wintypes.HWND, wintypes.UINT]
+        user32.GetWindow.restype = wintypes.HWND
+        user32.GetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int]
+        user32.GetWindowLongW.restype = wintypes.LONG
+        pending = [(hwnd, 0)]
+        budget = 512
+        while pending and budget > 0:
+            parent, depth = pending.pop()
+            if depth >= 12:
+                continue
+            child = user32.GetWindow(parent, 5)
+            while child and budget > 0:
+                budget -= 1
+                if user32.GetWindowLongW(child, -16) & 0x10000000:
+                    try:
+                        candidate = bridge.auto.ControlFromHandle(child)
+                        if candidate.AutomationId == automation_id:
+                            return candidate
+                    except Exception:
+                        pass
+                    pending.append((child, depth + 1))
+                child = user32.GetWindow(child, 2)
+    except Exception:
+        pass
+    return None
+
+
+def _native_tab_window(bridge, hwnd):
+    return _native_control(bridge, hwnd, "tabControlMain")
+
+
 class _BackgroundBridge:
     """Keep minimized-window caches separate from the legacy foreground reader."""
 
-    def __init__(self, bridge, window):
+    def __init__(self, bridge, window, hwnd):
         self._bridge = bridge
         self.window = window
+        self.hwnd = hwnd
         self._kc_panel_cache = None
         self._kc_grid_cache = None
 
     def __getattr__(self, name):
         return getattr(self._bridge, name)
+
+    def _find_by_id(self, control, automation_id, max_depth=12):
+        if automation_id == "gridDeliveries":
+            grid = _native_control(self._bridge, self.hwnd, automation_id)
+            if grid is not None:
+                self._bridge._log("KC-BACKGROUND native grid binding hwnd=%s" % self.hwnd)
+                return grid
+            tab = _native_tab_window(self._bridge, self.hwnd)
+            if tab is not None:
+                control = tab
+                self._bridge._log("KC-BACKGROUND native tab binding hwnd=%s" % self.hwnd)
+        return self._bridge._find_by_id(control, automation_id, max_depth=max_depth)
 
 
 def read_kc_list_background(bridge, hwnd):
@@ -78,7 +128,7 @@ def read_kc_list_background(bridge, hwnd):
         pid = window.ProcessId
         cache = getattr(bridge, "_kc_background_reader", None)
         if cache is None or cache[0:2] != (hwnd, pid):
-            cache = (hwnd, pid, _BackgroundBridge(bridge, window))
+            cache = (hwnd, pid, _BackgroundBridge(bridge, window, hwnd))
             bridge._kc_background_reader = cache
         else:
             cache[2].window = window

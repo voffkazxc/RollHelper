@@ -30,8 +30,6 @@ try {
     point := RcDutyBgClientPoint(element, testGrid)
     NativeAssert(point.x = 100 && point.y = 50, "physical UIA rectangle maps to control client center")
     RcDutyBgMouseMessage(testGrid, point, true)
-    fixtureWorkspace := new NativeFixtureWorkspace(testGrid)
-    RcDutyBgRefresh(testWindow, fixtureWorkspace)
     Sleep, 100
     NativeAssert(mouseMessages.MaxIndex() = 4, "four addressed mouse messages")
     expected := [0x201, 0x202, 0x203, 0x202]
@@ -40,19 +38,12 @@ try {
         NativeAssert(entry.msg = message && entry.hwnd = testGrid, "message order and target")
         NativeAssert(entry.point = point.packed, "all messages use validated client point")
     }
-    tabs := 0, controlsDown := 0, controlsUp := 0
-    for _, entry in keyboardMessages {
-        NativeAssert(entry.hwnd = testGrid, "keys delivered to target tab control")
-        if (entry.key = 9 && entry.msg = 0x100) {
-            NativeAssert(entry.ctrl, "target observes Ctrl pressed during Tab")
-            tabs++
-        }
-        if (entry.key = 17 && entry.msg = 0x100)
-            controlsDown++
-        if (entry.key = 17 && entry.msg = 0x101)
-            controlsUp++
-    }
-    NativeAssert(tabs = 2 && controlsDown = 2 && controlsUp = 2, "two complete Ctrl+Tab message sequences")
+    rejected := false
+    try RcDutyBgCtrlTab(testGrid)
+    catch error
+        rejected := true
+    NativeAssert(rejected, "WinForms command rejected for a generic Win32 control")
+    NativeAssert(!keyboardMessages.MaxIndex(), "no keys sent to an unsupported control")
     testEditor := DllCall("CreateWindowExW", "UInt", 0, "WStr", "Edit", "WStr", "", "UInt", 0x50000000, "Int", 40, "Int", 40, "Int", 100, "Int", 25, "Ptr", testGrid, "Ptr", 0, "Ptr", 0, "Ptr", 0, "Ptr")
     NativeAssert(RcDutyBgEditorContains(testEditor, testGrid, point), "editor contains filter point")
     NativeAssert(!RcDutyBgEditorContains(testEditor, testGrid, {x: 5, y: 5}), "unrelated editor is rejected")
@@ -74,13 +65,7 @@ try {
     NativeAssert(WinActive("A") = foreground, "foreground window unchanged")
     ctrlAfter := DllCall("GetAsyncKeyState", "Int", 0x11, "Short") & 0x8000
     NativeAssert(ctrlAfter = ctrlBefore, "physical Ctrl state unchanged")
-    fixtureAcceptTabs := false
-    refreshRejected := false
-    try RcDutyBgRefresh(testWindow, fixtureWorkspace)
-    catch error
-        refreshRejected := true
-    NativeAssert(refreshRejected, "no tab transition must not count as successful refresh")
-    FileAppend, PASS: native refresh/filter/double click/cleanup on minimized target; foreground unchanged`n, *
+    FileAppend, PASS: native mouse/filter/cleanup; unsupported refresh rejected; foreground unchanged`n, *
     DllCall("DestroyWindow", "Ptr", testWindow)
     ExitApp, 0
 } catch error {

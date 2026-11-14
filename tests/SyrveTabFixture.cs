@@ -31,12 +31,15 @@ internal static class SyrveTabFixture
     private static int keyDowns;
     private static int switches;
     private static int lastKeyData;
+    private static int keyDelay;
+    private static int activations;
 
     [STAThread]
     private static void Main(string[] args)
     {
         office = args[0];
         statePath = args[1];
+        keyDelay = args.Length > 2 ? int.Parse(args[2]) : 0;
         AppDomain.CurrentDomain.AssemblyResolve += delegate(object sender, ResolveEventArgs e)
         {
             string path = Path.Combine(office, new AssemblyName(e.Name).Name + ".dll");
@@ -69,6 +72,7 @@ internal static class SyrveTabFixture
             // Match Syrve's observed shortcut predicate; only change test tabs.
             if (e.KeyCode == Keys.Tab && e.Modifiers == Keys.Control)
             {
+                if (keyDelay > 0) System.Threading.Thread.Sleep(keyDelay);
                 tabs.SelectedTabPageIndex = 1 - tabs.SelectedTabPageIndex;
                 switches++;
                 e.Handled = true;
@@ -89,7 +93,8 @@ internal static class SyrveTabFixture
                 }
             }
         }
-        form.Shown += delegate { WriteState(); };
+        form.Activated += delegate { activations++; WriteState(); };
+        form.Shown += delegate { tabs.SelectedTabPage.Visible = true; WriteState(); };
         Application.Run(form);
     }
 
@@ -98,7 +103,7 @@ internal static class SyrveTabFixture
         File.WriteAllText(statePath, string.Join(",", new object[] {
             form.Handle.ToInt64(), tabs.Handle.ToInt64(),
             tabs.SelectedTabPageIndex, keyDowns, switches,
-            (int)form.WindowState, tabs.ContainsFocus ? 1 : 0, lastKeyData
+            (int)form.WindowState, tabs.ContainsFocus ? 1 : 0, lastKeyData, activations
         }));
     }
 }

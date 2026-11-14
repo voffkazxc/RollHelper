@@ -27,7 +27,7 @@ class SyrveComponentTimingTest(unittest.TestCase):
             args += [str(ROOT / "tests/SyrveTabFixture.cs")]
             compiled = subprocess.run(args, capture_output=True, timeout=30)
             self.assertEqual(compiled.returncode, 0, compiled.stdout.decode("utf-8", "replace"))
-            fixture = subprocess.Popen([str(executable), str(OFFICE), str(state)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=subprocess.CREATE_NO_WINDOW)
+            fixture = subprocess.Popen([str(executable), str(OFFICE), str(state), "350"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=subprocess.CREATE_NO_WINDOW)
             try:
                 end = time.monotonic() + 10
                 while not state.exists() and fixture.poll() is None and time.monotonic() < end:
@@ -51,13 +51,8 @@ physicalCtrl := DllCall("GetAsyncKeyState", "Int", 0x11, "Short") & 0x8000
 dutyOn := 1, kcStop := 0, rhPunchBusy := 0, _inDutyTake := 0
 RcDutyBgGeneration := 1, RcDutyBgRunGeneration := 1, RcDutyBgWasMinimized := true
 try {{
-    RcDutyBgCtrlTab(tabHwnd)
-    Sleep, 120
-    FileRead, middleState, {state}
-    if (StrSplit(middleState, ",")[3] != "1")
-        throw Exception("actual component did not switch to the other tab")
-    RcDutyBgCtrlTab(tabHwnd)
-    Sleep, 120
+    workspace := new FixtureWorkspace(tabHwnd)
+    RcDutyBgRefresh(hwnd, workspace)
     FileRead, endState, {state}
     if (StrSplit(endState, ",")[3] != "0")
         throw Exception("actual component did not return to its original tab")
@@ -70,10 +65,10 @@ try {{
     if (!rejected || A_KeyDelay != -1 || A_KeyDuration != -1)
         throw Exception("failed delivery did not restore caller key settings")
     WinGet, stateAfter, MinMax, ahk_id %hwnd%
-    if (stateAfter != -1 || WinActive("A") != foreground)
-        throw Exception("window state or foreground changed")
-    if ((DllCall("GetAsyncKeyState", "Int", 0x11, "Short") & 0x8000) != physicalCtrl)
-        throw Exception("physical Ctrl state changed")
+    ; The user may switch other apps during this stress test. The fixture must
+    ; never become the foreground app; its activation counter checks all runs.
+    if (stateAfter != -1 || WinActive("A") = hwnd)
+        throw Exception("fixture restored or took foreground")
     FileAppend, PASS: actual Syrve component refreshed under production timing`n, *
     ExitApp, 0
 }} catch error {{
@@ -83,18 +78,29 @@ try {{
 IikoDriver_InitEngine() {{
     return false
 }}
+class FixtureWorkspace {{
+    __New(hwnd) {{
+        this.CurrentNativeWindowHandle := hwnd
+    }}
+    FindAllBy(query, scope := 2) {{
+        throw Exception("native page window state not available")
+    }}
+}}
 '''
                 script = directory / "refresh.ahk"
                 script.write_text(harness, encoding="utf-8-sig")
-                for _ in range(3):
+                for _ in range(10):
                     result = subprocess.run([str(AHK), "/ErrorStdOut", str(script)], capture_output=True, timeout=20)
                     self.assertEqual(result.returncode, 0, result.stdout.decode("utf-8", "replace"))
                     self.assertIn(b"PASS: actual Syrve component", result.stdout)
                 final = list(map(int, state.read_text().split(",")))
                 self.assertEqual(final[2], initial[2], "original page restored")
-                self.assertEqual(final[4] - initial[4], 6, "six actual page transitions")
+                self.assertEqual(final[4] - initial[4], 20, "twenty serialized actual page transitions")
                 self.assertEqual(final[5], 1, "fixture remains minimized")
                 self.assertEqual(final[6], 0, "tab control has no focus")
+                self.assertEqual(final[8], initial[8], "fixture never activated during stress test")
+                self.assertEqual(final[3] - initial[3], 20, "only Ctrl+Tab events, no modifier key messages")
+                self.assertEqual(final[7], 0x20009, "WinForms key data carries Ctrl+Tab")
             finally:
                 if fixture.poll() is None:
                     fixture.terminate()
