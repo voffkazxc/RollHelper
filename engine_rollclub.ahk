@@ -5779,10 +5779,10 @@ RcCheckZone:
     if (hasPickup) {
         _pTxt := "САМОВИВІЗ" . (pickupPoint != "" ? (": " . pickupPoint) : "")
         GuiControl, Roll:, MapSearch, %_pTxt%
-        RcCurrentKitchen := RcFindKitchenFromPointOrConcept(_curPoint, _curConcept)
-        if (!IsObject(RcCurrentKitchen))
-            RcCurrentKitchen := RcFindKitchenFromText(pickupPoint)
-        RcKitchenPresent(RcCurrentKitchen)
+        _pickupKitchen := RcFindKitchenFromPointOrConcept(_curPoint, _curConcept)
+        if (!IsObject(_pickupKitchen))
+            _pickupKitchen := RcFindKitchenFromText(pickupPoint)
+        RcKitchenPresent(_pickupKitchen)
         RhRegColor(hZoneBox, RhB_Green, RhB_White)
         _pickupMin := RcKitchenMinutes("pickup", 40)
         RcApplyTimeEvaluation(_pickupMin, "PICKUP")

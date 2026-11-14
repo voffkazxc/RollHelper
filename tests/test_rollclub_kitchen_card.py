@@ -133,6 +133,11 @@ try {
         Assert(!DllCall("IsWindowVisible","Ptr",RcKC.hwnd), "close dismisses card")
         RcShowKitchenCard()
         Assert(DllCall("IsWindowVisible","Ptr",RcKC.hwnd), "summary reopens card")
+        RcKitchenPresent("")
+        GuiControlGet, summary, Roll:, KitchenStatusText
+        Assert(summary == "", "unresolved kitchen clears the previous summary")
+        Assert(!DllCall("IsWindowVisible","Ptr",RcKC.hwnd), "unresolved kitchen hides previous card")
+        RcKitchenPresent(k)
         Gui, Roll:Hide
         RcKitchenCardTick()
         Assert(!DllCall("IsWindowVisible","Ptr",RcKC.hwnd), "card hides with owner")

@@ -61,6 +61,7 @@ RcKitchenPresent(k, extra := "") {
     RcKC.extra := extra
     m := RcKitchenCardModel(k, "", RcKitchenSyncFailed)
     if (!IsObject(m)) {
+        GuiControl, Roll:, KitchenStatusText, %extra%
         RcKitchenCardHide()
         return
     }
@@ -186,14 +187,6 @@ RcKitchenCardRefresh() {
     global
     if (RcKitchensSyncBlocked())
         return
-    oldName := RcKC.k.Name
     RcKitchenLastSyncTick := 0
     GoSub, RcKitchensSyncIfStale
-    for _, k in Kitchens {
-        if (k.Name == oldName) {
-            RcCurrentKitchen := k
-            RcKitchenPresent(k, RcKC.extra)
-            break
-        }
-    }
 }
