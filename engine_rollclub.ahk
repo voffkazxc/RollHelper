@@ -5,6 +5,7 @@
 SetWorkingDir %A_ScriptDir%\brands\rollclub   ; дані Roll Club (конфіг, промо, кухні, img)
 FileEncoding, UTF-8
 #Include %A_ScriptDir%\lib\IikoUI.ahk
+#Include %A_ScriptDir%\lib\RollClubDutyBackground.ahk
 #Include %A_ScriptDir%\core\orchestration\OperationCoordinator.ahk
 #Include %A_ScriptDir%\core\modules\ModuleRegistry.ahk
 
@@ -2874,6 +2875,7 @@ RhAutoToggle:
 return
 
 KcStopDuty:
+    RcDutyBgGeneration++
     Gui, DutyBanner:Destroy
     ; будь-яка РУЧНА дія оператора (тільда/F1/F2/F3/Enter/Ctrl+Enter) → вимкнути дежурство + вікно "оператор працює".
     ; _inDutyTake=1 → викликано самим дежурством під час взяття, НЕ гасимо і вікно НЕ ставимо.
@@ -2890,6 +2892,7 @@ KcStopDuty:
 return
 
 KcDutyToggle:
+    RcDutyBgGeneration++
     OpCoord_Event("DutyScanning", "toggle", "KcDutyToggle", "was_dutyOn=" . dutyOn . ";punchBusy=" . rhPunchBusy . ";inDutyTake=" . _inDutyTake)
     if WinExist("DutyContinueBannerWin")
     {
@@ -3026,6 +3029,60 @@ KcMonitor:
     kcForce := 0
     kcBusy := 1
     kcStop := 0                     ; свіжий захід — скинути прапор стопу
+    ; A minimized Office gets a separate UIA-only path. It never falls through
+    ; to the legacy screen clicks on failure or after a partially completed take.
+    _bgHwnd := RcDutyBgHwnd()
+    if (_bgHwnd = -1) {
+        dutyOn := 0
+        kcStop := 1
+        kcBusy := 0
+        SetTimer, KcDutyTick, Off
+        SetTimer, KcMonitor, Off
+        ToolTip, Ctrl+F4: відкрито кілька вікон Syrve Office. Залиште одне.
+        SetTimer, RemoveToolTip, -8000
+        return
+    }
+    if (_bgHwnd) {
+        WinGet, _bgState, MinMax, ahk_id %_bgHwnd%
+        if (_bgState = -1) {
+            RcDutyBgRunGeneration := RcDutyBgGeneration
+            _bgBookedNo := 0
+            try {
+                _bgResult := RcDutyBgCycle(_bgHwnd, _bgBookedNo)
+                if (_bgResult = 1) {
+                    dutyOn := 0
+                    kcPaused := 1
+                    kcTook := 1
+                    SetTimer, KcDutyTick, Off
+                    SetTimer, KcMonitor, Off
+                    lastBookedNo := _bgBookedNo
+                    RcPlaySound("ok")
+                    _rcDutyBgBanner := 1
+                    GoSub, ShowDutyContinueBanner
+                    _rcDutyBgBanner := 0
+                } else {
+                    ToolTip, Ctrl+F4: фонове дежурство — очікую вільне замовлення
+                    SetTimer, RemoveToolTip, -1500
+                }
+            } catch _bgError {
+                ; A stop/start or manual action invalidates this old HTTP read.
+                ; Do not turn off a newer operator request when it returns.
+                if (RcDutyBgRunGeneration = RcDutyBgGeneration) {
+                    dutyOn := 0
+                    kcStop := 1
+                    SetTimer, KcDutyTick, Off
+                    SetTimer, KcMonitor, Off
+                }
+                RcDutyBgLog("stopped", _bgError.Message)
+                if (_bgError.Message != "STOP") {
+                    ToolTip, % "Ctrl+F4: " . _bgError.Message
+                    SetTimer, RemoveToolTip, -8000
+                }
+            }
+            kcBusy := 0
+            return
+        }
+    }
     ; === ПРАВИЛЬНИЙ ПОРЯДОК: вікно → стерти старий № → оновити КЦ (Ctrl+Tab×2) → аж тоді питати сервер ===
     SetTitleMatchMode, 2
     if !WinExist("Syrve Office")
@@ -3356,10 +3413,14 @@ ShowDutyContinueBanner:
     Gui, DutyBanner:Font, s10 norm, Segoe UI
     Gui, DutyBanner:Add, Button, x280 y68 w135 h36 gDutyStopSearch, ✖ Зупинити
     _bX := (A_ScreenWidth - 440) // 2
-    Gui, DutyBanner:Show, x%_bX% y70 w440 h116, DutyContinueBannerWin
+    if (_rcDutyBgBanner)
+        Gui, DutyBanner:Show, x%_bX% y70 w440 h116 NA, DutyContinueBannerWin
+    else
+        Gui, DutyBanner:Show, x%_bX% y70 w440 h116, DutyContinueBannerWin
 return
 
 DutyContinueSearch:
+    RcDutyBgGeneration++
     Gui, DutyBanner:Destroy
     dutyOn := 1
     kcStop := 0
@@ -3376,6 +3437,7 @@ KcDutyTickOnce:
 return
 
 DutyStopSearch:
+    RcDutyBgGeneration++
     Gui, DutyBanner:Destroy
     dutyOn := 0
     kcStop := 1

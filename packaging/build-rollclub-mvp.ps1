@@ -116,6 +116,14 @@ if ($serverAppText -notmatch "import rollclub_kc_legacy as _rollclub_kc") {
     $serverAppText = $serverAppText -replace "import telegram as _tg", "import telegram as _tg`r`nimport rollclub_kc_legacy as _rollclub_kc"
 }
 $serverAppText = $serverAppText -replace "_bridge\.read_kc_list\(brand=brand\)", "_rollclub_kc.read_kc_list(_bridge, brand=brand)"
+$legacyDutyRead = '_rollclub_kc.read_kc_list(_bridge, brand=brand)'
+$backgroundDutyRead = '(_rollclub_kc.read_kc_list_background(_bridge, int(request.args["background_hwnd"])) if "background_hwnd" in request.args else _rollclub_kc.read_kc_list(_bridge, brand=brand))'
+if ($serverAppText -notmatch 'read_kc_list_background\(_bridge') {
+    $serverAppText = $serverAppText.Replace($legacyDutyRead, $backgroundDutyRead)
+}
+if ($serverAppText -notmatch 'read_kc_list_background\(_bridge') {
+    throw "Cannot install minimized-window RollClub duty reader"
+}
 [IO.File]::WriteAllText($serverAppPath, $serverAppText, [Text.Encoding]::UTF8)
 
 $iikoBridgePath = Join-Path $serverRoot "iiko_bridge.py"
