@@ -1,10 +1,72 @@
 """Minimized Office reads must not use the foreground window or screen geometry."""
 import unittest
+import os
+from pathlib import Path
+import re
+import subprocess
+import tempfile
 
 from test_rollclub_duty_cache import Bridge, Control, MODULE
 
 
 class BackgroundDutyTests(unittest.TestCase):
+    def test_ctrl_f4_never_routes_to_legacy_for_any_window_state(self):
+        executable = Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "AutoHotkey/v1.1.37.02/AutoHotkeyU64.exe"
+        if not executable.exists():
+            self.skipTest("AHK v1 runtime required")
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "engine_rollclub.ahk").read_text(encoding="utf-8-sig")
+        start = source.index("    ; Ctrl+F4 always uses UIA.")
+        end = source.index("    ; === ПРАВИЛЬНИЙ ПОРЯДОК", start)
+        routing = source[start:end]
+        # Stub only OS/UI effects. Execute the production routing/return logic.
+        routing = re.sub(r"(?m)^\s*WinGet, _bgState,.*$", "    _bgState := testState", routing)
+        routing = re.sub(r"(?m)^\s*(ToolTip|Gui|SetTimer),.*$", "    ; OS effect stubbed", routing)
+        harness = '''#NoEnv
+#SingleInstance Off
+for _, testState in [-1, 0, 1, ""] {
+    for _, testHwnd in [123, 0, -1] {
+        dutyOn := 1, _rcDutyTickBackground := 1, calls := 0, legacy := 0
+        GoSub, TestRoute
+        if (legacy || calls != (testHwnd > 0 ? 1 : 0))
+            ExitApp, 1
+    }
+}
+FileAppend, PASS: 12 production routing cases`n, *
+ExitApp, 0
+TestRoute:
+''' + routing + '''
+legacy++
+return
+ShowDutyContinueBanner:
+return
+RcDutyBgHwnd() {
+    global testHwnd, dutyOn
+    dutyOn := 0 ; simulate a stop racing with window discovery
+    return testHwnd
+}
+RcDutyBgCycle(hwnd, ByRef number) {
+    global calls
+    calls++
+    return 0
+}
+RcDutyBgLog(event, detail) {
+}
+RcPlaySound(name) {
+}
+'''
+        with tempfile.TemporaryDirectory() as temporary:
+            script = Path(temporary) / "routing.ahk"
+            script.write_text(harness, encoding="utf-8-sig")
+            result = subprocess.run([str(executable), "/ErrorStdOut", str(script)], capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stdout.decode("utf-8", "replace"))
+        self.assertIn(b"PASS: 12", result.stdout)
+
+    def test_idle_poll_does_not_switch_tabs(self):
+        source = (Path(__file__).resolve().parents[1] / "lib/RollClubDutyBackground.ahk").read_text(encoding="utf-8-sig")
+        self.assertNotIn(".Select()", source)
+        self.assertNotIn("SelectionItem", source)
+
     def bridge(self):
         bridge = Bridge()
         bridge.window.ClassName = "WindowsForms10.Window.8.app"
