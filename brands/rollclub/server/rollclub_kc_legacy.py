@@ -48,7 +48,49 @@ def _read_cell(control):
     return column, value
 
 
-def read_kc_list(bridge, brand="rollclub"):
+class _BackgroundBridge:
+    """Keep minimized-window caches separate from the legacy foreground reader."""
+
+    def __init__(self, bridge, window):
+        self._bridge = bridge
+        self.window = window
+        self._kc_panel_cache = None
+        self._kc_grid_cache = None
+
+    def __getattr__(self, name):
+        return getattr(self._bridge, name)
+
+
+def read_kc_list_background(bridge, hwnd):
+    """Read the specific Office HWND; never attach to the foreground program."""
+    bridge._com_init()
+    hwnd = int(hwnd)
+    if hwnd <= 0 or bridge.auto is None:
+        return {"ok": False, "background_hwnd": hwnd, "error": "Invalid Office HWND or UIA unavailable"}
+    try:
+        window = bridge.auto.ControlFromHandle(hwnd)
+        # A stale/recycled HWND must not inherit another application's cache.
+        title = (window.Name or "").lower()
+        if "windowsforms" not in (window.ClassName or "").lower() or not (
+            "office" in title and ("syrve" in title or "iiko" in title)
+        ):
+            raise ValueError("HWND is not Syrve/iiko Office")
+        pid = window.ProcessId
+        cache = getattr(bridge, "_kc_background_reader", None)
+        if cache is None or cache[0:2] != (hwnd, pid):
+            cache = (hwnd, pid, _BackgroundBridge(bridge, window))
+            bridge._kc_background_reader = cache
+        else:
+            cache[2].window = window
+        result = read_kc_list(cache[2], background=True)
+        return dict(result, background_hwnd=hwnd)
+    except Exception as error:
+        bridge._kc_background_reader = None
+        bridge._log("KC-BACKGROUND read failed: %s" % error)
+        return {"ok": False, "background_hwnd": hwnd, "error": str(error)}
+
+
+def read_kc_list(bridge, brand="rollclub", background=False):
     """Read visible RollClub delivery rows using the original cached UIA flow."""
     import time
 
@@ -62,7 +104,9 @@ def read_kc_list(bridge, brand="rollclub"):
     data_panel = None
     cached = 0
     try:
-        foreground = bridge._get_foreground_win()
+        # Background card transitions are checked by the AHK owner. In particular
+        # do not recursively scan the entire Office tree on every background poll.
+        foreground = None if background else bridge._get_foreground_win()
         if foreground and bridge._find_by_id(foreground, "DeliveryOrderEditControl", max_depth=16) is not None:
             bridge._kc_panel_cache = None
             return {
@@ -90,13 +134,13 @@ def read_kc_list(bridge, brand="rollclub"):
         if grid is not None:
             try:
                 _ = grid.AutomationId
-                if getattr(grid, "IsOffscreen", False):
+                if not background and getattr(grid, "IsOffscreen", False):
                     grid = None
                     bridge._kc_grid_cache = None
                     bridge._kc_panel_cache = None
                 else:
-                    grect = getattr(grid, "BoundingRectangle", None)
-                    if grect and (grect.width() <= 20 or grect.height() <= 20):
+                    grect = None if background else getattr(grid, "BoundingRectangle", None)
+                    if not background and grect and (grect.width() <= 20 or grect.height() <= 20):
                         grid = None
                         bridge._kc_grid_cache = None
                         bridge._kc_panel_cache = None
@@ -106,10 +150,10 @@ def read_kc_list(bridge, brand="rollclub"):
                 bridge._kc_panel_cache = None
 
         if grid is None:
-            window = None
+            window = bridge.window if background else None
             try:
-                root = auto.GetRootControl()
-                for candidate in root.GetChildren():
+                root = auto.GetRootControl() if not background else None
+                for candidate in root.GetChildren() if root is not None else ():
                     class_name = candidate.ClassName or ""
                     if any(
                         blocked in class_name
@@ -141,7 +185,7 @@ def read_kc_list(bridge, brand="rollclub"):
                     "ok": False,
                     "error": "Список Доставки не відкрито (немає gridDeliveries)",
                 }
-            if getattr(grid, "IsOffscreen", False):
+            if not background and getattr(grid, "IsOffscreen", False):
                 return {
                     "ok": False,
                     "error": "Вкладка «Доставки» не активна (прихована)",
@@ -215,7 +259,7 @@ def read_kc_list(bridge, brand="rollclub"):
                     for cell in row.GetChildren():
                         cname = (cell.Name or "").lower()
                         if cname.startswith("№") or " №" in cname or "№ " in cname or "номер" in cname:
-                            crect = getattr(cell, "BoundingRectangle", None)
+                            crect = None if background else getattr(cell, "BoundingRectangle", None)
                             if crect and crect.width() > 10 and crect.height() > 5:
                                 filter_x = int(crect.xcenter())
                                 filter_y = int(crect.ycenter())
@@ -247,7 +291,7 @@ def read_kc_list(bridge, brand="rollclub"):
                 col_key = None
                 if name_lower.startswith("№") or "номер" in name_lower or "№" in name_lower:
                     col_key = "№"
-                    crect = getattr(cell, "BoundingRectangle", None)
+                    crect = None if background else getattr(cell, "BoundingRectangle", None)
                     if crect and crect.width() > 10 and crect.height() > 5:
                         cell_no_rect = crect
                 elif any(k in name_lower for k in ("комент", "коммент", "comment", "примеч", "приміт", "інфо", "инфо", "опис")):
@@ -273,7 +317,7 @@ def read_kc_list(bridge, brand="rollclub"):
                     if val and val.strip().isdigit() and 4 <= len(val.strip()) <= 8:
                         order_no = val.strip()
                         if not cell_no_rect:
-                            crect = getattr(cell, "BoundingRectangle", None)
+                            crect = None if background else getattr(cell, "BoundingRectangle", None)
                             if crect and crect.width() > 10 and crect.height() > 5:
                                 cell_no_rect = crect
             if first_row_x == 0:
@@ -282,7 +326,7 @@ def read_kc_list(bridge, brand="rollclub"):
                     first_row_y = int(cell_no_rect.ycenter())
                 else:
                     try:
-                        rrect = getattr(row, "BoundingRectangle", None)
+                        rrect = None if background else getattr(row, "BoundingRectangle", None)
                         if rrect and rrect.width() > 20 and rrect.height() > 8:
                             first_row_x = int(rrect.left + min(60, rrect.width() // 4))
                             first_row_y = int(rrect.ycenter())
