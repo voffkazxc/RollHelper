@@ -413,7 +413,7 @@ def read_kc_list(bridge, brand="rollclub", background=False):
                 new_client_count += 1
             elif not delivery["no"]:
                 pass
-            else:
+            elif take is None:
                 take = delivery
                 if cell_no_rect:
                     take["click_x"] = int(cell_no_rect.xcenter())
@@ -421,7 +421,8 @@ def read_kc_list(bridge, brand="rollclub", background=False):
                 elif first_row_x > 0:
                     take["click_x"] = first_row_x
                     take["click_y"] = first_row_y
-                break
+                if not background:
+                    break
         except Exception:
             continue
 

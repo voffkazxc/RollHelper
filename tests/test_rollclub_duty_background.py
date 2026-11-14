@@ -62,10 +62,20 @@ RcPlaySound(name) {
         self.assertEqual(result.returncode, 0, result.stdout.decode("utf-8", "replace"))
         self.assertIn(b"PASS: 12", result.stdout)
 
-    def test_idle_poll_does_not_switch_tabs(self):
+    def test_refresh_is_addressed_to_syrve_not_desktop(self):
         source = (Path(__file__).resolve().parents[1] / "lib/RollClubDutyBackground.ahk").read_text(encoding="utf-8-sig")
         self.assertNotIn(".Select()", source)
         self.assertNotIn("SelectionItem", source)
+        self.assertEqual(source.count("ControlSend, ahk_parent, {Ctrl down}{Tab}{Ctrl up}, ahk_id %tabHwnd%"), 2)
+
+    def test_background_counts_every_row_for_filter_verification(self):
+        bridge = self.bridge()
+        first = bridge.panel._children[0]
+        second = Control("Строка 2", children=[Control("№ row 2", value="741878"), Control("Комментарий row 2", value="Пост-13"), Control("Оператор row 2", value="")])
+        bridge.panel._children = [first, second]
+        result = MODULE.read_kc_list_background(bridge, 123)
+        self.assertEqual(result["count"], 2)
+        self.assertEqual(result["take_no"], 741877)
 
     def bridge(self):
         bridge = Bridge()
